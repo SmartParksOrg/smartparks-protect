@@ -27,7 +27,6 @@ import type {
   Position,
   ProjectAssignmentExtended,
   ReattributeResult,
-  TrafficRow,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -41,7 +40,7 @@ import {
 import { HealthCard } from "@/components/devices/HealthCard";
 import { ContactsCard } from "@/components/devices/ContactsCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
-import { TrafficTable } from "@/components/network/TrafficTable";
+import { DeviceTraffic } from "@/components/devices/DeviceTraffic";
 import {
   RecordDeliveriesDialog,
   SourceEventDialog,
@@ -97,7 +96,7 @@ const TABS = [
   "overview",
   "data",
   "connectivity",
-  "network",
+  "traffic",
   "settings",
 ] as const;
 
@@ -171,21 +170,8 @@ export function DevicePage() {
     queryFn: () =>
       api.get<DeviceDataSpan>(`/api/v1/devices/${deviceId}/data-span`),
   });
-  const traffic = useQuery({
-    queryKey: queryKeys.traffic(projectId ?? "", { deviceId, recent: true }),
-    queryFn: () =>
-      api.get<TrafficRow[]>(`/api/v1/projects/${projectId}/traffic`, {
-        query: {
-          device_id: deviceId,
-          limit: 20,
-          from: new Date(Date.now() - 7 * 86400_000).toISOString(),
-        },
-      }),
-    enabled: Boolean(projectId),
-    refetchInterval: 15_000,
-  });
   const now = useNow();
-  const [tab, setTab] = useTab(TABS);
+  const [tab, setTab] = useTab(TABS, { network: "traffic" });
   const [connectivityHours, setConnectivityHours] = useState(168);
   const repairInvalidate = [
     queryKeys.device(deviceId),
@@ -354,7 +340,8 @@ export function DevicePage() {
           <>
             <StatusBadge value={d.status} />
             {(d.links ?? []).map((link) => (
-              <Button key={link.key} asChild variant="outline" size="sm">
+              // two sources may both offer OPEN_DEVICE, so the key takes the address too
+              <Button key={`${link.key}:${link.url}`} asChild variant="outline" size="sm">
                 <a href={link.url} target="_blank" rel="noreferrer">
                   <ExternalLink className="size-4" /> {link.label}
                 </a>
@@ -531,7 +518,7 @@ export function DevicePage() {
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
-            <TabsTrigger value="network">{t("Network")}</TabsTrigger>
+            <TabsTrigger value="traffic">{t("Traffic")}</TabsTrigger>
             <TabsTrigger value="settings">{t("Settings")}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview">
@@ -786,8 +773,39 @@ export function DevicePage() {
               onHoursChange={setConnectivityHours}
             />
           </TabsContent>
-          <TabsContent value="network">
+          <TabsContent value="traffic">
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+              {projectId && (
+                <Card className="lg:col-span-2">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>{t("Traffic")}</CardTitle>
+                    <Button
+                      asChild
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                    >
+                      <Link
+                        to={`/projects/${projectId}/network/traffic?device=${d.id}`}
+                      >
+                        {t("With the project's traffic")}
+                      </Link>
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <DeviceTraffic
+                      projectId={projectId}
+                      deviceId={d.id}
+                      onSelect={(r) =>
+                        setEvent({
+                          id: r.source_event_id,
+                          ingestedAt: r.ingested_at,
+                        })
+                      }
+                    />
+                  </CardContent>
+                </Card>
+              )}
               <div className="lg:col-span-2">
                 <DeviceControl
                   deviceId={d.id}
@@ -825,38 +843,6 @@ export function DevicePage() {
                   )}
                 </CardContent>
               </Card>
-              {projectId && (
-                <Card className="lg:col-span-2">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>{t("Traffic")}</CardTitle>
-                    <Button
-                      asChild
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0"
-                    >
-                      <Link
-                        to={`/projects/${projectId}/network/traffic?device=${d.id}`}
-                      >
-                        {t("All traffic of this device")}
-                      </Link>
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <TrafficTable
-                      rows={traffic.data}
-                      isLoading={traffic.isPending}
-                      emptyMessage={t("No messages in the last 7 days.")}
-                      onSelect={(r) =>
-                        setEvent({
-                          id: r.source_event_id,
-                          ingestedAt: r.ingested_at,
-                        })
-                      }
-                    />
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </TabsContent>
           <TabsContent value="data">

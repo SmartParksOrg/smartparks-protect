@@ -409,7 +409,6 @@
   "All statuses": "Alle statussen",
   "All systems working": "Alle systemen werken",
   "All that fit": "Alles wat past",
-  "All traffic of this device": "Al het verkeer van dit apparaat",
   "All types": "Alle types",
   "Allow": "Toestaan",
   "Also create an entity per device": "Ook per apparaat een entiteit aanmaken",
@@ -1714,7 +1713,6 @@
   "Needs attention": "Aandacht nodig",
   "Neighbour": "Buur",
   "Net squared displacement": "Netto kwadratische verplaatsing",
-  "network": "netwerk",
   "Network": "Netwerk",
   "network estimate": "netwerkschatting",
   "Network estimate": "Netwerkschatting",
@@ -2655,7 +2653,6 @@
   "The device reported a failure": "Het apparaat meldde een fout",
   "The device sends no answer for this action; the lifecycle ends at the last stage the network reports.": "Het apparaat stuurt geen antwoord op deze actie; de levensloop eindigt bij de laatste fase die het netwerk meldt.",
   "the device type": "het apparaattype",
-  "The device's network tab": "Het tabblad Netwerk van het apparaat",
   "The device's own fixes decide where this is shown.": "De eigen fixes van het apparaat bepalen waar dit wordt getoond.",
   "the device's settings": "de instellingen van het apparaat",
   "The drawing becomes a feature of the project, shown on the map and usable in rules.": "De tekening wordt een kaartobject van het project, getoond op de kaart en bruikbaar in regels.",
@@ -3328,5 +3325,13 @@
   "No unassigned source events.": "Geen niet-toegewezen bronberichten.",
   "Select": "Selecteer",
   "Unassigned": "Niet toegewezen",
-  "{{missed}} of {{total}} ({{percent}}%)": "{{missed}} van {{total}} ({{percent}}%)"
+  "{{missed}} of {{total}} ({{percent}}%)": "{{missed}} van {{total}} ({{percent}}%)",
+  "{{shown}} of {{count}} messages, {{window}}_one": "{{shown}} van {{count}} bericht, {{window}}",
+  "{{shown}} of {{count}} messages, {{window}}_other": "{{shown}} van {{count}} berichten, {{window}}",
+  "No failed or unassigned messages in this window.": "Geen mislukte of niet-toegewezen berichten in dit venster.",
+  "No messages in this window.": "Geen berichten in dit venster.",
+  "Problems only": "Alleen problemen",
+  "The device's traffic tab": "Het verkeerstabblad van het apparaat",
+  "traffic": "verkeer",
+  "With the project's traffic": "Bij het verkeer van het project"
 }

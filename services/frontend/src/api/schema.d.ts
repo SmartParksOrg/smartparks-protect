@@ -2729,8 +2729,30 @@ export interface paths {
         /**
          * Traffic
          * @description Source events of the project's devices, newest first. Default window: last 24 hours.
+         *     `before` and `before_id` page on, the keyset of the last row shown (decision D352).
          */
         get: operations["traffic_api_v1_projects__project_id__traffic_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/traffic/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Traffic Count
+         * @description How many source events the same read covers in its window (decision D352: the
+         *     device's traffic list says how far it has loaded).
+         */
+        get: operations["traffic_count_api_v1_projects__project_id__traffic_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -14437,6 +14459,11 @@ export interface components {
             data_received_at?: string | null;
             health?: components["schemas"]["DeviceHealth"] | null;
         };
+        /** TrafficCount */
+        TrafficCount: {
+            /** Count */
+            count: number;
+        };
         /** TrafficRow */
         TrafficRow: {
             /** Source Event Id */
@@ -20837,8 +20864,14 @@ export interface operations {
             query?: {
                 device_id?: string | null;
                 event_type?: string | null;
+                /** @description Only these processing statuses, repeatable (decision D352) */
+                status?: string[] | null;
                 from?: string | null;
                 to?: string | null;
+                /** @description The page after the row ingested at this moment (with before_id) */
+                before?: string | null;
+                /** @description That row's source event id */
+                before_id?: number | null;
                 limit?: number;
                 include_payload?: boolean;
             };
@@ -20857,6 +20890,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrafficRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    traffic_count_api_v1_projects__project_id__traffic_count_get: {
+        parameters: {
+            query?: {
+                device_id?: string | null;
+                event_type?: string | null;
+                status?: string[] | null;
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficCount"];
                 };
             };
             /** @description Validation Error */

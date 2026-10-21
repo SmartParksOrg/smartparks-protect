@@ -1131,9 +1131,9 @@ export function EntityPanel({
             {" · "}
             <Link
               className="underline"
-              to={`/projects/${project}/devices/${props.device_id}?tab=network`}
+              to={`/projects/${project}/devices/${props.device_id}?tab=traffic`}
             >
-              {t("network")}
+              {t("traffic")}
             </Link>
           </>
         )}
@@ -1308,8 +1308,8 @@ export function DevicePanel({
           {t("data")}
         </Link>
         {" · "}
-        <Link className="underline" to={`${devicePath}?tab=network`}>
-          {t("network")}
+        <Link className="underline" to={`${devicePath}?tab=traffic`}>
+          {t("traffic")}
         </Link>
       </PanelRow>
     </MapPanel>

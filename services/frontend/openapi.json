@@ -10281,7 +10281,7 @@
      "network"
     ],
     "summary": "Traffic",
-    "description": "Source events of the project's devices, newest first. Default window: last 24 hours.",
+    "description": "Source events of the project's devices, newest first. Default window: last 24 hours.\n`before` and `before_id` page on, the keyset of the last row shown (decision D352).",
     "operationId": "traffic_api_v1_projects__project_id__traffic_get",
     "security": [
      {
@@ -10332,6 +10332,27 @@
       }
      },
      {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only these processing statuses, repeatable (decision D352)",
+       "title": "Status"
+      },
+      "description": "Only these processing statuses, repeatable (decision D352)"
+     },
+     {
       "name": "from",
       "in": "query",
       "required": false,
@@ -10364,6 +10385,43 @@
        ],
        "title": "To"
       }
+     },
+     {
+      "name": "before",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The page after the row ingested at this moment (with before_id)",
+       "title": "Before"
+      },
+      "description": "The page after the row ingested at this moment (with before_id)"
+     },
+     {
+      "name": "before_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "That row's source event id",
+       "title": "Before Id"
+      },
+      "description": "That row's source event id"
      },
      {
       "name": "limit",
@@ -10399,6 +10457,140 @@
           "$ref": "#/components/schemas/TrafficRow"
          },
          "title": "Response Traffic Api V1 Projects  Project Id  Traffic Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/traffic/count": {
+   "get": {
+    "tags": [
+     "network"
+    ],
+    "summary": "Traffic Count",
+    "description": "How many source events the same read covers in its window (decision D352: the\ndevice's traffic list says how far it has loaded).",
+    "operationId": "traffic_count_api_v1_projects__project_id__traffic_count_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "event_type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Event Type"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TrafficCount"
         }
        }
       }
@@ -47427,6 +47619,19 @@
      "name"
     ],
     "title": "TrackingDevice"
+   },
+   "TrafficCount": {
+    "properties": {
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     }
+    },
+    "type": "object",
+    "required": [
+     "count"
+    ],
+    "title": "TrafficCount"
    },
    "TrafficRow": {
     "properties": {

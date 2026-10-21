@@ -197,7 +197,7 @@ export function GatewayPanel({
                         to={
                           allProjects
                             ? `/admin/devices/${d.device_id}`
-                            : `/projects/${projectId}/devices/${d.device_id}?tab=network`
+                            : `/projects/${projectId}/devices/${d.device_id}?tab=traffic`
                         }
                       >
                         {d.device_name ?? d.device_id}

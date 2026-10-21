@@ -93,6 +93,9 @@ interface Props<T> {
   defaultHidden?: string[];
   /** Column ids hidden by default on a phone as well, so the operational columns fit. */
   defaultHiddenSmall?: string[];
+  /** The first column stays in view while the rest scrolls sideways on a narrow screen
+   * (decision D352: the traffic table keeps every column on a phone). */
+  stickyFirstColumn?: boolean;
   /** A filter row under the header: a choice or a text match per column, so a selection
    * (the header box takes every row that passes) can be organised in bulk. */
   columnFilters?: boolean;
@@ -127,6 +130,7 @@ export function DataTable<T>({
   columnsKey,
   defaultHidden = [],
   defaultHiddenSmall = [],
+  stickyFirstColumn = false,
   columnFilters: withFilters,
   cardOf,
 }: Props<T>) {
@@ -346,7 +350,7 @@ export function DataTable<T>({
           <TableHeader>
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
-                {group.headers.map((header) => {
+                {group.headers.map((header, index) => {
                   const sorted = header.column.getIsSorted();
                   return (
                     <TableHead
@@ -354,6 +358,9 @@ export function DataTable<T>({
                       className={cn(
                         header.column.getCanSort() &&
                           "cursor-pointer select-none",
+                        stickyFirstColumn &&
+                          index === 0 &&
+                          "sticky left-0 z-10 bg-card",
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
@@ -494,8 +501,15 @@ export function DataTable<T>({
                   onMouseEnter={() => onRowHover?.(row.original)}
                   onMouseLeave={() => onRowHover?.(null)}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                  {row.getVisibleCells().map((cell, index) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        stickyFirstColumn &&
+                          index === 0 &&
+                          "sticky left-0 z-10 bg-card",
+                      )}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

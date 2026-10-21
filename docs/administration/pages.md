@@ -14,7 +14,7 @@ Data holds the records, positions and events, with the curate, deliveries and pr
 links on each. Connectivity holds what the networks say about the link, per data source: the
 connection state, the gateways heard with the best one and its share, signal and frame-counter
 gaps for LoRaWAN, the last satellite session for Iridium. Network holds the machinery of that object: identities, traffic, traces and
-commands. The tab sits in the URL (`?tab=data`, `?tab=network`), so a link from a traffic
+commands. The tab sits in the URL (`?tab=data`, `?tab=traffic`; `network` still opens the traffic tab for an old link), so a link from a traffic
 row, a gateway or a trace lands on the tab it means. A list shows the columns a person needs
 first; the Columns picker adds the rest, per user.
 
@@ -80,7 +80,7 @@ page keeps the project-side view of the same memberships.
 
 ## Where the machinery lives
 
-- Identities, ports and frames: the device page's Network tab and Network, Traffic.
+- Identities, ports and frames: the device page's Traffic tab (the table first, with the window presets, a type filter, "Problems only" and Load more with the count of the window, every column on a phone with the time staying in view) and Network, Traffic.
 - Processing traces: Network, Trace explorer, and the provenance links on a position.
 - Provider fields: the source event dialog reached from traffic rows and provenance links.
 - Gateways: Network, Gateways, the map's Coverage tab and Server admin, Gateways.

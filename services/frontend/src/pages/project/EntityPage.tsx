@@ -81,11 +81,11 @@ import { typePath } from "@/lib/entityTypes";
 
 /** One entity: what it is, the device tracking it now with its health, and the history of the
  * devices that tracked it, with "Assign device" for project admins (decision D106). */
-const TABS = ["overview", "data", "connectivity", "network"] as const;
+const TABS = ["overview", "data", "connectivity", "traffic"] as const;
 
 export function EntityPage() {
   const { t } = useTranslation();
-  const [tab, setTab] = useTab(TABS);
+  const [tab, setTab] = useTab(TABS, { network: "traffic" });
   const [connectivityHours, setConnectivityHours] = useState(168);
   const { projectId = "", entityId = "" } = useParams();
   const { can } = usePermissions(projectId);
@@ -507,7 +507,7 @@ export function EntityPage() {
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
-            <TabsTrigger value="network">{t("Network")}</TabsTrigger>
+            <TabsTrigger value="traffic">{t("Traffic")}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview">
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
@@ -948,7 +948,7 @@ export function EntityPage() {
               </Callout>
             )}
           </TabsContent>
-          <TabsContent value="network">
+          <TabsContent value="traffic">
             <div className="grid gap-4 [&>*]:min-w-0">
               {!current && (
                 <p className="text-sm text-muted-foreground">
@@ -972,9 +972,9 @@ export function EntityPage() {
                       className="h-auto p-0"
                     >
                       <Link
-                        to={`/projects/${projectId}/devices/${current.device_id}?tab=network`}
+                        to={`/projects/${projectId}/devices/${current.device_id}?tab=traffic`}
                       >
-                        {t("The device's network tab")}
+                        {t("The device's traffic tab")}
                       </Link>
                     </Button>
                   </CardHeader>

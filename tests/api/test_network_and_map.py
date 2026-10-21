@@ -181,6 +181,68 @@ async def test_traffic_traces_and_health(client, db, bus):
         )
     ).json()
     assert with_payload[0]["payload"]["lat"] == -24.91
+    # the device's traffic list pages on by keyset and narrows by status, with the count of the
+    # window beside it (decision D352)
+    first = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic",
+            params={"device_id": device["id"], "limit": 1},
+            headers=admin.headers,
+        )
+    ).json()
+    second = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic",
+            params={
+                "device_id": device["id"],
+                "limit": 1,
+                "before": first[0]["ingested_at"],
+                "before_id": first[0]["source_event_id"],
+            },
+            headers=admin.headers,
+        )
+    ).json()
+    assert len(first) == 1 and len(second) == 1
+    assert second[0]["source_event_id"] != first[0]["source_event_id"]
+    assert second[0]["ingested_at"] <= first[0]["ingested_at"]
+    processed = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic",
+            params={"device_id": device["id"], "status": ["processed", "failed"]},
+            headers=admin.headers,
+        )
+    ).json()
+    assert len(processed) == 2
+    none = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic",
+            params={"device_id": device["id"], "status": "failed"},
+            headers=admin.headers,
+        )
+    ).json()
+    assert none == []
+    assert (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic",
+            params={"status": "nonsense"},
+            headers=admin.headers,
+        )
+    ).status_code == 422
+    count = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic/count",
+            params={"device_id": device["id"]},
+            headers=admin.headers,
+        )
+    ).json()
+    assert count == {"count": 2}
+    assert (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic/count",
+            params={"device_id": device["id"], "status": "failed"},
+            headers=admin.headers,
+        )
+    ).json() == {"count": 0}
 
     traces = await client.get(
         f"/api/v1/projects/{project.id}/traces",

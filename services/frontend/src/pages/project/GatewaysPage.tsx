@@ -235,7 +235,7 @@ export function GatewaysPage() {
       cell: ({ row }) => (
         <a
           className="underline"
-          href={`/projects/${projectId}/devices/${row.original.device_id}?tab=network`}
+          href={`/projects/${projectId}/devices/${row.original.device_id}?tab=traffic`}
           onClick={(e) => e.stopPropagation()}
         >
           {row.original.device_name ?? row.original.device_id}
@@ -433,7 +433,7 @@ export function GatewaysPage() {
               <div className="space-y-1">
                 <a
                   className="font-medium underline"
-                  href={`/projects/${projectId}/devices/${d.device_id}?tab=network`}
+                  href={`/projects/${projectId}/devices/${d.device_id}?tab=traffic`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {d.device_name ?? d.device_id}

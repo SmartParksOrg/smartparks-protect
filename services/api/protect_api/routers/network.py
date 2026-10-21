@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
@@ -233,23 +233,60 @@ async def _scope_device_ids(
     return list(ids)
 
 
-@router.get("/projects/{project_id}/traffic", response_model=list[TrafficRow])
-async def traffic(
-    device_id: uuid.UUID | None = None,
-    event_type: str | None = None,
-    time_from: datetime | None = Query(None, alias="from"),
-    time_to: datetime | None = Query(None, alias="to"),
-    limit: int = Query(100, ge=1, le=MAX_ROWS),
-    include_payload: bool = False,
-    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
-    session: AsyncSession = Depends(get_session),
-) -> list[TrafficRow]:
-    """Source events of the project's devices, newest first. Default window: last 24 hours."""
+class TrafficCount(BaseModel):
+    count: int
+
+
+def _traffic_statuses(status: list[str] | None) -> list[ProcessingStatus]:
+    """The statuses a traffic read narrows to; an unknown one is a 422."""
+    out: list[ProcessingStatus] = []
+    for value in status or []:
+        try:
+            out.append(ProcessingStatus(value))
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Unknown status {value!r}") from None
+    return out
+
+
+async def _traffic_scope(
+    session: AsyncSession,
+    context: ScopeContext,
+    device_id: uuid.UUID | None,
+    time_from: datetime | None,
+    time_to: datetime | None,
+) -> tuple[list[uuid.UUID], datetime, datetime]:
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     device_ids = await _scope_device_ids(session, context, time_from, time_to)
     if device_id is not None:
         device_ids = [d for d in device_ids if d == device_id]
+    return device_ids, time_from, time_to
+
+
+@router.get("/projects/{project_id}/traffic", response_model=list[TrafficRow])
+async def traffic(
+    device_id: uuid.UUID | None = None,
+    event_type: str | None = None,
+    status: list[str] | None = Query(
+        None, description="Only these processing statuses, repeatable (decision D352)"
+    ),
+    time_from: datetime | None = Query(None, alias="from"),
+    time_to: datetime | None = Query(None, alias="to"),
+    before: datetime | None = Query(
+        None, description="The page after the row ingested at this moment (with before_id)"
+    ),
+    before_id: int | None = Query(None, description="That row's source event id"),
+    limit: int = Query(100, ge=1, le=MAX_ROWS),
+    include_payload: bool = False,
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[TrafficRow]:
+    """Source events of the project's devices, newest first. Default window: last 24 hours.
+    `before` and `before_id` page on, the keyset of the last row shown (decision D352)."""
+    statuses = _traffic_statuses(status)
+    device_ids, time_from, time_to = await _traffic_scope(
+        session, context, device_id, time_from, time_to
+    )
     if not device_ids:
         return []
     statement = (
@@ -264,10 +301,55 @@ async def traffic(
     )
     if event_type is not None:
         statement = statement.where(SourceEvent.event_type == event_type)
+    if statuses:
+        statement = statement.where(SourceEvent.processing_status.in_(statuses))
+    if before is not None:
+        before = require_aware(before)
+        statement = (
+            statement.where(tuple_(SourceEvent.ingested_at, SourceEvent.id) < (before, before_id))
+            if before_id is not None
+            else statement.where(SourceEvent.ingested_at < before)
+        )
     rows = (
-        await session.execute(statement.order_by(SourceEvent.ingested_at.desc()).limit(limit))
+        await session.execute(
+            statement.order_by(SourceEvent.ingested_at.desc(), SourceEvent.id.desc()).limit(limit)
+        )
     ).all()
     return await traffic_rows(session, rows, include_payload)
+
+
+@router.get("/projects/{project_id}/traffic/count", response_model=TrafficCount)
+async def traffic_count(
+    device_id: uuid.UUID | None = None,
+    event_type: str | None = None,
+    status: list[str] | None = Query(None),
+    time_from: datetime | None = Query(None, alias="from"),
+    time_to: datetime | None = Query(None, alias="to"),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> TrafficCount:
+    """How many source events the same read covers in its window (decision D352: the
+    device's traffic list says how far it has loaded)."""
+    statuses = _traffic_statuses(status)
+    device_ids, time_from, time_to = await _traffic_scope(
+        session, context, device_id, time_from, time_to
+    )
+    if not device_ids:
+        return TrafficCount(count=0)
+    statement = (
+        select(func.count())
+        .select_from(SourceEvent)
+        .where(
+            SourceEvent.device_id.in_(device_ids),
+            SourceEvent.ingested_at >= time_from,
+            SourceEvent.ingested_at < time_to,
+        )
+    )
+    if event_type is not None:
+        statement = statement.where(SourceEvent.event_type == event_type)
+    if statuses:
+        statement = statement.where(SourceEvent.processing_status.in_(statuses))
+    return TrafficCount(count=int(await session.scalar(statement) or 0))
 
 
 @router.get("/data-sources/{data_source_id}/traffic", response_model=list[TrafficRow])
