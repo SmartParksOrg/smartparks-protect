@@ -66,26 +66,38 @@ const DEAD_TOPICS = [
   "needs_attention.created",
 ];
 
+/** One figure of the summary, a button that opens the tab holding those items (Tim,
+ * 2026-10-21: a press on a tile must show the matching list); compact on a phone, where
+ * seven tiles filled the first screen. */
 function Stat({
   label,
   value,
   tone,
+  active,
+  onClick,
 }: {
   label: string;
   value: number | string;
   tone?: "warn" | "bad";
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Card>
-      <CardContent className="pt-4">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div
-          className={`text-2xl font-semibold ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-brand-sand" : ""}`}
-        >
-          {value}
-        </div>
-      </CardContent>
-    </Card>
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`min-w-0 rounded-lg border bg-card px-3 py-2 text-left shadow-sm transition-colors hover:bg-muted/50 sm:px-4 sm:py-3 ${active ? "border-primary ring-1 ring-primary" : ""}`}
+    >
+      <div className="truncate text-xs text-muted-foreground" title={label}>
+        {label}
+      </div>
+      <div
+        className={`text-xl font-semibold sm:text-2xl ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-brand-sand" : ""}`}
+      >
+        {value}
+      </div>
+    </button>
   );
 }
 
@@ -757,24 +769,6 @@ export function AttentionPage() {
       cell: ({ getValue }) => formatTime(getValue<string>()),
     },
   ];
-  const identities = useQuery({
-    queryKey: queryKeys.unknownIdentities,
-    queryFn: () =>
-      api.get<PageType<UnknownIdentity>>("/api/v1/attention/identities", {
-        query: { limit: 200 },
-      }),
-  });
-  const failed = useQuery({
-    queryKey: queryKeys.failedSourceEvents("failed"),
-    queryFn: () =>
-      api.get<SourceEventSummary[]>("/api/v1/attention/source-events", {
-        query: { status: "failed", limit: 200 },
-      }),
-  });
-  const newMetrics = useQuery({
-    queryKey: queryKeys.newMetrics,
-    queryFn: () => api.get<NewMetricsResponse>("/api/v1/attention/metrics"),
-  });
   // the tab and the dead-letter topic live in the URL, so a system alert opens the page on
   // its own dead letters (decision D349)
   const [params, setParams] = useSearchParams();
@@ -786,12 +780,46 @@ export function AttentionPage() {
     setParams(next, { replace: true });
   };
   const topic = DEAD_TOPICS.find((t) => t === params.get("topic")) ?? DEAD_TOPICS[0];
+  // the source events tab lists the failed or the unassigned ones (the second tile)
+  const eventStatus = params.get("status") === "unassigned" ? "unassigned" : "failed";
+  const openTab = (value: string, status?: "failed" | "unassigned") => {
+    const next = new URLSearchParams(params);
+    if (value === "identities") next.delete("tab");
+    else next.set("tab", value);
+    if (status === "unassigned") next.set("status", "unassigned");
+    else next.delete("status");
+    setParams(next, { replace: true });
+  };
   const setTopic = (value: string) => {
     const next = new URLSearchParams(params);
     next.set("topic", value);
     setParams(next, { replace: true });
   };
   const [bulkDead, setBulkDead] = useState<"resolve" | "retry" | null>(null);
+  // a tile opens a tab the strip may have scrolled out of view on a phone
+  useEffect(() => {
+    document
+      .querySelector('[role="tab"][data-state="active"]')
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [tab]);
+  const identities = useQuery({
+    queryKey: queryKeys.unknownIdentities,
+    queryFn: () =>
+      api.get<PageType<UnknownIdentity>>("/api/v1/attention/identities", {
+        query: { limit: 200 },
+      }),
+  });
+  const failed = useQuery({
+    queryKey: queryKeys.failedSourceEvents(eventStatus),
+    queryFn: () =>
+      api.get<SourceEventSummary[]>("/api/v1/attention/source-events", {
+        query: { status: eventStatus, limit: 200 },
+      }),
+  });
+  const newMetrics = useQuery({
+    queryKey: queryKeys.newMetrics,
+    queryFn: () => api.get<NewMetricsResponse>("/api/v1/attention/metrics"),
+  });
   const dead = useQuery({
     queryKey: queryKeys.deadLetters(topic),
     queryFn: () =>
@@ -809,7 +837,7 @@ export function AttentionPage() {
   const invalidateAll = [
     queryKeys.unknownIdentities,
     queryKeys.attentionSummary,
-    queryKeys.failedSourceEvents("failed"),
+    queryKeys.failedSourceEvents(eventStatus),
     queryKeys.deadLetters(topic),
   ];
   const ignore = useMutationToast({
@@ -1069,21 +1097,27 @@ export function AttentionPage() {
             })}
           </Callout>
         )}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-7">
           <Stat
             label={t("Unknown identities")}
             value={s?.unknown_identities ?? "…"}
             tone={s?.unknown_identities ? "warn" : undefined}
+            active={tab === "identities"}
+            onClick={() => openTab("identities")}
           />
           <Stat
             label={t("Unassigned source events")}
             value={s?.unassigned_source_events ?? "…"}
             tone={s?.unassigned_source_events ? "warn" : undefined}
+            active={tab === "failed" && eventStatus === "unassigned"}
+            onClick={() => openTab("failed", "unassigned")}
           />
           <Stat
             label={t("Failed source events")}
             value={s?.failed_source_events ?? "…"}
             tone={s?.failed_source_events ? "bad" : undefined}
+            active={tab === "failed" && eventStatus === "failed"}
+            onClick={() => openTab("failed", "failed")}
           />
           <Stat
             label={t("Dead letters")}
@@ -1091,21 +1125,29 @@ export function AttentionPage() {
               s ? Object.values(s.dead_letters).reduce((a, b) => a + b, 0) : "…"
             }
             tone={s && Object.keys(s.dead_letters).length ? "bad" : undefined}
+            active={tab === "dead"}
+            onClick={() => openTab("dead")}
           />
           <Stat
             label={t("New metrics")}
             value={s?.uncategorized_metrics ?? "…"}
             tone={s?.uncategorized_metrics ? "warn" : undefined}
+            active={tab === "metrics"}
+            onClick={() => openTab("metrics")}
           />
           <Stat
             label={t("Clocks ahead")}
             value={s?.clock_ahead_devices ?? "…"}
             tone={s?.clock_ahead_devices ? "warn" : undefined}
+            active={tab === "clocks"}
+            onClick={() => openTab("clocks")}
           />
           <Stat
             label={t("Name conflicts")}
             value={s?.name_conflicts ?? "…"}
             tone={s?.name_conflicts ? "warn" : undefined}
+            active={tab === "names"}
+            onClick={() => openTab("names")}
           />
         </div>
         <QueueProgress
@@ -1120,7 +1162,7 @@ export function AttentionPage() {
           }}
         />
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] sm:overflow-visible">
             <TabsTrigger value="identities">
               {t("Unknown identities")}
             </TabsTrigger>
@@ -1164,6 +1206,26 @@ export function AttentionPage() {
               <DataTable
                 columns={clockColumns}
                 data={clocks.data}
+                cardOf={(row) => (
+                  <div className="space-y-1 text-sm">
+                    <Link
+                      className="font-medium underline"
+                      to={`/admin/devices/${row.device_id}`}
+                    >
+                      {row.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {t("{{positions}} positions, {{measurements}} measurements", {
+                        positions: row.positions,
+                        measurements: row.measurements,
+                      })}
+                      {" · "}
+                      {t("device time up to {{time}}", {
+                        time: formatTime(row.until),
+                      })}
+                    </div>
+                  </div>
+                )}
                 isLoading={clocks.isPending}
                 emptyMessage={t(
                   "Every device clock is within an hour of the delivery.",
@@ -1181,6 +1243,48 @@ export function AttentionPage() {
               <DataTable
                 columns={nameColumns}
                 data={names.data}
+                cardOf={(row) => (
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <Link
+                        className="font-medium underline"
+                        to={
+                          row.project_id
+                            ? `/projects/${row.project_id}/devices/${row.device_id}`
+                            : `/admin/devices?device=${row.device_id}`
+                        }
+                      >
+                        {row.device_name}
+                      </Link>
+                      <span className="text-muted-foreground">
+                        {" · "}
+                        {t("{{source}} names it {{name}}", {
+                          source: row.data_source_name,
+                          name: row.network_name,
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-auto whitespace-normal"
+                        disabled={renameFromNetwork.isPending}
+                        onClick={() => renameFromNetwork.mutate(row)}
+                      >
+                        {t("Rename to {{name}}", { name: row.network_name })}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={keepName.isPending}
+                        onClick={() => keepName.mutate(row)}
+                      >
+                        {t("Keep Protect's name")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 isLoading={names.isPending}
                 emptyMessage={t(
                   "Every device is named as the network names it.",
@@ -1217,6 +1321,56 @@ export function AttentionPage() {
               data={identities.data?.items}
               searchable
               columnFilters
+              cardOf={(row) => (
+                <div className="flex gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 shrink-0 accent-primary"
+                    aria-label={t("Select")}
+                    checked={selected.has(row.id)}
+                    onChange={(e) => {
+                      const next = new Set(selected);
+                      if (e.target.checked) next.add(row.id);
+                      else next.delete(row.id);
+                      setSelected(next);
+                    }}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="font-mono font-medium break-all">
+                      {row.external_id}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {typeof row.attributes?.name === "string" &&
+                      row.attributes.name
+                        ? `${row.attributes.name} · `
+                        : ""}
+                      {row.data_source_name} · {row.identity_type}
+                      {row.suggested_project_name
+                        ? ` · ${row.suggested_project_name}`
+                        : ""}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("{{count}} events", { count: row.event_count })}
+                      {" · "}
+                      {t("last seen {{ago}}", {
+                        ago: formatAgo(row.last_seen_at),
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      <Button size="sm" onClick={() => setCreating(row)}>
+                        {t("Create device")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => ignore.mutate(row.id)}
+                      >
+                        {t("Ignore")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               isLoading={identities.isPending}
               emptyMessage={t("Every identity is linked to a device.")}
               selection={{
@@ -1226,20 +1380,94 @@ export function AttentionPage() {
               }}
             />
           </TabsContent>
-          <TabsContent value="failed">
+          <TabsContent value="failed" className="space-y-2">
+            <div className="flex flex-wrap gap-1">
+              <Button
+                size="sm"
+                variant={eventStatus === "failed" ? "default" : "outline"}
+                aria-pressed={eventStatus === "failed"}
+                onClick={() => openTab("failed", "failed")}
+              >
+                {t("Failed")}
+                {s ? ` (${s.failed_source_events})` : ""}
+              </Button>
+              <Button
+                size="sm"
+                variant={eventStatus === "unassigned" ? "default" : "outline"}
+                aria-pressed={eventStatus === "unassigned"}
+                onClick={() => openTab("failed", "unassigned")}
+              >
+                {t("Unassigned")}
+                {s ? ` (${s.unassigned_source_events})` : ""}
+              </Button>
+            </div>
+            {eventStatus === "unassigned" && (
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  "Messages of identities no device holds yet, the newest 200. They are decoded as soon as their identity gets a device under Unknown identities.",
+                )}
+              </p>
+            )}
             <DataTable
               columns={failedColumns}
               data={failed.data}
               searchable
               columnFilters
+              cardOf={(row) => (
+                <div className="space-y-1 text-sm">
+                  <div className="font-mono font-medium break-all">
+                    {row.external_id ?? t("no identity")}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatTime(row.ingested_at)} · {row.event_type}
+                  </div>
+                  {row.error_code && (
+                    <div className="text-xs text-destructive">
+                      {row.error_code}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setEvent({ id: row.id, ingestedAt: row.ingested_at })
+                      }
+                    >
+                      {t("Inspect")}
+                    </Button>
+                    {row.trace_id && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setTrace(row.trace_id)}
+                      >
+                        {t("Trace")}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!row.device_id}
+                      onClick={() => reprocess.mutate(row)}
+                    >
+                      {t("Reprocess")}
+                    </Button>
+                  </div>
+                </div>
+              )}
               isLoading={failed.isPending}
-              emptyMessage={t("No failed source events.")}
+              emptyMessage={
+                eventStatus === "unassigned"
+                  ? t("No unassigned source events.")
+                  : t("No failed source events.")
+              }
             />
           </TabsContent>
           <TabsContent value="dead" className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Select value={topic} onValueChange={setTopic}>
-                <SelectTrigger className="w-72">
+                <SelectTrigger className="w-full sm:w-72">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1307,6 +1535,50 @@ export function AttentionPage() {
               columns={deadColumns}
               data={dead.data}
               searchable
+              cardOf={(row) => (
+                <div className="space-y-1 text-sm">
+                  <div className="font-medium">
+                    {row.error_code ?? t("error")}
+                    <span className="text-xs text-muted-foreground">
+                      {" · "}
+                      {formatTime(row.dead_at)}
+                      {row.delivery_count != null
+                        ? ` · ${t("{{count}} attempts", { count: row.delivery_count })}`
+                        : ""}
+                    </span>
+                  </div>
+                  {row.error && (
+                    <div className="text-xs text-muted-foreground break-words">
+                      {row.error}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {row.trace_id && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setTrace(row.trace_id ?? null)}
+                      >
+                        {t("Trace")}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => retry.mutate(row)}
+                    >
+                      {t("Retry")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => resolve.mutate(row)}
+                    >
+                      {t("Resolve")}
+                    </Button>
+                  </div>
+                </div>
+              )}
               isLoading={dead.isPending}
               emptyMessage={t("No dead letters on this topic.")}
             />
@@ -1314,12 +1586,12 @@ export function AttentionPage() {
         </Tabs>
       </Page>
       <CreateDeviceDialog
-        key={creating?.id ?? "none"}
+        key={creating?.id ?? "create-none"}
         identity={creating}
         onClose={() => setCreating(null)}
       />
       <BulkCreateDialog
-        key={bulk.map((i) => i.id).join(",") || "none"}
+        key={bulk.map((i) => i.id).join(",") || "bulk-none"}
         identities={bulk}
         onClose={() => setBulk([])}
         onDone={() => setSelected(new Set())}

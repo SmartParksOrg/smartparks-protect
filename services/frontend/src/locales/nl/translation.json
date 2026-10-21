@@ -3315,5 +3315,19 @@
   "Resolve {{count}} dead letters?_other": "{{count}} dode brieven oplossen?",
   "Send {{count}} dead letters again?_one": "{{count}} dode brief opnieuw versturen?",
   "Send {{count}} dead letters again?_other": "{{count}} dode brieven opnieuw versturen?",
-  "What this section means": "Wat deze sectie betekent"
+  "What this section means": "Wat deze sectie betekent",
+  "{{count}} attempts_one": "{{count}} poging",
+  "{{count}} attempts_other": "{{count}} pogingen",
+  "{{count}} events_one": "{{count}} bericht",
+  "{{count}} events_other": "{{count}} berichten",
+  "{{positions}} positions, {{measurements}} measurements": "{{positions}} posities, {{measurements}} metingen",
+  "{{source}} names it {{name}}": "{{source}} noemt het {{name}}",
+  "device time up to {{time}}": "apparaattijd tot {{time}}",
+  "error": "fout",
+  "last seen {{ago}}": "laatst gezien {{ago}}",
+  "Messages of identities no device holds yet, the newest 200. They are decoded as soon as their identity gets a device under Unknown identities.": "Berichten van identiteiten die nog geen apparaat heeft, de nieuwste 200. Ze worden gedecodeerd zodra hun identiteit een apparaat krijgt onder Onbekende identiteiten.",
+  "no identity": "geen identiteit",
+  "No unassigned source events.": "Geen niet-toegewezen bronberichten.",
+  "Select": "Selecteer",
+  "Unassigned": "Niet toegewezen"
 }
