@@ -36,7 +36,7 @@ Metrics unknown to the registry are registered automatically with category `unca
 
 ## Failures
 
-A step that raises `ApplicationError` records the error on the trace and marks the source event failed. The bus dead-letters the message when the error is not retryable or the attempts are exhausted; retryable errors are re-delivered with a doubling backoff (ADR 0004). Dead letters are listed, retried and resolved under `/api/v1/attention/dead-letters`.
+A step that raises `ApplicationError` records the error on the trace and marks the source event failed. A refusal no retry can change (a frame that does not decode, no keys, a contradicting EUI) ends there: the event is listed under Failed source events on Needs attention with "Decode again", and the decoder acknowledges the message (decision D349). Retryable errors are re-delivered with a doubling backoff (ADR 0004); a message whose attempts are exhausted, a crashed handler or an unsupported message version becomes a dead letter, listed, retried and resolved one by one or per topic under `/api/v1/attention/dead-letters`, and from the system alert itself.
 
 ## Needs Attention
 

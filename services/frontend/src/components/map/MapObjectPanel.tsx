@@ -19,8 +19,10 @@ import type {
   DeviceFeatureProperties,
   EntityFeatureProperties,
 } from "@/components/map/layers";
+import { StationRows } from "@/components/map/StationRows";
 import { Button } from "@/components/ui/button";
 import { useIsPhone } from "@/hooks/useMediaQuery";
+import { useOffloadStation } from "@/hooks/useOffloadStation";
 import { kilovolts } from "@/lib/fence";
 import { courseText, speedText } from "@/lib/speed";
 import { trendSpecFor } from "@/lib/trend";
@@ -151,6 +153,15 @@ export function MapPanel({
 }
 
 /** One label and value row of the panel body. */
+/** The newest of several times, or null when none is set. */
+function newest(...times: (string | null | undefined)[]): string | null {
+  let best: string | null = null;
+  for (const time of times) {
+    if (time && (best === null || Date.parse(time) > Date.parse(best))) best = time;
+  }
+  return best;
+}
+
 export function PanelRow({
   label,
   children,
@@ -968,6 +979,22 @@ export function EntityPanel({
 }) {
   const { t } = useTranslation();
   const project = projectFor(projectId, props.project_id);
+  // an offload station's panel is about the station (decision D350): its own last report,
+  // the card, the trackers served; a static one draws no track, no heatmap, is not followed
+  const station = props.entity_type === "offload_station";
+  const stationRead = useOffloadStation(station ? props.device_id : null);
+  const stationCard = stationRead.data;
+  const moves = !station || stationCard?.mobile === true;
+  const stationSeen = station
+    ? newest(
+        stationCard?.state_time,
+        stationCard?.last_reception_at,
+        stationCard?.last_upload_at,
+        props.device_last_seen_at,
+        props.last_seen_at,
+      )
+    : props.last_seen_at;
+  const stationUptime = stationCard?.state?.uptime_seconds as number | null | undefined;
   // the sightings belong to the device, so the row leads to the device's Data tab
   const contactsHref = props.device_id
     ? `/projects/${project}/devices/${props.device_id}?tab=data`
@@ -1000,7 +1027,7 @@ export function EntityPanel({
       }
       summary={
         <PanelSummary
-          lastSeenAt={props.last_seen_at}
+          lastSeenAt={stationSeen}
           positionTime={props.position_time}
           positionKind={props.position_kind}
           accuracy={props.accuracy_m}
@@ -1018,21 +1045,23 @@ export function EntityPanel({
       onClose={onClose}
       footer={
         <>
-          <TrackButton
-            on={tracked}
-            lengthLabel={trackLengthLabel}
-            returned={track?.returned_points}
-            total={track?.total_points}
-            onToggle={onToggleTrack}
-          />
-          <HeatButton on={heat} onToggle={onToggleHeat} />
-          <FollowButton on={following} onToggle={onToggleFollow} />
+          {moves && (
+            <TrackButton
+              on={tracked}
+              lengthLabel={trackLengthLabel}
+              returned={track?.returned_points}
+              total={track?.total_points}
+              onToggle={onToggleTrack}
+            />
+          )}
+          {moves && <HeatButton on={heat} onToggle={onToggleHeat} />}
+          {moves && <FollowButton on={following} onToggle={onToggleFollow} />}
           {position && <CopyPositionButton position={position} />}
         </>
       }
     >
       <HealthRows
-        lastSeenAt={props.last_seen_at}
+        lastSeenAt={stationSeen}
         positionTime={props.position_time}
         positionKind={props.position_kind}
         accuracy={props.accuracy_m}
@@ -1047,7 +1076,7 @@ export function EntityPanel({
         lastMovementAt={props.last_movement_at}
         activity={props.activity}
         lastStatusAt={props.last_status_at}
-        uptime={props.uptime}
+        uptime={station && stationUptime != null ? stationUptime : props.uptime}
         lastResetAt={props.last_reset_at}
         heardByName={props.heard_by_name}
         heardByTo={heardByTo}
@@ -1062,6 +1091,13 @@ export function EntityPanel({
         trapClosed={props.trap_closed}
         now={now}
       />
+      {station && (
+        <StationRows
+          station={stationCard}
+          loading={stationRead.isPending}
+          now={now}
+        />
+      )}
       <PanelRow label={t("Device")}>
         {props.device_id ? (
           <Link

@@ -572,6 +572,7 @@ async def offload_station(
     if isinstance(report, dict):
         read.state = report
         read.state_time = current.latest_state_time if current else None
+        read.card_ok = lp0_sd_card_ok((report or {}).get("status") or {})
         read.is_station = True
     return read
 

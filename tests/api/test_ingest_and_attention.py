@@ -242,6 +242,11 @@ async def test_unknown_device_needs_attention_then_processed(client, db, bus):
 
 
 async def test_dead_letter_admin(client, db, bus):
+    """A final decode failure is a failed source event and no dead letter (decision D349); a
+    dead letter the bus did set aside is resolved one by one, or all of a topic at once, or
+    all sent again."""
+    from shared.bus import Message
+
     admin, _project, _, source, _device, external_id = await _setup(client, db)
     group, handler, _walk = await _decode_pending(db, bus)
     auth = {"Authorization": f"Bearer {source['webhook_token']}"}
@@ -252,28 +257,67 @@ async def test_dead_letter_admin(client, db, bus):
     )
     event_id = accepted.json()["source_event_ids"][0]
     await bus.consume(Topic.SOURCE_EVENT_RECEIVED, group, "c1", handler, once=True)
-    dead = (
+    topic = Topic.SOURCE_EVENT_RECEIVED
+    listed = (
         await client.get(
-            "/api/v1/attention/dead-letters",
-            params={"topic": Topic.SOURCE_EVENT_RECEIVED},
-            headers=admin.headers,
+            "/api/v1/attention/dead-letters", params={"topic": topic}, headers=admin.headers
         )
     ).json()
-    mine = [d for d in dead if d.get("trace_id") == accepted.json()["trace_ids"][0]]
-    assert mine and mine[0]["error_code"] == "TIMESTAMP_INVALID"
+    assert [d for d in listed if d.get("trace_id") == accepted.json()["trace_ids"][0]] == []
     failed = (
         await client.get(
             "/api/v1/attention/source-events", params={"status": "failed"}, headers=admin.headers
         )
     ).json()
     assert any(e["id"] == event_id for e in failed)
+
+    # what the bus does set aside (retries exhausted, a crash): one by one, or all at once
+    trace = str(uuid.uuid4())
+    for n in range(3):
+        await bus.publish_dead(
+            topic,
+            Message(topic, {"source_event_id": event_id, "n": n}, trace_id=trace),
+            "boom",
+            "INTERNAL_ERROR",
+        )
+    mine = [
+        d
+        for d in (
+            await client.get(
+                "/api/v1/attention/dead-letters", params={"topic": topic}, headers=admin.headers
+            )
+        ).json()
+        if d.get("trace_id") == trace
+    ]
+    assert len(mine) == 3 and mine[0]["error_code"] == "INTERNAL_ERROR"
     assert (
         await client.post(
-            f"/api/v1/attention/dead-letters/{Topic.SOURCE_EVENT_RECEIVED}/{mine[0]['id']}/resolve",
+            f"/api/v1/attention/dead-letters/{topic}/{mine[0]['id']}/resolve",
             headers=admin.headers,
         )
     ).status_code == 204
-    await bus.redis.xgroup_destroy(Topic.SOURCE_EVENT_RECEIVED, group)
+    retried = await client.post(
+        f"/api/v1/attention/dead-letters/{topic}/retry-all", headers=admin.headers
+    )
+    assert retried.status_code == 200 and retried.json()["queued"] >= 2
+    assert await bus.dead_count(topic) == 0
+    await bus.publish_dead(
+        topic, Message(topic, {"n": 9}, trace_id=trace), "boom", "INTERNAL_ERROR"
+    )
+    resolved = await client.post(
+        f"/api/v1/attention/dead-letters/{topic}/resolve-all", headers=admin.headers
+    )
+    assert resolved.status_code == 200 and resolved.json()["resolved"] == 1
+    assert await bus.dead_count(topic) == 0
+    assert (
+        await client.post(
+            "/api/v1/attention/dead-letters/no.such/resolve-all", headers=admin.headers
+        )
+    ).status_code == 404
+    # the retried messages are back on the stream: take them off the test group
+    await bus.consume(topic, group, "c1", handler, once=True)
+    await bus.consume(topic, group, "c1", handler, once=True)
+    await bus.redis.xgroup_destroy(topic, group)
 
 
 async def test_viewer_cannot_see_attention_or_other_project_positions(client, db):

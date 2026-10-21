@@ -196,6 +196,8 @@ shows each tracker's last known position with its entity's icon and its name, a 
 live map on the tracker (the overview carries `last_position`, `last_position_at` and
 `entity_icon` per tracker), and a pin beside each tracker's name in the list does the same.
 
+**On the live map** (decision D350, Tim, 2026-10-21), a station's panel is about the station: its last report of itself, the SD card (usable with its free share, absent or faulted, unknown), whether it listens and the writes pending, the visits, the trackers served in the last 30 days with the last offload, and the cards uploaded, beside the battery and the place; "Last seen" is its last sign of life (the report, the last offload, the last upload or the device's own last contact), and a static station has no track, heatmap or follow button.
+
 **Static or mobile** (decision D336, Tim, 2026-10-18). A station is static by default: it stands
 where a person placed it (decision D261), and the Setup column asks for that place. A station
 that travels, on a vehicle or with a ranger, is made mobile, in the station dialog or on its

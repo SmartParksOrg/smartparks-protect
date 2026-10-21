@@ -9704,6 +9704,102 @@
     }
    }
   },
+  "/api/v1/attention/dead-letters/{topic}/retry-all": {
+   "post": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Retry All Dead Letters",
+    "description": "Every dead letter of the topic published again (decision D349: one action from the\nalert or the tab, not one per row).",
+    "operationId": "retry_all_dead_letters_api_v1_attention_dead_letters__topic__retry_all_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "topic",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Topic"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReprocessResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/attention/dead-letters/{topic}/resolve-all": {
+   "post": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Resolve All Dead Letters",
+    "description": "Every dead letter of the topic set aside at once (decision D349); the system check\ncloses the alert within the minute.",
+    "operationId": "resolve_all_dead_letters_api_v1_attention_dead_letters__topic__resolve_all_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "topic",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Topic"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeadLettersResolved"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/attention/dead-letters/{topic}/{dead_id}/resolve": {
    "post": {
     "tags": [
@@ -29337,6 +29433,19 @@
     ],
     "title": "DeadLetter"
    },
+   "DeadLettersResolved": {
+    "properties": {
+     "resolved": {
+      "type": "integer",
+      "title": "Resolved"
+     }
+    },
+    "type": "object",
+    "required": [
+     "resolved"
+    ],
+    "title": "DeadLettersResolved"
+   },
    "DecodedEventRead": {
     "properties": {
      "time": {
@@ -41113,6 +41222,18 @@
        }
       ],
       "title": "State Time"
+     },
+     "card_ok": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Card Ok",
+      "description": "The one reading of a usable card (decision D345): no when the report says the card is missing or the storage faulted, yes when it is in and writable, unknown otherwise or without a report"
      }
     },
     "type": "object",

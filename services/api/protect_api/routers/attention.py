@@ -213,6 +213,10 @@ class SourceEventSummary(BaseModel):
     trace_id: uuid.UUID | None
 
 
+class DeadLettersResolved(BaseModel):
+    resolved: int
+
+
 class DeadLetter(BaseModel):
     id: str
     topic: str
@@ -984,6 +988,54 @@ async def retry_dead_letter(
     )
     await session.commit()
     return ReprocessResult(queued=1)
+
+
+@router.post("/dead-letters/{topic}/retry-all", response_model=ReprocessResult)
+async def retry_all_dead_letters(
+    topic: str,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> ReprocessResult:
+    """Every dead letter of the topic published again (decision D349: one action from the
+    alert or the tab, not one per row)."""
+    if topic not in DEAD_TOPICS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown topic")
+    count = await bus.retry_all_dead(topic)
+    await record_audit(
+        session,
+        user=user,
+        action="attention.dead_letters_retried",
+        object_type="dead_letter",
+        object_id=topic,
+        details={"count": count},
+    )
+    await session.commit()
+    return ReprocessResult(queued=count)
+
+
+@router.post("/dead-letters/{topic}/resolve-all", response_model=DeadLettersResolved)
+async def resolve_all_dead_letters(
+    topic: str,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> DeadLettersResolved:
+    """Every dead letter of the topic set aside at once (decision D349); the system check
+    closes the alert within the minute."""
+    if topic not in DEAD_TOPICS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown topic")
+    count = await bus.resolve_all_dead(topic)
+    await record_audit(
+        session,
+        user=user,
+        action="attention.dead_letters_resolved",
+        object_type="dead_letter",
+        object_id=topic,
+        details={"count": count},
+    )
+    await session.commit()
+    return DeadLettersResolved(resolved=count)
 
 
 @router.post("/dead-letters/{topic}/{dead_id}/resolve", status_code=status.HTTP_204_NO_CONTENT)

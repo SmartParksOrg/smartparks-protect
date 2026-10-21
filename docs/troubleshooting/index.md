@@ -4,7 +4,7 @@ Where to look when something does not arrive, does not fire or does not send. St
 
 ## A device stopped updating
 
-1. Server admin, System health. Is a worker stale, is there stream lag, are there dead letters? A stale decoder means nothing is decoded; fix the worker first (`docker compose logs decoder`).
+1. Server admin, System health. Is a worker stale, is there stream lag, are there dead letters? A stale decoder means nothing is decoded; fix the worker first (`docker compose logs decoder`). Dead letters are resolved or retried on Needs attention, under Dead letters, one by one or all of a topic at once, or straight from the system alert's "Resolve the dead letters"; a frame that simply does not decode is not one of them, it sits under Failed source events with "Decode again".
 2. Server admin, Data sources: does the source show events in the last hour? If not, the platform is not delivering: check its console with the deep link on the device page, the webhook URL and token for push sources, the credentials for MQTT and websocket sources (`docker compose logs ingest` shows reconnects and refusals).
 3. Project, Network, Traffic: are uplinks of the device arriving? If they arrive but the device page stays old, open the trace of the newest uplink.
 4. The trace says where it stopped: `PAYLOAD_DECODE_FAILED` (the driver rejected the frame: wrong device type, wrong port, firmware change), `DEVICE_NOT_FOUND` or an unassigned status (no device for the identity: Needs attention, unknown identities), `TIMESTAMP_INVALID` (the device clock), a duplicate (the same record arrived over another path, which is fine).

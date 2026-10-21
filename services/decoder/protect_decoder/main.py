@@ -23,6 +23,7 @@ from shared.ingest import (
 )
 from shared.logger import get_logger
 from shared.models import DeviceLogFile, ExternalIdentity, SourceEvent
+from shared.trace import ApplicationError
 from shared.worker import Worker
 
 log = get_logger("decoder")
@@ -67,11 +68,26 @@ def build_worker() -> Worker:
 
     async def handle(message: Message) -> None:
         payload = message.payload
-        await decode(
-            int(payload["source_event_id"]),
-            datetime.fromisoformat(payload["ingested_at"]),
-            reprocess=bool(payload.get("reprocess", False)),
-        )
+        try:
+            await decode(
+                int(payload["source_event_id"]),
+                datetime.fromisoformat(payload["ingested_at"]),
+                reprocess=bool(payload.get("reprocess", False)),
+            )
+        except ApplicationError as error:
+            if error.retryable:
+                raise
+            # a refusal that no retry can change (a frame that does not decode, no keys, a
+            # contradicting EUI) is recorded on the event and its trace, which Needs attention
+            # lists under Failed source events with "Decode again"; a dead letter would say
+            # the same thing a second time and raise a system alert over a garbage frame
+            # (decision D349, Tim, 2026-10-21). The message is done.
+            log.warning(
+                "source event refused",
+                source_event_id=payload.get("source_event_id"),
+                error_code=error.code,
+                error=str(error),
+            )
 
     async def on_identity_reprocess(message: Message) -> None:
         """Walk the retained events of an identity that got a device (decision D121): oldest

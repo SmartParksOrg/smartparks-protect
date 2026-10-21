@@ -2557,6 +2557,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attention/dead-letters/{topic}/retry-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry All Dead Letters
+         * @description Every dead letter of the topic published again (decision D349: one action from the
+         *     alert or the tab, not one per row).
+         */
+        post: operations["retry_all_dead_letters_api_v1_attention_dead_letters__topic__retry_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attention/dead-letters/{topic}/resolve-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve All Dead Letters
+         * @description Every dead letter of the topic set aside at once (decision D349); the system check
+         *     closes the alert within the minute.
+         */
+        post: operations["resolve_all_dead_letters_api_v1_attention_dead_letters__topic__resolve_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attention/dead-letters/{topic}/{dead_id}/resolve": {
         parameters: {
             query?: never;
@@ -7809,6 +7851,11 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** DeadLettersResolved */
+        DeadLettersResolved: {
+            /** Resolved */
+            resolved: number;
+        };
         /** DecodedEventRead */
         DecodedEventRead: {
             /**
@@ -12221,6 +12268,11 @@ export interface components {
             } | null;
             /** State Time */
             state_time?: string | null;
+            /**
+             * Card Ok
+             * @description The one reading of a usable card (decision D345): no when the report says the card is missing or the storage faulted, yes when it is in and writable, unknown otherwise or without a report
+             */
+            card_ok?: boolean | null;
         };
         /**
          * OffloadStationSetup
@@ -20503,6 +20555,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReprocessResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_all_dead_letters_api_v1_attention_dead_letters__topic__retry_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReprocessResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_all_dead_letters_api_v1_attention_dead_letters__topic__resolve_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadLettersResolved"];
                 };
             };
             /** @description Validation Error */

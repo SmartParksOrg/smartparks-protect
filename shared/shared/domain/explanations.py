@@ -154,8 +154,9 @@ EVENTS: dict[str, str] = {
         "work it does (decoding, rules, exports, analyses) waits until it is back."
     ),
     "SYSTEM_DEAD_LETTERS": (
-        "Messages on the server's bus failed repeatedly and were set aside. Nothing is lost, "
-        "but a server admin should look at them under System health."
+        "Messages on the server's bus failed repeatedly and were set aside. Nothing is lost: "
+        "a server admin looks at them on Needs attention, under Dead letters, and resolves or "
+        "retries them there or from this alert."
     ),
     "SYSTEM_STREAM_LAG": (
         "The server's workers are behind on their queues; data arrives later than usual "

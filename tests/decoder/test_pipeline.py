@@ -382,7 +382,10 @@ async def test_identity_walker_links_receptions_and_passes_a_failing_event(db, b
     assert all(w.identity_id != identity for w in await reprocessing.walks(bus.redis))
 
 
-async def test_decode_failure_lands_in_dead_letter(db, bus, world):
+async def test_a_final_decode_failure_is_a_failed_event_and_no_dead_letter(db, bus, world):
+    """Decision D349 (Tim, 2026-10-21: a garbage frame raised a system alert and resolving it
+    took five clicks): a refusal no retry can change is recorded on the event and its trace,
+    which Needs attention lists; the bus message is done, no dead letter, no alert."""
     import contextlib
 
     from redis.exceptions import ResponseError
@@ -404,8 +407,9 @@ async def test_decode_failure_lands_in_dead_letter(db, bus, world):
             for d in await bus.list_dead(Topic.SOURCE_EVENT_RECEIVED)
             if d.get("trace_id") == str(stored.trace_id)
         ]
-        assert dead and dead[0]["error_code"] == ErrorCode.TIMESTAMP_INVALID
-        await bus.resolve_dead(Topic.SOURCE_EVENT_RECEIVED, dead[0]["id"])
+        assert dead == []
+        pending = await bus.redis.xpending(Topic.SOURCE_EVENT_RECEIVED, group)
+        assert pending["pending"] == 0  # acknowledged: the message is done
     finally:
         await bus.redis.xgroup_destroy(Topic.SOURCE_EVENT_RECEIVED, group)
     event_id, ingested_at = stored.source_event.id, stored.source_event.ingested_at

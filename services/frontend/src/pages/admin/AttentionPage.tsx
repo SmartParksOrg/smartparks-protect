@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
@@ -34,6 +34,7 @@ import {
   SourceEventDialog,
   TraceDialog,
 } from "@/components/devices/ProvenancePanel";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -774,7 +775,23 @@ export function AttentionPage() {
     queryKey: queryKeys.newMetrics,
     queryFn: () => api.get<NewMetricsResponse>("/api/v1/attention/metrics"),
   });
-  const [topic, setTopic] = useState(DEAD_TOPICS[0]);
+  // the tab and the dead-letter topic live in the URL, so a system alert opens the page on
+  // its own dead letters (decision D349)
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "identities";
+  const setTab = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value === "identities") next.delete("tab");
+    else next.set("tab", value);
+    setParams(next, { replace: true });
+  };
+  const topic = DEAD_TOPICS.find((t) => t === params.get("topic")) ?? DEAD_TOPICS[0];
+  const setTopic = (value: string) => {
+    const next = new URLSearchParams(params);
+    next.set("topic", value);
+    setParams(next, { replace: true });
+  };
+  const [bulkDead, setBulkDead] = useState<"resolve" | "retry" | null>(null);
   const dead = useQuery({
     queryKey: queryKeys.deadLetters(topic),
     queryFn: () =>
@@ -832,6 +849,18 @@ export function AttentionPage() {
       api.post(`/api/v1/attention/dead-letters/${d.topic}/${d.id}/resolve`),
     invalidate: invalidateAll,
     success: t("Dead letter resolved"),
+  });
+  // every dead letter of the topic at once (decision D349)
+  const allDead = useMutationToast({
+    mutationFn: (action: "resolve" | "retry") =>
+      api.post<{ resolved?: number; queued?: number }>(
+        `/api/v1/attention/dead-letters/${topic}/${action === "resolve" ? "resolve-all" : "retry-all"}`,
+      ),
+    invalidate: invalidateAll,
+    success: (r) =>
+      r.queued != null
+        ? t("{{count}} dead letters sent again", { count: r.queued })
+        : t("{{count}} dead letters resolved", { count: r.resolved ?? 0 }),
   });
 
   const identityColumns: ColumnDef<UnknownIdentity, unknown>[] = [
@@ -1090,7 +1119,7 @@ export function AttentionPage() {
             });
           }}
         />
-        <Tabs defaultValue="identities">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="identities">
               {t("Unknown identities")}
@@ -1208,18 +1237,72 @@ export function AttentionPage() {
             />
           </TabsContent>
           <TabsContent value="dead" className="space-y-3">
-            <Select value={topic} onValueChange={setTopic}>
-              <SelectTrigger className="w-72">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DEAD_TOPICS.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t} {s?.dead_letters[t] ? `(${s.dead_letters[t]})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={topic} onValueChange={setTopic}>
+                <SelectTrigger className="w-72">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEAD_TOPICS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t} {s?.dead_letters[t] ? `(${s.dead_letters[t]})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(dead.data?.length ?? 0) > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={allDead.isPending}
+                    onClick={() => setBulkDead("retry")}
+                  >
+                    {t("Retry all")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={allDead.isPending}
+                    onClick={() => setBulkDead("resolve")}
+                  >
+                    {t("Resolve all")}
+                  </Button>
+                </>
+              )}
+            </div>
+            <ConfirmDialog
+              open={bulkDead !== null}
+              onOpenChange={(open) => {
+                if (!open) setBulkDead(null);
+              }}
+              title={
+                bulkDead === "retry"
+                  ? t("Send {{count}} dead letters again?", {
+                      count: dead.data?.length ?? 0,
+                    })
+                  : t("Resolve {{count}} dead letters?", {
+                      count: dead.data?.length ?? 0,
+                    })
+              }
+              description={
+                bulkDead === "retry"
+                  ? t(
+                      "Every dead letter on this topic goes back on the queue for its worker, oldest first. One that fails again lands here again.",
+                    )
+                  : t(
+                      "Every dead letter on this topic is set aside. The source events they belong to keep their status and traces; nothing else is deleted.",
+                    )
+              }
+              confirmLabel={
+                bulkDead === "retry" ? t("Send again") : t("Resolve all")
+              }
+              destructive={false}
+              onConfirm={() => {
+                if (bulkDead) allDead.mutate(bulkDead);
+                setBulkDead(null);
+              }}
+            />
             <DataTable
               columns={deadColumns}
               data={dead.data}

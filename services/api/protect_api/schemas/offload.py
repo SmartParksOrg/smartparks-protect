@@ -108,6 +108,12 @@ class OffloadStationRead(BaseModel):
         default=None, description="The station's last port 23 report (decision D323)"
     )
     state_time: datetime | None = None
+    card_ok: bool | None = Field(
+        default=None,
+        description="The one reading of a usable card (decision D345): no when the report "
+        "says the card is missing or the storage faulted, yes when it is in and writable, "
+        "unknown otherwise or without a report",
+    )
 
 
 class OffloadOverviewStation(BaseModel):

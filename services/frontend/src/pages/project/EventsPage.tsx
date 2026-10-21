@@ -107,6 +107,53 @@ export function AlertActions({
   );
 }
 
+/** The way out of a dead-letter alert in one click (decision D349, Tim, 2026-10-21: five
+ * clicks before): resolve every dead letter of the topic from the alert itself, or look at
+ * them first on Needs attention with the topic preselected. The system check closes the
+ * alert within the minute once the stream is empty. */
+function DeadLettersActions({
+  topic,
+  onDone,
+}: {
+  topic: string;
+  onDone?: () => void;
+}) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const resolveAll = useMutationToast({
+    mutationFn: () =>
+      api.post<{ resolved: number }>(
+        `/api/v1/attention/dead-letters/${topic}/resolve-all`,
+      ),
+    success: (r) =>
+      t("{{count}} dead letters resolved; the alert closes within a minute", {
+        count: r.resolved,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["attention"] });
+      onDone?.();
+    },
+  });
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={resolveAll.isPending}
+        onClick={() => resolveAll.mutate()}
+      >
+        {t("Resolve the dead letters")}
+      </Button>
+      <Link
+        className="underline"
+        to={`/admin/attention?tab=dead&topic=${encodeURIComponent(topic)}`}
+      >
+        {t("Look at them first")}
+      </Link>
+    </div>
+  );
+}
+
 /** The event's context without the machinery (the deduplication fingerprint), or null when
  * nothing is left: what a rule or a decoder saw, folded away as technical details. */
 function technicalContext(
@@ -229,6 +276,15 @@ export function EventDetailDialog({
                 <div className="mb-2 flex items-center gap-2 font-medium">
                   {t("Alert")} <StatusBadge value={d.alert.status} />
                 </div>
+                {scope === "server" &&
+                  d.event.event_type === "SYSTEM_DEAD_LETTERS" &&
+                  d.alert.status !== "resolved" &&
+                  typeof d.event.context?.topic === "string" && (
+                    <DeadLettersActions
+                      topic={d.event.context.topic}
+                      onDone={() => void detail.refetch()}
+                    />
+                  )}
                 <AlertActions
                   scope={scope}
                   alert={d.alert}

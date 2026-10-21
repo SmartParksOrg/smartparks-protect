@@ -385,6 +385,24 @@ class RedisStreamsBus:
         deleted: int = await self.redis.xdel(dead_topic(topic), dead_id)
         return deleted > 0
 
+    async def retry_all_dead(self, topic: str) -> int:
+        """Every dead letter of the topic published again, oldest first (decision D349)."""
+        entries = cast(
+            "list[tuple[str, dict[str, str]]]", await self.redis.xrange(dead_topic(topic))
+        )
+        for dead_id, fields in entries:
+            message = Message.from_fields(topic, dead_id, fields)
+            await self.publish(topic, message.payload, trace_id=message.trace_id)
+            await self.redis.xdel(dead_topic(topic), dead_id)
+        return len(entries)
+
+    async def resolve_all_dead(self, topic: str) -> int:
+        """Every dead letter of the topic set aside at once (decision D349); the count."""
+        count: int = await self.redis.xlen(dead_topic(topic))
+        if count:
+            await self.redis.delete(dead_topic(topic))
+        return count
+
     async def dead_count(self, topic: str) -> int:
         count: int = await self.redis.xlen(dead_topic(topic))
         return count
