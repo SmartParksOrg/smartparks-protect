@@ -43,7 +43,7 @@ export function DataSourceTrafficPage() {
         description={t("Every message this source received, linked to a device or not, with the raw payload and the trace. Refreshes every five seconds.")}
         actions={<>
           <Button asChild variant="outline"><Link to="/admin/data-sources"><ArrowLeft className="size-4" /> {t("Data sources")}</Link></Button>
-          <Input className="w-44 font-mono" placeholder={t("Identity contains")} value={identity} onChange={(e) => setParams((p) => { if (e.target.value) p.set("identity", e.target.value); else p.delete("identity"); return p; })} aria-label={t("Identity filter")} />
+          <Input type="search" className="w-full sm:w-44" placeholder={t("Identity")} value={identity} onChange={(e) => setParams((p) => { if (e.target.value) p.set("identity", e.target.value); else p.delete("identity"); return p; })} aria-label={t("Identity filter")} />
           <Select value={eventType || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("type"); else p.set("type", v); return p; })}>
             <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("All types")}</SelectItem>{EVENT_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>

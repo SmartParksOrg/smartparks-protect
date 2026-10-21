@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { RefreshCw, RotateCcw } from "lucide-react";
+import { RefreshCw, RotateCcw, Search } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
@@ -83,18 +83,24 @@ function InboundTab({ params, set }: TabProps) {
   const traffic = useQuery({ queryKey: queryKeys.adminTraffic("inbound", query), queryFn: () => api.get<TrafficRow[]>("/api/v1/admin/traffic/inbound", { query: { ...query, hours: undefined, from: new Date(Date.now() - hours * 3600_000).toISOString() } }), refetchInterval: 5_000 });
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* two columns on a phone, one row on a desktop (Tim, 2026-10-21: the identity box read as a stray) */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <Select value={sourceId || "all"} onValueChange={(v) => set("source", v === "all" ? "" : v)}>
-          <SelectTrigger className="w-56" aria-label={t("Data source")}><SelectValue /></SelectTrigger>
+          <SelectTrigger className="col-span-2 w-full sm:w-56" aria-label={t("Data source")}><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">{t("All data sources")}</SelectItem>{sources.data?.items.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
         </Select>
-        <Input className="w-44 font-mono" placeholder={t("Identity contains")} value={identity} onChange={(e) => set("identity", e.target.value)} aria-label={t("Identity filter")} />
+        <div className="relative col-span-2 sm:w-52">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input type="search" className="pl-8" placeholder={t("Identity")} value={identity} onChange={(e) => set("identity", e.target.value)} aria-label={t("Identity filter")} />
+        </div>
         <Select value={eventType || "all"} onValueChange={(v) => set("type", v === "all" ? "" : v)}>
-          <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
           <SelectContent><SelectItem value="all">{t("All types")}</SelectItem>{EVENT_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
         </Select>
-        <WindowSelect hours={hours} onChange={(h) => set("hours", String(h))} />
-        <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
+        <div className="flex gap-2">
+          <WindowSelect hours={hours} onChange={(h) => set("hours", String(h))} className="min-w-0 flex-1 sm:w-40 sm:flex-none" />
+          <Button variant="outline" size="icon" className="shrink-0" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
+        </div>
       </div>
       {traffic.error && <Callout kind="error">{traffic.error.message}</Callout>}
       <TrafficTable showSource showIdentity rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && windowFooter(traffic.data.length, hours, t)} />

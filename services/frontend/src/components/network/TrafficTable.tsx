@@ -121,6 +121,9 @@ export function TrafficTable({
       columns={columns}
       data={rows}
       searchable
+      // a phone keeps the time, the source, the identity, the device and the status; the
+      // channel, the type and the details wait in the column picker (Tim, 2026-10-21)
+      defaultHiddenSmall={["acquisition_channel", "event_type", "details"]}
       isLoading={isLoading}
       emptyMessage={emptyMessage}
       onRowClick={onSelect}
