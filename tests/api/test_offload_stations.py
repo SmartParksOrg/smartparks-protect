@@ -1323,3 +1323,9 @@ async def test_a_cards_history_moves_a_new_devices_assignments_back(client, db, 
     )
     assert current.validity.lower.isoformat() == now
     assert all(m["device_id"] != veteran["id"] for m in moved)
+    # the station's own first data is not the card's period: the card holds other devices'
+    # records (decision D351, Tim, 2026-10-21: SP052104's "belong to no entity" notice lost
+    # its repair button because its card made it look a day older than its membership)
+    span = (await client.get(f"/api/v1/devices/{station['id']}/data-span", headers=h)).json()
+    assert span["first_log_at"] is None
+    assert span["first_data_at"] is None or span["first_data_at"] >= now

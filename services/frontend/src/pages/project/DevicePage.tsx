@@ -209,11 +209,20 @@ export function DevicePage() {
           )
         : t("Assignment extended"),
   });
+  // the entity assignment can reach back to the device's first data, or to the start of its
+  // project assignment when that came later: the records in between are the project's
+  // already, and those before it are the project notice's business (decision D351)
+  const entityStart = (s: DeviceDataSpan): string | null =>
+    s.first_data_at && s.earliest_project_from
+      ? new Date(s.earliest_project_from) > new Date(s.first_data_at)
+        ? s.earliest_project_from
+        : s.first_data_at
+      : (s.first_data_at ?? s.earliest_project_from ?? null);
   const extendEntity = useMutationToast({
     mutationFn: (s: DeviceDataSpan) =>
       api.post<EntityAssignmentExtended>(
         `/api/v1/projects/${projectId}/entity-assignments/${s.earliest_entity_assignment_id}/extend-start`,
-        { body: { valid_from: s.first_data_at } },
+        { body: { valid_from: entityStart(s) } },
       ),
     invalidate: repairInvalidate,
     success: (r) =>
@@ -250,11 +259,6 @@ export function DevicePage() {
     : 0;
   const mayRepair = can("data:curate");
   const firstData = sp?.first_data_at ?? null;
-  const projectCovered = Boolean(
-    sp?.earliest_project_from &&
-    firstData &&
-    new Date(sp.earliest_project_from) <= new Date(firstData),
-  );
   const currentEntityId =
     d?.entity_assignments.find((a) => !a.valid_to)?.entity_id ?? null;
   const currentEntityAssignment =
@@ -504,7 +508,7 @@ export function DevicePage() {
                   date: formatTime(sp.earliest_entity_from),
                 },
               )}{" "}
-              {mayRepair && firstData && projectCovered && (
+              {mayRepair && entityStart(sp) && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -513,7 +517,7 @@ export function DevicePage() {
                   onClick={() => extendEntity.mutate(sp)}
                 >
                   {t("Extend the entity assignment back to {{date}}", {
-                    date: formatTime(firstData),
+                    date: formatTime(entityStart(sp)),
                   })}
                 </Button>
               )}

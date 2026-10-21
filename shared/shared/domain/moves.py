@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.curation.effective import effective_time
 from shared.domain.attribution import queue_reattribution
+from shared.enums import AcquisitionChannel
 from shared.models import (
     Alert,
     AttributionJob,
@@ -60,7 +61,11 @@ async def first_data_at(session: AsyncSession, device_id: uuid.UUID) -> datetime
             )
         ),
         await session.scalar(
-            select(func.min(DeviceLogFile.period_start)).where(DeviceLogFile.device_id == device_id)
+            select(func.min(DeviceLogFile.period_start)).where(
+                DeviceLogFile.device_id == device_id,
+                # a station's card files hold other devices' records (decision D351)
+                DeviceLogFile.acquisition_channel != AcquisitionChannel.LP0,
+            )
         ),
     ):
         if value is not None:

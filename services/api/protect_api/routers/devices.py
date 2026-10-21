@@ -980,8 +980,13 @@ async def device_data_span(
             ExternalIdentity.device_id == device.id
         )
     )
+    # a station's SD card files hold other devices' records (channel lp0), so their period
+    # says nothing about when this device first produced data (decision D351)
     first_log = await session.scalar(
-        select(func.min(DeviceLogFile.period_start)).where(DeviceLogFile.device_id == device.id)
+        select(func.min(DeviceLogFile.period_start)).where(
+            DeviceLogFile.device_id == device.id,
+            DeviceLogFile.acquisition_channel != AcquisitionChannel.LP0,
+        )
     )
     candidates = [t for t in [min(firsts, default=None), first_seen, first_log] if t is not None]
     project_assignment = (
