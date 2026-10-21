@@ -184,8 +184,11 @@ belongs to one project at a time, so such a tracker's records went to its own pr
 and map; the section names the device, its project, its entity, its address, the stations that
 heard it and its last offload, links to the device in its project, and offers "Move to this
 project", which opens the move dialog with this project preset (the moment to move from, the
-preview of what comes along, then the move), to a server admin or a project admin of both
-projects. The keys are never on this page; they stay on the device page, masked until shown. The page lists and links: a station or a tracker is a
+preview of what comes along and the warning that the old project's members lose the records,
+then the move), to a server admin or a project admin of both projects: a project admin can
+never pull a device out of a project they do not administer (Tim, 2026-10-21). The section
+and Unknown devices keep their explanation behind an info button in the heading, and each
+shows only when it has rows. The keys are never on this page; they stay on the device page, masked until shown. The page lists and links: a station or a tracker is a
 link away. **Upload SD card files**, in the page's header, takes the files of any number of
 cards and puts each with its station (step 3 above). The Stations section is a list or a map,
 switched at its heading and remembered per person (Tim, 2026-10-18): the map shows every station

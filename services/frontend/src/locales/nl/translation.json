@@ -3314,5 +3314,6 @@
   "Resolve {{count}} dead letters?_one": "{{count}} dode brief oplossen?",
   "Resolve {{count}} dead letters?_other": "{{count}} dode brieven oplossen?",
   "Send {{count}} dead letters again?_one": "{{count}} dode brief opnieuw versturen?",
-  "Send {{count}} dead letters again?_other": "{{count}} dode brieven opnieuw versturen?"
+  "Send {{count}} dead letters again?_other": "{{count}} dode brieven opnieuw versturen?",
+  "What this section means": "Wat deze sectie betekent"
 }

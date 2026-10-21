@@ -9,6 +9,7 @@ import {
   CircleHelp,
   FolderInput,
   HardDrive,
+  Info,
   Laptop,
   MapPin,
   Plus,
@@ -82,6 +83,24 @@ export function OffloadPage() {
   const [adding, setAdding] = useState<OffloadUnknownAddress | null>(null);
   // a tracker of another project the stations served, offered the move here (decision D348)
   const [moving, setMoving] = useState<OffloadOtherTracker | null>(null);
+  // the explanations of the two sections sit behind an info button (Tim, 2026-10-21: the
+  // text took more space than the rows)
+  const [otherInfo, setOtherInfo] = useState(false);
+  const [unknownInfo, setUnknownInfo] = useState(false);
+  const infoButton = (open: boolean, toggle: () => void) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-7"
+      aria-pressed={open}
+      aria-label={t("What this section means")}
+      title={t("What this section means")}
+      onClick={toggle}
+    >
+      <Info className="size-4" />
+    </Button>
+  );
   const [stationsView, setStationsView] = useOffloadView("stations");
   const [trackersView, setTrackersView] = useOffloadView("trackers");
   const [fieldOpen, setFieldOpen] = useState(false);
@@ -1102,12 +1121,15 @@ export function OffloadPage() {
           <section className="space-y-2">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <FolderInput className="size-4" /> {t("Trackers of other projects")}
+              {infoButton(otherInfo, () => setOtherInfo((v) => !v))}
             </h2>
-            <Callout kind="info">
-              {t(
-                "The stations served these trackers, but each belongs to another project, so its records went there: to its own entity, map and pages. A device belongs to one project at a time. To have it here, move it to this project with its history; the arrow does that for a project admin of both projects.",
-              )}
-            </Callout>
+            {otherInfo && (
+              <Callout kind="info">
+                {t(
+                  "The stations served these trackers, but each belongs to another project, so its records went there: to its own entity, map and pages. A device belongs to one project at a time. To have it here, move it to this project with its history; the arrow does that for a project admin of both projects.",
+                )}
+              </Callout>
+            )}
             <DataTable
               columns={otherColumns}
               data={otherTrackers}
@@ -1119,20 +1141,23 @@ export function OffloadPage() {
           <section className="space-y-2">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <CircleHelp className="size-4" /> {t("Unknown devices")}
+              {infoButton(unknownInfo, () => setUnknownInfo((v) => !v))}
             </h2>
-            <Callout kind="warning">
-              {t(
-                "The stations received frames of these LP0 addresses, and no device of Protect holds them. They wait. The plus makes the device, with the DevEUI the card named, or gives the address to a device of the project; the frames are decoded as soon as its keys are set.",
-              )}
-              {serverAdmin && (
-                <>
-                  {" "}
-                  <Link className="underline" to="/admin/attention">
-                    {t("Needs attention lists them too.")}
-                  </Link>
-                </>
-              )}
-            </Callout>
+            {unknownInfo && (
+              <Callout kind="warning">
+                {t(
+                  "The stations received frames of these LP0 addresses, and no device of Protect holds them. They wait. The plus makes the device, with the DevEUI the card named, or gives the address to a device of the project; the frames are decoded as soon as its keys are set.",
+                )}
+                {serverAdmin && (
+                  <>
+                    {" "}
+                    <Link className="underline" to="/admin/attention">
+                      {t("Needs attention lists them too.")}
+                    </Link>
+                  </>
+                )}
+              </Callout>
+            )}
             <DataTable
               columns={unknownColumns}
               data={unknown}
