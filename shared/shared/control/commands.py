@@ -16,7 +16,7 @@ from shared.bus import Topic
 from shared.connectivity.base import CommandConnector, DataSourceContext
 from shared.connectivity.channels import api_channel_key, channel_enabled
 from shared.connectivity.registry import ADAPTERS
-from shared.control.actions import ControlAction, ResponseContext, actions_of
+from shared.control.actions import ControlAction, EncodeContext, ResponseContext, actions_of
 from shared.device_drivers.base import DecodedRecords
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import resolve_attribution
@@ -375,7 +375,7 @@ async def request_command(
         async with tracer.step(
             "control", "action encoded", input_ref=f"action:{action.key}"
         ) as step:
-            encoded = action.encode(params)
+            encoded = action.encode(params, EncodeContext(firmware_version=device.firmware_version))
             command.payload_hex = encoded.payload.hex()
             command.f_port = encoded.f_port
             command.confirmed_downlink = encoded.confirmed

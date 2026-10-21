@@ -182,10 +182,16 @@ export function WebBleCard({
     null,
   );
   const [erasing, setErasing] = useState(false);
+  // the catalogue of the firmware the connected device named in its status (decision D346):
+  // a device flashed since the server last heard it still gets the right generation
+  const firmware = ble.connection?.status?.firmwareVersion ?? null;
   const catalog = useQuery({
-    queryKey: queryKeys.driverCatalog(deviceId),
+    queryKey: [...queryKeys.driverCatalog(deviceId), firmware],
     queryFn: () =>
-      api.get<DriverCatalog>(`/api/v1/devices/${deviceId}/driver-catalog`),
+      api.get<DriverCatalog>(
+        `/api/v1/devices/${deviceId}/driver-catalog`,
+        firmware ? { query: { firmware } } : undefined,
+      ),
     enabled: Boolean(ble.connection),
   });
   if (driverKey !== "opencollar") return null;

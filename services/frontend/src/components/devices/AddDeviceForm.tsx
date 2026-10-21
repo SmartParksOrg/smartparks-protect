@@ -99,12 +99,6 @@ export function AddDeviceForm({
   // the Bluetooth read speaks OpenCollar; another type is added by hand
   const readable =
     offered.find((x) => x.id === typeId)?.driver_key === "opencollar";
-  const catalog = useQuery({
-    queryKey: [...queryKeys.deviceTypes, typeId, "driver-catalog"],
-    queryFn: () =>
-      api.get<DriverCatalog>(`/api/v1/device-types/${typeId}/driver-catalog`),
-    enabled: Boolean(typeId) && readable && mode === "bluetooth",
-  });
   const [name, setName] = useState(initial?.name ?? "");
   const [serial, setSerial] = useState(initial?.serial ?? "");
   // the LP0 address and keys typed in (decision D338): the address alone claims the frames a
@@ -152,7 +146,7 @@ export function AddDeviceForm({
     identity?.hardwareKey != null && identity.hardwareKey !== "rangeredge";
 
   const read = async () => {
-    if (!catalog.data) return;
+    if (!typeId) return;
     setReading("busy");
     setReadError("");
     try {
@@ -160,10 +154,18 @@ export function AddDeviceForm({
       const transport = await connectWebBluetooth();
       const active = new OpenCollarSession(transport);
       session.current = active;
+      // the status names the firmware, which decides how the settings are addressed and which
+      // catalogue names them (decision D346): the catalogue is asked for after it
       const status = await active.requestStatus().catch(() => null);
+      const catalog = await api.get<DriverCatalog>(
+        `/api/v1/device-types/${typeId}/driver-catalog`,
+        status?.firmwareVersion
+          ? { query: { firmware: status.firmwareVersion } }
+          : undefined,
+      );
       const values = await active.requestSettings();
       const found = readIdentity(
-        catalog.data.catalog as unknown as Catalog,
+        catalog.catalog as unknown as Catalog,
         values,
         status,
         active.name,
@@ -346,7 +348,7 @@ export function AddDeviceForm({
                 variant="outline"
                 size="sm"
                 onClick={read}
-                disabled={reading === "busy" || !catalog.data}
+                disabled={reading === "busy" || !typeId}
               >
                 <Bluetooth className="size-4" />{" "}
                 {reading === "busy"

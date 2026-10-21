@@ -179,7 +179,9 @@ async def test_upload_list_download_and_redecode(client, db, bus):
         )
     ).status_code == 403
     catalog = (await client.get(f"/api/v1/devices/{device['id']}/driver-catalog", headers=h)).json()
-    assert catalog["driver_key"] == "opencollar" and len(catalog["catalog"]["settings"]) == 123
+    # a device whose firmware is unknown is served the newest catalogue (decision D346)
+    assert catalog["driver_key"] == "opencollar" and catalog["catalog"]["firmware"] == "8.1.0"
+    assert len(catalog["catalog"]["settings"]) == 127
 
 
 async def test_ble_sync_and_the_webble_command_route(client, db, bus, monkeypatch):

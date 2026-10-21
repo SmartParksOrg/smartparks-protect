@@ -1353,6 +1353,9 @@ async def _write_states(
                 source="ble" if event.acquisition_channel == AcquisitionChannel.WEBBLE else "frame",
                 observed_at=record.time,
                 source_event_id=event.id,
+                # the firmware this very delivery reported, else the device's known one: a
+                # Bluetooth sync carries the status and the settings in one go
+                firmware=outcome.firmware_version or device.firmware_version,
             )
         outcome.messages.append(
             (

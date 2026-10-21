@@ -63,10 +63,11 @@ async def record_settings_frame(
     source: str,
     observed_at: datetime,
     source_event_id: int | None,
+    firmware: str | None = None,
 ) -> int:
-    """A state record holding settings TLVs (`port_3_tlv`): every setting the catalogue names
-    becomes a known value; returns how many changed."""
-    catalog = driver_catalog(driver_key)
+    """A state record holding settings TLVs (`port_3_tlv`): every setting the catalogue of the
+    device's firmware names becomes a known value; returns how many changed."""
+    catalog = driver_catalog(driver_key, firmware)
     if not catalog:
         return 0
     changed = 0

@@ -1057,7 +1057,7 @@ async def device_settings(
     device = await _visible_device(session, user, device_id)
     device_type = await session.get(DeviceType, device.device_type_id)
     driver_key = device_type.driver_key if device_type else ""
-    catalog = driver_catalog(driver_key)
+    catalog = driver_catalog(driver_key, device.firmware_version)
     known = await known_settings(session, device.id)
     items = []
     for item in catalog:
@@ -1084,7 +1084,7 @@ async def device_settings(
                 command_id=row.command_id if row else None,
             )
         )
-    document = driver_catalog_document(driver_key)
+    document = driver_catalog_document(driver_key, device.firmware_version)
     return DeviceSettingsRead(
         driver_key=driver_key,
         firmware=str(document.get("firmware")) if document.get("firmware") else None,
@@ -1112,7 +1112,7 @@ async def set_device_setting(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
         await _require_project_admin(session, user, attribution.project_id)
     device_type = await session.get(DeviceType, device.device_type_id)
-    catalog = driver_catalog(device_type.driver_key if device_type else "")
+    catalog = driver_catalog(device_type.driver_key if device_type else "", device.firmware_version)
     item = next((i for i in catalog if i.get("name") == key), None)
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No setting {key} in the catalogue")

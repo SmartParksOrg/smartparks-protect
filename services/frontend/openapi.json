@@ -6564,7 +6564,7 @@
      "catalog"
     ],
     "summary": "Device Type Driver Catalog",
-    "description": "The driver's protocol catalogue by device type, for reading a device over Bluetooth\nbefore it exists in Protect (the Offload page's \"Add a device\"); the per-device route in\n`log_files.py` serves a device that does. Empty for drivers without one.",
+    "description": "The driver's protocol catalogue by device type for a firmware, for reading a device\nover Bluetooth before it exists in Protect (the Offload page's \"Add a device\": the browser\nreads the status first and asks with the version it names); the per-device route in\n`log_files.py` serves a device that does. Empty for drivers without one.",
     "operationId": "device_type_driver_catalog_api_v1_device_types__device_type_id__driver_catalog_get",
     "security": [
      {
@@ -6581,6 +6581,25 @@
        "format": "uuid",
        "title": "Device Type Id"
       }
+     },
+     {
+      "name": "firmware",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 32
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The firmware the device reported, which picks the catalogue's generation",
+       "title": "Firmware"
+      },
+      "description": "The firmware the device reported, which picks the catalogue's generation"
      }
     ],
     "responses": {
@@ -19263,7 +19282,7 @@
      "log files"
     ],
     "summary": "Driver Catalog",
-    "description": "The driver's protocol catalogue (settings, commands, values) for the WebBLE settings\neditor; empty for drivers without one.",
+    "description": "The driver's protocol catalogue (settings, commands, values) for the WebBLE settings\neditor, of the generation the device's firmware uses (decision D346); empty for drivers\nwithout one.",
     "operationId": "driver_catalog_api_v1_devices__device_id__driver_catalog_get",
     "security": [
      {
@@ -19280,6 +19299,25 @@
        "format": "uuid",
        "title": "Device Id"
       }
+     },
+     {
+      "name": "firmware",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 32
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The firmware read over Bluetooth just now; else the device's known one",
+       "title": "Firmware"
+      },
+      "description": "The firmware read over Bluetooth just now; else the device's known one"
      }
     ],
     "responses": {

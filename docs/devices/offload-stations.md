@@ -279,7 +279,9 @@ takes minutes and the row's bar says where it is.
   person or device): the device made and assigned to the project from now, its LP0 credentials
   set at once; `devices:write`; a serial or an LP0 address another device holds is 409.
 - `GET /api/v1/device-types/{device_type_id}/driver-catalog`: the driver's protocol catalogue
-  by device type, for reading a device over Bluetooth before it exists.
+  by device type, for reading a device over Bluetooth before it exists; `?firmware=` names the
+  version the device's status reported, which picks the catalogue's generation (a RangerEdge on
+  firmware 8 addresses its settings by family and id, decision D346).
 - `POST /api/v1/projects/{project_id}/offload/stations` (`device_id`, optional `entity_id` or
   `entity_name`, optional `latitude` and `longitude`): a device of the project becomes an offload
   station, or a station is completed; answers what was made (`entity_created`, `entity_kept`,

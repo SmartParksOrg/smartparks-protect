@@ -1,6 +1,8 @@
 """OpenCollar Edge control actions (protocol research section 4: commands on FPort 32 as
-`cmd_id length argument`, settings on FPort 3 as `id length value`). Responses arrive on the
-message's natural port, which is how the interpreters recognise them."""
+`cmd_id length argument`, settings on FPort 3 as `id length value`, and from firmware 7.4 as
+`family id length value` with the setting looked up in that firmware's catalogue, decision
+D346). Responses arrive on the message's natural port, which is how the interpreters recognise
+them."""
 
 import struct
 from typing import Any
@@ -11,6 +13,7 @@ from shared.control.actions import (
     CommandResult,
     ConfirmationPolicy,
     ControlAction,
+    EncodeContext,
     EncodedCommand,
     NoParameters,
     ResponseContext,
@@ -32,8 +35,17 @@ def command(cmd_id: int, argument: bytes = b"") -> bytes:
     return bytes([cmd_id, len(argument)]) + argument
 
 
-def setting(setting_id: int, value: bytes) -> bytes:
-    return bytes([setting_id, len(value)]) + value
+def setting(item: dict[str, Any], value: bytes) -> bytes:
+    """A settings record for a catalogue entry: `[id][len][value]`, or `[family][id][len][value]`
+    when the entry carries a family (the firmware 8 catalogue)."""
+    return address(item) + bytes([len(value)]) + value
+
+
+def address(item: dict[str, Any]) -> bytes:
+    """The bytes that name a setting on the wire: one id byte, or the family and the id."""
+    if item.get("family") is not None:
+        return bytes([int(item["family"]), int(item["wire_id"])])
+    return bytes([int(item["id"])])
 
 
 class GnssIntervalParameters(BaseModel):
@@ -46,15 +58,15 @@ class GnssIntervalParameters(BaseModel):
     )
 
 
-def _encode_reset(_: BaseModel) -> EncodedCommand:
+def _encode_reset(_: BaseModel, __: EncodeContext) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_RESET), f_port=PORT_COMMANDS)
 
 
-def _encode_request_status(_: BaseModel) -> EncodedCommand:
+def _encode_request_status(_: BaseModel, __: EncodeContext) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_SEND_STATUS), f_port=PORT_COMMANDS)
 
 
-def _encode_request_position(_: BaseModel) -> EncodedCommand:
+def _encode_request_position(_: BaseModel, __: EncodeContext) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_GET_UBLOX_FIX), f_port=PORT_COMMANDS)
 
 
@@ -70,11 +82,11 @@ class SettingNameParameters(BaseModel):
     setting: str = Field(min_length=1, max_length=64, description="The setting's catalogue name")
 
 
-def _encode_request_setting(params: BaseModel) -> EncodedCommand:
+def _encode_request_setting(params: BaseModel, context: EncodeContext) -> EncodedCommand:
     assert isinstance(params, SettingNameParameters)
-    item = _catalog_item(params.setting)
+    item = _catalog_item(params.setting, context.firmware_version)
     return EncodedCommand(
-        payload=command(CMD_SEND_SINGLE_SETTING, bytes([int(item["id"])])),
+        payload=command(CMD_SEND_SINGLE_SETTING, address(item)),
         f_port=PORT_COMMANDS,
         metadata={"requested_setting": params.setting, "setting_id": int(item["id"])},
     )
@@ -89,45 +101,48 @@ class SettingParameters(BaseModel):
     value: Any = Field(description="The new value: a number, a boolean, a string or hex bytes")
 
 
-def _catalog_item(name: str) -> dict[str, Any]:
+def _catalog_item(name: str, firmware: str | None) -> dict[str, Any]:
+    """The catalogue entry of a setting for the firmware the device reported (the family
+    format from 7.4, the plain ids before it; unknown is the newest)."""
     from shared.domain.reporting import driver_catalog
 
-    for item in driver_catalog("opencollar"):
+    for item in driver_catalog("opencollar", firmware):
         if item.get("name") == name:
             return item
     raise ValueError(f"no setting {name!r} in the OpenCollar catalogue")
 
 
-def _encode_setting(params: BaseModel) -> EncodedCommand:
+def _encode_setting(params: BaseModel, context: EncodeContext) -> EncodedCommand:
     assert isinstance(params, SettingParameters)
     from shared.domain.reporting_rules import encode_setting_value
 
-    item = _catalog_item(params.setting)
+    item = _catalog_item(params.setting, context.firmware_version)
     value = encode_setting_value(item, params.value)
     return EncodedCommand(
-        payload=setting(int(item["id"]), value),
+        payload=setting(item, value),
         f_port=PORT_SETTINGS,
         metadata={"setting": params.setting, "setting_id": int(item["id"]), "value": params.value},
     )
 
 
-def _encode_request_settings(_: BaseModel) -> EncodedCommand:
+def _encode_request_settings(_: BaseModel, __: EncodeContext) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_SEND_ALL_SETTINGS), f_port=PORT_COMMANDS)
 
 
-def _encode_request_mac(_: BaseModel) -> EncodedCommand:
+def _encode_request_mac(_: BaseModel, __: EncodeContext) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_GET_MAC), f_port=PORT_COMMANDS)
 
 
-def _encode_gnss_interval(params: BaseModel) -> EncodedCommand:
+def _encode_gnss_interval(params: BaseModel, context: EncodeContext) -> EncodedCommand:
     assert isinstance(params, GnssIntervalParameters)
+    item = _catalog_item("ublox_send_interval", context.firmware_version)
     value = struct.pack("<I", params.interval_seconds)
     return EncodedCommand(
-        payload=setting(SETTING_UBLOX_SEND_INTERVAL, value),
+        payload=setting(item, value),
         f_port=PORT_SETTINGS,
         metadata={
             "setting": "ublox_send_interval",
-            "setting_id": SETTING_UBLOX_SEND_INTERVAL,
+            "setting_id": int(item["id"]),
             "value": params.interval_seconds,
         },
     )

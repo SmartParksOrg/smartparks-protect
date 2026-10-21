@@ -274,15 +274,21 @@ async def list_project_log_files(
 @router.get("/devices/{device_id}/driver-catalog", response_model=DriverCatalog)
 async def driver_catalog(
     device_id: uuid.UUID,
+    firmware: str | None = Query(
+        default=None,
+        max_length=32,
+        description="The firmware read over Bluetooth just now; else the device's known one",
+    ),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> DriverCatalog:
     """The driver's protocol catalogue (settings, commands, values) for the WebBLE settings
-    editor; empty for drivers without one."""
+    editor, of the generation the device's firmware uses (decision D346); empty for drivers
+    without one."""
     device = await _visible_device(session, user, device_id)
     driver_key, driver = await driver_for(session, device)
     catalog = getattr(driver, "catalog", None)
-    data: dict[str, Any] = catalog() if callable(catalog) else {}
+    data: dict[str, Any] = catalog(firmware or device.firmware_version) if callable(catalog) else {}
     return DriverCatalog(driver_key=driver_key, catalog=data)
 
 

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from shared.control.actions import ConfirmationPolicy, ResponseContext, actions_of
+from shared.control.actions import ConfirmationPolicy, EncodeContext, ResponseContext, actions_of
 from shared.device_drivers.base import (
     DecodedMeasurement,
     DecodedPosition,
@@ -47,7 +47,7 @@ def test_driver_declares_actions():
 )
 def test_encoding_golden(key, params, f_port, payload):
     action = CONTROL_ACTIONS[key]
-    encoded = action.encode(action.parameters.model_validate(params))
+    encoded = action.encode(action.parameters.model_validate(params), EncodeContext("7.3"))
     assert (encoded.f_port, encoded.payload.hex()) == (f_port, payload)
     assert encoded.confirmed is False
 

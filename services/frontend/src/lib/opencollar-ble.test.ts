@@ -14,8 +14,10 @@ import {
   parseTlv,
   PORT,
   readIdentity,
+  settingAddress,
   settingFrame,
   toBase64,
+  usesFamilies,
   type Catalog,
   type Transport,
 } from "@/lib/opencollar-ble";
@@ -43,6 +45,19 @@ describe("OpenCollar BLE framing", () => {
     // the wiki example: set ublox_send_interval to 3600 s is `02 04 10 0E 00 00`, over BLE with port 3 first
     expect(hex(settingFrame(0x02, encodeSettingValue("uint32", 4, 3600)))).toBe("030204100e0000");
     expect(hex(settingFrame(0x3f, encodeSettingValue("bool", 1, true)))).toBe("033f0101");
+  });
+
+  it("addresses a setting of the firmware 8 catalogue by family and id (decision D346)", () => {
+    // ublox_send_interval is family 6, id 0 there; the same 3600 s becomes `06 00 04 10 0E 00 00`
+    const interval = { id: 0x0600, family: 6, wire_id: 0 };
+    expect(settingAddress(interval)).toEqual([6, 0]);
+    expect(hex(settingFrame(interval, encodeSettingValue("uint32", 4, 3600)))).toBe("030600" + "04100e0000");
+    expect(settingAddress({ id: 0x3f })).toEqual([0x3f]);
+    expect(usesFamilies("7.3")).toBe(false);
+    expect(usesFamilies("6.15")).toBe(false);
+    expect(usesFamilies("7.4")).toBe(true);
+    expect(usesFamilies("8.1")).toBe(true);
+    expect(usesFamilies(null)).toBe(true); // unknown is the newest, as the server reads it
   });
 
   it("encodes and decodes every setting type little-endian", () => {
@@ -75,6 +90,11 @@ describe("OpenCollar BLE framing", () => {
     expect(parseTlv(fromHex("020410 0e0000 3f0101".replace(/ /g, "")))).toEqual([
       { id: 2, value: fromHex("100e0000") },
       { id: 0x3f, value: fromHex("01") },
+    ]);
+    // firmware 8: a family byte in front, the id reported as the address family << 8 | id
+    expect(parseTlv(fromHex("060004 100e0000 02030101".replace(/ /g, "")), true)).toEqual([
+      { id: 0x0600, value: fromHex("100e0000") },
+      { id: 0x0203, value: fromHex("01") },
     ]);
     const confirm = parseFrame(fromHex("1ff302bb01"));
     expect(confirm.port).toBe(PORT.messages);
@@ -136,10 +156,49 @@ describe("OpenCollar BLE session", () => {
       }
     });
     const session = new OpenCollarSession(transport);
+    session.families = false; // a firmware 7 device, as its status would have said
     const settings = await session.requestSettings();
     expect(settings.size).toBe(3);
     expect(decodeSettingValue("uint32", settings.get(2)!)).toBe(3600);
     expect(decodeSettingValue("uint8", settings.get(0)!)).toBe(5);
+  });
+
+  it("reads a firmware 8 device's settings by family and id once its status named the firmware", async () => {
+    const transport = fakeTransport((frame, emit) => {
+      // the wiki status example with the firmware byte at 8.1 and the type byte RangerEdge
+      if (frame[1] === CMD.sendStatus) emit(fromHex("04f40e" + "00 00 88 00 80 05 80 80 ff 12 81 05 00 00".replace(/ /g, "")));
+      if (frame[1] === CMD.sendAllSettings) {
+        emit(fromHex("03" + "0600" + "04" + "100e0000"));
+        emit(fromHex("03" + "0505" + "08" + "0016c001f0abcdef" + "0206" + "08" + "5350303531380000"));
+        emit(fromHex("1ff302a701"));
+      }
+    });
+    const session = new OpenCollarSession(transport);
+    expect(session.families).toBe(true);
+    const status = await session.requestStatus();
+    expect(status.firmwareVersion).toBe("8.1");
+    expect(session.families).toBe(true);
+    const settings = await session.requestSettings();
+    expect(settings.size).toBe(3);
+    expect(decodeSettingValue("uint32", settings.get(0x0600)!)).toBe(3600);
+    expect(hex(settings.get(0x0505)!)).toBe("0016c001f0abcdef");
+    expect(decodeSettingValue("string", settings.get(0x0206)!)).toBe("SP0518");
+  });
+
+  it("drops back to the one-byte ids when the status names firmware 7", async () => {
+    const transport = fakeTransport((frame, emit) => {
+      if (frame[1] === CMD.sendStatus) emit(fromHex("04f40e" + "0400a00095007f7f721444550000"));
+      if (frame[1] === CMD.sendAllSettings) {
+        emit(fromHex("03" + "0204100e0000"));
+        emit(fromHex("1ff302a701"));
+      }
+    });
+    const session = new OpenCollarSession(transport);
+    const status = await session.requestStatus();
+    expect(status.firmwareVersion).toBe("4.4");
+    expect(session.families).toBe(false);
+    const settings = await session.requestSettings();
+    expect(decodeSettingValue("uint32", settings.get(2)!)).toBe(3600);
   });
 
   it("treats a silent setting write as accepted without confirmation", async () => {
@@ -152,13 +211,16 @@ describe("OpenCollar BLE session", () => {
 });
 
 describe("a device's identity read over Bluetooth (phase 42)", () => {
+  // the firmware 8 catalogue's addresses (decision D346): family << 8 | id
   const catalog: Catalog = {
+    firmware: "8.1.0",
+    families: true,
     settings: [
-      { id: 17, name: "device_eui", length: 8, type: "byte_array", default: "0000000000000000", min: null, max: null },
-      { id: 33, name: "device_name", length: 8, type: "string", default: "", min: null, max: null },
-      { id: 66, name: "lp0_app_key", length: 16, type: "byte_array", default: "", min: null, max: null },
-      { id: 67, name: "lp0_network_key", length: 16, type: "byte_array", default: "", min: null, max: null },
-      { id: 68, name: "lp0_dev_addr", length: 4, type: "byte_array", default: "", min: null, max: null },
+      { id: 0x0505, family: 5, wire_id: 5, name: "device_eui", length: 8, type: "byte_array", default: "0000000000000000", min: null, max: null },
+      { id: 0x0206, family: 2, wire_id: 6, name: "device_name", length: 8, type: "string", default: "", min: null, max: null },
+      { id: 0x050e, family: 5, wire_id: 14, name: "lp0_app_key", length: 16, type: "byte_array", default: "", min: null, max: null },
+      { id: 0x050f, family: 5, wire_id: 15, name: "lp0_network_key", length: 16, type: "byte_array", default: "", min: null, max: null },
+      { id: 0x0510, family: 5, wire_id: 16, name: "lp0_dev_addr", length: 4, type: "byte_array", default: "", min: null, max: null },
     ],
     commands: [],
   };
@@ -167,11 +229,11 @@ describe("a device's identity read over Bluetooth (phase 42)", () => {
 
   it("takes the EUI, the name, the hardware and the LP0 credentials from the settings and the status", () => {
     const values = new Map<number, Uint8Array>([
-      [17, fromHex("0016c001f0abcdef")],
-      [33, new TextEncoder().encode("SP0518\0\0")],
-      [66, fromHex("2b7e151628aed2a6abf7158809cf4f3c")],
-      [67, fromHex("000102030405060708090a0b0c0d0e0f")],
-      [68, fromHex("26010203")],
+      [0x0505, fromHex("0016c001f0abcdef")],
+      [0x0206, new TextEncoder().encode("SP0518\0\0")],
+      [0x050e, fromHex("2b7e151628aed2a6abf7158809cf4f3c")],
+      [0x050f, fromHex("000102030405060708090a0b0c0d0e0f")],
+      [0x0510, fromHex("26010203")],
     ]);
     const identity = readIdentity(catalog, values, status, "SP05-adv");
     expect(identity.name).toBe("SP0518");
@@ -184,10 +246,10 @@ describe("a device's identity read over Bluetooth (phase 42)", () => {
 
   it("counts an all-zero EUI or key as not set and falls back to the advertised name", () => {
     const values = new Map<number, Uint8Array>([
-      [17, fromHex("0000000000000000")],
-      [66, fromHex("2b7e151628aed2a6abf7158809cf4f3c")],
-      [67, fromHex("00000000000000000000000000000000")],
-      [68, fromHex("26010203")],
+      [0x0505, fromHex("0000000000000000")],
+      [0x050e, fromHex("2b7e151628aed2a6abf7158809cf4f3c")],
+      [0x050f, fromHex("00000000000000000000000000000000")],
+      [0x0510, fromHex("26010203")],
     ]);
     const identity = readIdentity(catalog, values, null, "SP05-adv");
     expect(identity.name).toBe("SP05-adv");

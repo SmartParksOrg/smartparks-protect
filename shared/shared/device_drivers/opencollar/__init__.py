@@ -43,13 +43,35 @@ from shared.enums import AcquisitionChannel, ErrorCode, Severity
 from shared.trace import ApplicationError
 
 DECODER_VERSION = "fw7.3.0"
+#: The protocol catalogues, newest first: each the settings, commands and values of one
+#: firmware generation (decision D346). Firmware 7.4 and later address a setting by a family
+#: byte and an id inside it, and a settings record on the wire is `[family][id][len][value]`;
+#: that catalogue keeps the address as one `id` (family << 8 | id) with `family` and
+#: `wire_id` beside it, so every lookup by id works on both. `catalog.json` is firmware 7.3.0,
+#: `catalog-v8.json` is 8.1.0, built by `scripts/opencollar_catalog_v8.py`.
 CATALOG_PATH = Path(__file__).with_name("catalog.json")
+CATALOG_V8_PATH = Path(__file__).with_name("catalog-v8.json")
+#: Where the family format starts: development build 7.4, shipped in 8.0.0.
+FAMILIES_SINCE = (7, 4)
 
 
 @lru_cache
-def _catalog() -> dict[str, Any]:
-    data: dict[str, Any] = json.loads(CATALOG_PATH.read_text())
+def _catalog(path: Path = CATALOG_PATH) -> dict[str, Any]:
+    data: dict[str, Any] = json.loads(path.read_text())
     return data
+
+
+def uses_families(version: str | None) -> bool:
+    """Whether a firmware addresses its settings by family and id (7.4 and later); an unknown
+    version means the newest, as `layout_for` reads it."""
+    parsed = parse_firmware(version)
+    return parsed is None or parsed >= FAMILIES_SINCE
+
+
+def catalog_for(version: str | None) -> dict[str, Any]:
+    """The protocol catalogue of a firmware version: the family-addressed one from 7.4 on,
+    else the 7.3.0 one; an unknown version takes the newest."""
+    return _catalog(CATALOG_V8_PATH if uses_families(version) else CATALOG_PATH)
 
 
 COMPONENT = "driver.opencollar"
@@ -488,6 +510,7 @@ class OpenCollarDriver:
           (`[port][msg_id][len][data][store timestamp]` repeated, wiki satellite page).
         """
         layout = layout_for(event.firmware_version)
+        families = uses_families(event.firmware_version)
         records = DecodedRecords(decoder_version=layout.key)
         received = event.network_received_at or event.ingested_at
         channel = event.acquisition_channel or AcquisitionChannel.LORAWAN
@@ -498,14 +521,20 @@ class OpenCollarDriver:
                 raise _fail("frame shorter than a port byte and a message", channel=channel)
             port, message = event.frame[0], event.frame[1:]
             if port == PORT_FLASH_LOG:
-                self._decode_flash_log(message, records, layout)
+                self._decode_flash_log(message, records, layout, families)
             else:
                 self._decode_message(
-                    port, message, received, records, via=str(channel), layout=layout
+                    port,
+                    message,
+                    received,
+                    records,
+                    via=str(channel),
+                    layout=layout,
+                    families=families,
                 )
             return records
         if channel == AcquisitionChannel.IRIDIUM:
-            self._decode_flash_log(event.frame, records, layout)
+            self._decode_flash_log(event.frame, records, layout, families)
             return records
         if event.f_port is None:
             raise _fail("uplink carries no LoRaWAN port", event_type=event.event_type)
@@ -513,10 +542,16 @@ class OpenCollarDriver:
         # stored stream, port 23 the station's own statistics, any other a live message
         via = "lp0" if channel == AcquisitionChannel.LP0 else "lorawan"
         if event.f_port == PORT_FLASH_LOG:
-            self._decode_flash_log(event.frame, records, layout)
+            self._decode_flash_log(event.frame, records, layout, families)
         else:
             self._decode_message(
-                event.f_port, event.frame, received, records, via=via, layout=layout
+                event.f_port,
+                event.frame,
+                received,
+                records,
+                via=via,
+                layout=layout,
+                families=families,
             )
         return records
 
@@ -904,19 +939,24 @@ class OpenCollarDriver:
         )
 
     @staticmethod
-    def catalog() -> dict[str, Any]:
-        """Settings, commands and values of the protocol (research sections 4.2 to 4.4), for
-        the WebBLE settings editor and the documentation. Generated from the research document
-        into `catalog.json`; regenerate when a firmware release changes the tables."""
-        return dict(_catalog())
+    def catalog(firmware: str | None = None) -> dict[str, Any]:
+        """Settings, commands and values of the protocol (research sections 4.2 to 4.4) for the
+        firmware a device reports, for the WebBLE settings editor, the device's settings tab and
+        the documentation: `catalog.json` (7.3.0, generated from the research document) up to
+        7.3, `catalog-v8.json` (8.1.0, `scripts/opencollar_catalog_v8.py`) from 7.4 on, the
+        newest for an unknown version (decision D346)."""
+        return dict(catalog_for(firmware))
 
     # Framing
 
-    def _decode_flash_log(self, frame: bytes, records: DecodedRecords, layout: Layout) -> None:
+    def _decode_flash_log(
+        self, frame: bytes, records: DecodedRecords, layout: Layout, families: bool
+    ) -> None:
         """Concatenated stored records: port, msg_id, len, data, store timestamp (u32). A status
-        record inside the stream names the firmware; the records after it use its layout. The
-        stream is history read out of the device's flash, so the records keep the times they
-        were stored at, however long after them the stream arrives (`records.stored`)."""
+        record inside the stream names the firmware; the records after it use its layout and
+        its settings format. The stream is history read out of the device's flash, so the
+        records keep the times they were stored at, however long after them the stream arrives
+        (`records.stored`)."""
         records.stored = True
         i = 0
         count = 0
@@ -938,6 +978,7 @@ class OpenCollarDriver:
                 records,
                 via="flash_log",
                 layout=layout,
+                families=families,
             )
             if port == PORT_STATUS and len(records.states) > before:
                 reported = records.states[-1].state.get("firmware_version")
@@ -945,6 +986,8 @@ class OpenCollarDriver:
                 if learned.key != layout.key:
                     layout = learned
                     records.decoder_version = layout.key
+                if reported:
+                    families = uses_families(str(reported))
             count += 1
             i = end + 4
         if count == 0 and len(frame) > 0:
@@ -959,11 +1002,14 @@ class OpenCollarDriver:
         *,
         via: str,
         layout: Layout,
+        families: bool,
     ) -> None:
         if port in (PORT_SETTINGS, PORT_VALUES):
             records.states.append(
                 DecodedState(
-                    time=time, state={f"port_{port}_tlv": _parse_tlv(frame)}, record_type="settings"
+                    time=time,
+                    state={f"port_{port}_tlv": _parse_tlv(frame, families)},
+                    record_type="settings",
                 )
             )
             return
@@ -1372,11 +1418,22 @@ class OpenCollarDriver:
             )
 
 
-def _parse_tlv(frame: bytes) -> dict[str, str]:
+def _parse_tlv(frame: bytes, families: bool = False) -> dict[str, str]:
+    """The `[id][len][value]` list of ports 3 and 30, keyed by the id as two hex digits; from
+    firmware 7.4 the list is `[family][id][len][value]` and the key is the address, family and
+    id as four hex digits, which is the catalogue's `id` of that generation (decision D346).
+    The key's width tells the two formats apart, so a frame of the one generation looked up
+    in the other's catalogue matches nothing rather than the wrong setting."""
     result: dict[str, str] = {}
+    header = 3 if families else 2
     i = 0
-    while i + 2 <= len(frame):
-        item_id, length = frame[i], frame[i + 1]
-        result[f"0x{item_id:02X}"] = frame[i + 2 : i + 2 + length].hex()
-        i += 2 + length
+    while i + header <= len(frame):
+        if families:
+            address, length = (frame[i] << 8) | frame[i + 1], frame[i + 2]
+            key = f"0x{address:04X}"
+        else:
+            address, length = frame[i], frame[i + 1]
+            key = f"0x{address:02X}"
+        result[key] = frame[i + header : i + header + length].hex()
+        i += header + length
     return result

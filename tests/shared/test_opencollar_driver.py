@@ -267,6 +267,31 @@ def test_simulator_frames_decode_to_positions_and_status():
 # log file and over Iridium.
 
 
+def test_a_settings_frame_is_read_in_the_format_of_the_firmware_the_device_reported():
+    """Decision D346: a port 3 record is `[id][len][value]` up to firmware 7.3 and
+    `[family][id][len][value]` from 7.4 on; the stored key is the id as two hex digits, or the
+    address as four, so a reader looking the frame up in the other generation's catalogue
+    matches nothing rather than a wrong setting. Unknown firmware is read as the newest."""
+    from dataclasses import replace
+
+    newer = "03" + "060004100e0000" + "0505080016c001f0abcdef"
+    older = "03" + "0204100e0000" + "11080016c001f0abcdef"
+    driver = OpenCollarDriver()
+    read_new = driver.decode(replace(channel_event("webble", newer), firmware_version="8.1"))
+    assert read_new.states[0].state == {
+        "port_3_tlv": {"0x0600": "100e0000", "0x0505": "0016c001f0abcdef"}
+    }
+    read_old = driver.decode(replace(channel_event("webble", older), firmware_version="7.3"))
+    assert read_old.states[0].state == {
+        "port_3_tlv": {"0x02": "100e0000", "0x11": "0016c001f0abcdef"}
+    }
+    unknown = driver.decode(channel_event("webble", newer))
+    assert unknown.states[0].state == read_new.states[0].state
+    assert (
+        read_new.decoder_version == read_old.decoder_version == "fw7.2.0"
+    )  # the ports did not move
+
+
 def channel_event(channel: str, hex_data: str) -> SourceEventData:
     return SourceEventData(
         id=2,
@@ -315,7 +340,7 @@ def test_short_channel_frames_are_decode_failures():
 
 
 def test_catalog_lists_the_protocol_tables():
-    catalog = OpenCollarDriver.catalog()
+    catalog = OpenCollarDriver.catalog("7.3")  # the newest without a version is 8.1.0 (D346)
     settings = {s["name"]: s for s in catalog["settings"]}
     interval = settings["ublox_send_interval"]
     assert {k: interval[k] for k in ("id", "name", "length", "type", "default", "min", "max")} == {

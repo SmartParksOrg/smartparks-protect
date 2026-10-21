@@ -4,7 +4,7 @@ admins change them."""
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -170,16 +170,22 @@ async def list_device_types(
 @router.get("/device-types/{device_type_id}/driver-catalog", response_model=DriverCatalog)
 async def device_type_driver_catalog(
     device_type_id: uuid.UUID,
+    firmware: str | None = Query(
+        default=None,
+        max_length=32,
+        description="The firmware the device reported, which picks the catalogue's generation",
+    ),
     _: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> DriverCatalog:
-    """The driver's protocol catalogue by device type, for reading a device over Bluetooth
-    before it exists in Protect (the Offload page's "Add a device"); the per-device route in
+    """The driver's protocol catalogue by device type for a firmware, for reading a device
+    over Bluetooth before it exists in Protect (the Offload page's "Add a device": the browser
+    reads the status first and asks with the version it names); the per-device route in
     `log_files.py` serves a device that does. Empty for drivers without one."""
     device_type = await get_or_404(session, DeviceType, device_type_id, "Device type")
     driver = DRIVERS.get(device_type.driver_key)
     catalog = getattr(driver, "catalog", None)
-    data: dict[str, Any] = catalog() if callable(catalog) else {}
+    data: dict[str, Any] = catalog(firmware) if callable(catalog) else {}
     return DriverCatalog(driver_key=device_type.driver_key, catalog=data)
 
 

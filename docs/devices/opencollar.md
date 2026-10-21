@@ -8,7 +8,7 @@ Every uplink is `[msg_id][len][data]` on an FPort that selects the message type;
 
 The same messages arrive over other paths (architecture 25, phase 11) and the driver reads them by the delivery's acquisition channel: over Web Bluetooth and in raw log files a frame carries the port in front, `[port][msg_id][len][data]`, and on port 29 the rest of the frame is the stored record stream; over Iridium the payload is the satellite buffer, a stored record stream in the flash storage format. A record's own timestamp stays canonical whichever path delivered it, which is what makes the same fix over LoRaWAN, from a file and over Bluetooth one position with three deliveries. See [OpenCollar over Web Bluetooth](opencollar-webble.md), [raw log files](raw-log-files.md) and [Cloudloop](../integrations/cloudloop/index.md).
 
-The protocol catalogue (settings, commands and readable values of firmware 7.3.0, research sections 4.2 to 4.4) ships with the driver as `catalog.json`, generated from the research document, and feeds the Web Bluetooth settings editor through `GET /devices/{id}/driver-catalog`.
+The protocol catalogue (settings, commands and readable values, research sections 4.2 to 4.4) ships with the driver in two generations (decision D346): `catalog.json` describes firmware 7.3.0, generated from the research document, and `catalog-v8.json` firmware 8.1.0, built by `scripts/opencollar_catalog_v8.py` from the firmware's own settings table. Firmware 7.4 and later address every setting by a family byte and an id inside it, and a settings record on the wire is `[family][id][len][value]` instead of `[id][len][value]`; the firmware a device reports in its status picks the generation, in the decoder, in the command encoders and in the browser, and an unknown firmware is read as the newest. `GET /devices/{id}/driver-catalog` and `GET /device-types/{id}/driver-catalog` serve it, with `?firmware=` for a version read over Bluetooth just now.
 
 ## What the driver produces
 
@@ -49,7 +49,7 @@ Documented in section 8 of the research: the course over ground byte order in po
 
 ## Control
 
-Downlinks are settings on FPort 3 (`id len value`) and commands on FPort 32; `cmd_reset` is 0xA1, `cmd_send_status` 0xA4, `cmd_send_position` 0xA5. The complete command and settings tables are in the research document; the encoders and the command lifecycle are described under [device control](device-control.md).
+Downlinks are settings on FPort 3 (`id len value`; `family id len value` from firmware 7.4, with the setting looked up in that firmware's catalogue, decision D346) and commands on FPort 32; `cmd_reset` is 0xA1, `cmd_send_status` 0xA4, `cmd_send_position` 0xA5. The complete command and settings tables are in the research document; the encoders and the command lifecycle are described under [device control](device-control.md).
 
 ## Testing
 

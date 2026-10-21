@@ -1640,8 +1640,9 @@ export interface paths {
         };
         /**
          * Device Type Driver Catalog
-         * @description The driver's protocol catalogue by device type, for reading a device over Bluetooth
-         *     before it exists in Protect (the Offload page's "Add a device"); the per-device route in
+         * @description The driver's protocol catalogue by device type for a firmware, for reading a device
+         *     over Bluetooth before it exists in Protect (the Offload page's "Add a device": the browser
+         *     reads the status first and asks with the version it names); the per-device route in
          *     `log_files.py` serves a device that does. Empty for drivers without one.
          */
         get: operations["device_type_driver_catalog_api_v1_device_types__device_type_id__driver_catalog_get"];
@@ -4581,7 +4582,8 @@ export interface paths {
         /**
          * Driver Catalog
          * @description The driver's protocol catalogue (settings, commands, values) for the WebBLE settings
-         *     editor; empty for drivers without one.
+         *     editor, of the generation the device's firmware uses (decision D346); empty for drivers
+         *     without one.
          */
         get: operations["driver_catalog_api_v1_devices__device_id__driver_catalog_get"];
         put?: never;
@@ -18526,7 +18528,10 @@ export interface operations {
     };
     device_type_driver_catalog_api_v1_device_types__device_type_id__driver_catalog_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The firmware the device reported, which picks the catalogue's generation */
+                firmware?: string | null;
+            };
             header?: never;
             path: {
                 device_type_id: string;
@@ -24734,7 +24739,10 @@ export interface operations {
     };
     driver_catalog_api_v1_devices__device_id__driver_catalog_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The firmware read over Bluetooth just now; else the device's known one */
+                firmware?: string | null;
+            };
             header?: never;
             path: {
                 device_id: string;

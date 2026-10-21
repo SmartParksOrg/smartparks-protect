@@ -59,7 +59,16 @@ class ResponseContext:
     parameters: dict[str, Any]
 
 
-Encoder = Callable[[BaseModel], EncodedCommand]
+@dataclass(frozen=True, slots=True)
+class EncodeContext:
+    """What an encoder knows about the device the command is for: the firmware it reported,
+    for a driver whose wire format depends on it (OpenCollar's settings since 7.4, decision
+    D346). Unknown is None, and a driver reads that as the newest."""
+
+    firmware_version: str | None = None
+
+
+Encoder = Callable[[BaseModel, EncodeContext], EncodedCommand]
 Interpreter = Callable[[ResponseContext], CommandResult | None]
 
 

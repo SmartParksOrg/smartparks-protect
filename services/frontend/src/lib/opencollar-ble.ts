@@ -38,9 +38,25 @@ export const MSG = { cmdConfirm: 0xf3, status: 0xf4, flashStatus: 0x94, timestam
 
 export type SettingType = "uint8" | "uint16" | "uint32" | "int8" | "int16" | "int32" | "bool" | "byte_array" | "string" | "float";
 
-export interface CatalogSetting { id: number; name: string; length: number; type: SettingType; default: unknown; min: number | boolean | null; max: number | boolean | null }
+/** A setting of the driver's catalogue. From firmware 7.4 a setting is addressed by a family
+ * byte and an id inside it (decision D346): `id` is then the whole address, family << 8 | id,
+ * and `family` and `wire_id` are its two bytes; before 7.4 `id` is the one byte itself. */
+export interface CatalogSetting { id: number; name: string; length: number; type: SettingType; default: unknown; min: number | boolean | null; max: number | boolean | null; family?: number | null; wire_id?: number | null }
 export interface CatalogCommand { id: number; name: string; argument_length: number; description: string }
-export interface Catalog { firmware?: string; settings: CatalogSetting[]; commands: CatalogCommand[]; values?: unknown[] }
+export interface Catalog { firmware?: string; applies_from?: string; families?: boolean; settings: CatalogSetting[]; commands: CatalogCommand[]; values?: unknown[] }
+
+/** Where the family format of the settings starts: development build 7.4, shipped in 8.0.0. */
+export const FAMILIES_SINCE: readonly [number, number] = [7, 4];
+
+/** Whether a firmware addresses its settings by family and id, from the "major.minor" the
+ * status message names; unknown means the newest, as the server reads it. */
+export function usesFamilies(version: string | null | undefined): boolean {
+  const match = /^v?(\d+)\.(\d+)/.exec((version ?? "").trim());
+  if (!match) return true;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > FAMILIES_SINCE[0] || (major === FAMILIES_SINCE[0] && minor >= FAMILIES_SINCE[1]);
+}
 
 export function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -65,9 +81,16 @@ export function commandFrame(cmdId: number, argument: Uint8Array = new Uint8Arra
   return new Uint8Array([PORT.commands, cmdId, argument.length, ...argument]);
 }
 
-/** `[port 3][id][len][value]` (research 4.1). */
-export function settingFrame(settingId: number, value: Uint8Array): Uint8Array {
-  return new Uint8Array([PORT.settings, settingId, value.length, ...value]);
+/** The bytes that name a setting on the wire: its one id byte, or its family and id. */
+export function settingAddress(setting: Pick<CatalogSetting, "id" | "family" | "wire_id">): number[] {
+  return setting.family != null ? [setting.family, setting.wire_id ?? setting.id & 0xff] : [setting.id];
+}
+
+/** `[port 3][id][len][value]` (research 4.1), or `[port 3][family][id][len][value]` for a
+ * setting of the firmware 8 catalogue. */
+export function settingFrame(setting: number | Pick<CatalogSetting, "id" | "family" | "wire_id">, value: Uint8Array): Uint8Array {
+  const target = typeof setting === "number" ? { id: setting } : setting;
+  return new Uint8Array([PORT.settings, ...settingAddress(target), value.length, ...value]);
 }
 
 /** Little-endian encoding per the catalogue's `conversion` type (research 4.1). */
@@ -140,15 +163,17 @@ export function decodeSettingValue(type: SettingType, bytes: Uint8Array): number
   }
 }
 
-/** `[id][len][value]` repeated (ports 3 and 30). */
-export function parseTlv(bytes: Uint8Array): Array<{ id: number; value: Uint8Array }> {
+/** `[id][len][value]` repeated (ports 3 and 30), or with `families` `[family][id][len][value]`,
+ * the id reported as the address family << 8 | id, which is the firmware 8 catalogue's `id`. */
+export function parseTlv(bytes: Uint8Array, families = false): Array<{ id: number; value: Uint8Array }> {
   const items: Array<{ id: number; value: Uint8Array }> = [];
+  const header = families ? 3 : 2;
   let i = 0;
-  while (i + 2 <= bytes.length) {
-    const id = bytes[i];
-    const length = bytes[i + 1];
-    items.push({ id, value: bytes.slice(i + 2, i + 2 + length) });
-    i += 2 + length;
+  while (i + header <= bytes.length) {
+    const id = families ? (bytes[i] << 8) | bytes[i + 1] : bytes[i];
+    const length = bytes[i + header - 1];
+    items.push({ id, value: bytes.slice(i + header, i + header + length) });
+    i += header + length;
   }
   return items;
 }
@@ -295,6 +320,9 @@ export interface FlashDownload { frames: Uint8Array[]; confirmed: boolean; statu
 /** The protocol on top of a transport: requests with matching answers, collectors for streams. */
 export class OpenCollarSession {
   readonly received: Frame[] = [];
+  /** Whether the device's settings come as `[family][id][len][value]`: set from the firmware
+   * the status message names (`requestStatus`), the newest until one was read. */
+  families = true;
   private readonly listeners = new Set<(frame: Frame) => void>();
   private readonly unsubscribe: () => void;
   private queue: Promise<unknown> = Promise.resolve();
@@ -341,7 +369,9 @@ export class OpenCollarSession {
 
   async requestStatus(): Promise<StatusMessage> {
     const frame = await this.request(commandFrame(CMD.sendStatus), (f) => f.port === PORT.status && f.msgId === MSG.status);
-    return decodeStatus(frame.data);
+    const status = decodeStatus(frame.data);
+    this.families = usesFamilies(status.firmwareVersion);
+    return status;
   }
 
   async requestFlashStatus(): Promise<{ usedPercent: number; messages: number }> {
@@ -355,11 +385,13 @@ export class OpenCollarSession {
     return new Date(seconds * 1000);
   }
 
-  /** All settings: the device answers with several port 3 frames and a confirmation (research 3.3). */
+  /** All settings: the device answers with several port 3 frames and a confirmation (research
+   * 3.3), read in the format of the firmware the status named (`families`); the keys are the
+   * catalogue's ids of that generation. */
   async requestSettings(timeoutMs = 10000): Promise<Map<number, Uint8Array>> {
     const values = new Map<number, Uint8Array>();
     await this.collect(commandFrame(CMD.sendAllSettings), (f) => {
-      if (f.port === PORT.settings) for (const item of parseTlv(f.raw.slice(1))) values.set(item.id, item.value);
+      if (f.port === PORT.settings) for (const item of parseTlv(f.raw.slice(1), this.families)) values.set(item.id, item.value);
       return isConfirmation(f, CMD.sendAllSettings);
     }, timeoutMs, 1500);
     return values;
@@ -367,7 +399,7 @@ export class OpenCollarSession {
 
   /** Write one setting; a confirmation is optional, so a quiet second counts as accepted. */
   async writeSetting(setting: CatalogSetting, value: unknown): Promise<boolean | null> {
-    const frame = settingFrame(setting.id, encodeSettingValue(setting.type, setting.length, value));
+    const frame = settingFrame(setting, encodeSettingValue(setting.type, setting.length, value));
     try {
       const confirm = await this.request(frame, (f) => f.port === PORT.messages && f.msgId === MSG.cmdConfirm, 1000);
       return confirm.data[1] === 1;

@@ -5,11 +5,9 @@ and the device page's Reporting card, so both say the same thing."""
 
 from __future__ import annotations
 
-import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -46,28 +44,24 @@ FRAMES_TO_READ = 20
 LEARN_DAYS = 30
 
 
-def driver_catalog_document(driver_key: str) -> dict[str, Any]:
-    """The driver's whole catalogue document (settings, commands, values, firmware), when it
-    ships one; empty otherwise."""
-    path = Path(__file__).resolve().parents[1] / "device_drivers" / driver_key / "catalog.json"
-    if not path.exists():
+def driver_catalog_document(driver_key: str, firmware: str | None = None) -> dict[str, Any]:
+    """The driver's whole catalogue document (settings, commands, values, firmware) for the
+    firmware a device reported, when the driver ships one; empty otherwise. The driver picks
+    the generation (OpenCollar: the family-addressed catalogue from 7.4 on, decision D346;
+    an unknown firmware takes the newest)."""
+    from shared.device_drivers.registry import DRIVERS
+
+    driver = DRIVERS.get(driver_key)
+    catalog = getattr(driver, "catalog", None)
+    if not callable(catalog):
         return {}
-    try:
-        document = json.loads(path.read_text())
-    except ValueError:
-        return {}
+    document = catalog(firmware)
     return document if isinstance(document, dict) else {}
 
 
-def driver_catalog(driver_key: str) -> list[dict[str, Any]]:
-    """The driver's settings catalogue, when it ships one (OpenCollar's `catalog.json`)."""
-    path = Path(__file__).resolve().parents[1] / "device_drivers" / driver_key / "catalog.json"
-    if not path.exists():
-        return []
-    try:
-        document = json.loads(path.read_text())
-    except ValueError:
-        return []
+def driver_catalog(driver_key: str, firmware: str | None = None) -> list[dict[str, Any]]:
+    """The driver's settings catalogue for a firmware, when it ships one."""
+    document = driver_catalog_document(driver_key, firmware)
     settings = document.get("settings") if isinstance(document, dict) else None
     return [s for s in settings or [] if isinstance(s, dict)]
 
@@ -94,7 +88,7 @@ async def declared_intervals(
     """The declared fix and status intervals as of `until`, most trustworthy source first: a
     person's override, the newest settings frame the device sent, an acknowledged interval
     command, the type's and the device's declared settings."""
-    catalog = driver_catalog(device_type.driver_key) if device_type else []
+    catalog = driver_catalog(device_type.driver_key, device.firmware_version) if device_type else []
     base = merged_settings(
         {str(s.get("name")): s.get("default") for s in catalog},
         dict(device_type.default_settings or {}) if device_type else None,

@@ -18,7 +18,12 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from shared.control.actions import ConfirmationPolicy, ControlAction, EncodedCommand
+from shared.control.actions import (
+    ConfirmationPolicy,
+    ControlAction,
+    EncodeContext,
+    EncodedCommand,
+)
 from shared.device_drivers.base import (
     DEFAULT_DECODABLE_EVENT_TYPES,
     DecodedEvent,
@@ -176,7 +181,7 @@ class PlatformCommandParameters(BaseModel):
     )
 
 
-def _encode_platform_command(params: BaseModel) -> EncodedCommand:
+def _encode_platform_command(params: BaseModel, _: EncodeContext) -> EncodedCommand:
     return EncodedCommand(
         payload=json.dumps(params.model_dump(), separators=(",", ":")).encode(),
         f_port=0,

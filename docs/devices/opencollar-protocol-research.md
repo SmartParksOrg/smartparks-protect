@@ -561,7 +561,7 @@ Commands present in older firmware and in the wiki but not in 7.3.0: `cmd_get_rf
 
 ### 4.4 Complete settings table (FPort 3), firmware 7.3.0
 
-Defaults, ranges and types from `scripts/settings/settings.json` at commit 73fa4de. Intervals are seconds unless the name says ms or hz. `ble-settings-app/settings/settings-v*.json` holds the same table for each earlier release (4.4.2, 5.0.1, 6.8.1 to 7.2.0); ids are stable across releases, new ids are appended, removed features leave gaps (0x3C to 0x3E, 0x51, 0x53 to 0x56, 0x58 to 0x5E, 0x6F to 0x71 were RF scan, open sky and satellite settings).
+Firmware 7.4 and later address these settings by family and id and send them as `[family][id][len][value]`; section 7.1 has the families and the table of 8.1.0 is `catalog-v8.json` beside the driver. Defaults, ranges and types from `scripts/settings/settings.json` at commit 73fa4de. Intervals are seconds unless the name says ms or hz. `ble-settings-app/settings/settings-v*.json` holds the same table for each earlier release (4.4.2, 5.0.1, 6.8.1 to 7.2.0); ids are stable across releases, new ids are appended, removed features leave gaps (0x3C to 0x3E, 0x51, 0x53 to 0x56, 0x58 to 0x5E, 0x6F to 0x71 were RF scan, open sky and satellite settings).
 
 | ID | Name | Len | Type | Default | Min | Max |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -4161,7 +4161,14 @@ Firmware / tracker type (high nibble, setting `tracker_type` 0x00, 0 = hardware 
 
 ## 7.1 Firmware 8 and the settings structure
 
-Tim (2026-09-16): OpenCollar Edge firmware v8 and later changes the settings structure in an important way. The tables of section 4 and `catalog.json` describe firmware 7.3.0; the catalogue's `since_firmware` per setting and `versions` list are the place a version-dependent catalogue grows from, keyed by the firmware the device reports in its status. The change is to be addressed when the release and the information to understand it are available; Tim guides that work.
+Tim (2026-09-16): OpenCollar Edge firmware v8 and later changes the settings structure in an important way. Read on 2026-10-21 from the firmware's `scripts/settings/settings.json` of the LP0 branch at 7bae042 (as the public ble-settings-app bundles it, `settings/settings-v8.1.0.json`) and the settings app's own reading of it, after a RangerEdge on firmware 8.1 answered the Offload page's Bluetooth read with settings nothing in Protect could name (decision D346):
+
+* **Families.** Every setting belongs to a family, a byte that groups the storage: `old` 0x00 (empty), `reserved_special` 0x01, `general` 0x02, `flags` 0x03, `ble` 0x04, `lora` 0x05, `gps` 0x06, `satellite` 0x07, `sensors` 0x08; the readable values of port 30 are family `values` 0xA0. Ids restart per family, so a setting is named by the pair: `device_name` is 0x02 0x06, `device_eui` 0x05 0x05, `lp0_app_key` 0x05 0x0E, `lp0_network_key` 0x05 0x0F, `lp0_dev_addr` 0x05 0x10, `ublox_send_interval` 0x06 0x00. The firmware migrates saved settings to the family storage on the first boot of 8.0.0; a downgrade to 7.3 or earlier can bring defaults back, since those versions use the old addresses.
+* **On the wire.** A settings record is `[family][id][len][value]` on FPort 3 in both directions, where it was `[id][len][value]`; a port 30 record the same with family 0xA0. `cmd_send_single_setting` (0xA8) takes the two address bytes as its argument (`length` 2 in the table, 1 before). Commands keep their one-byte ids on FPort 32; the status message, the positions, the flash log stream and every other uplink are unchanged.
+* **Since when.** The settings app reads the family format from firmware 7.4, the development build in which it arrived, and every 8.x release has it; `catalog-v8.json` says `applies_from` 7.4.0.
+* **Additions.** 7.3.0 added `ublox_min_satellites_timer`; 8.0 added nothing to the table; 8.1 (the LP0 branch, development builds) added `lp0_master_key` (0x05 0x27), `lp0_node_params` as before at 0x05 0x23 with `lp0_focus_offloading` (0x05 0x24), `lp0_signal_checks` (0x05 0x25) and `lp0_statistics_interval` (0x05 0x26), and the commands `cmd_offload_start` (0xCF, 3 bytes), `cmd_offload_cancel` (0xD1, 4 bytes) and `cmd_flash_clear_confirmed` (0xD2, 1 byte).
+
+The driver ships both tables: `catalog.json` (section 4.4, firmware 7.3.0) and `catalog-v8.json` (firmware 8.1.0, built by `scripts/opencollar_catalog_v8.py`, every setting with `family`, `wire_id` and its address as `id`), and the firmware a device reports picks the one it is read and written with.
 
 ## 8. What could not be found, and whom to ask
 
