@@ -110,6 +110,17 @@ class FieldMapRequest(BaseModel):
     force: bool = Field(default=False, description="Cut again although a fresh map covers the area")
 
 
+class FieldOtherTracker(BaseModel):
+    """A tracker of another project the project's stations served (decision D348): the address
+    and the names, never a key, so Protect Go names a card's frames of it instead of offering
+    to add a device Protect already has."""
+
+    dev_addr: str
+    device_id: uuid.UUID
+    device_name: str
+    project_name: str | None = None
+
+
 class FieldBundleRead(BaseModel):
     """One project for the field: its devices with the entity each tracks now, the entities,
     the stations with their EUI and place, the trackers' LP0 credentials the caller may see, the
@@ -141,6 +152,10 @@ class FieldBundleRead(BaseModel):
     )
     entities: list[FieldEntity] = Field(default_factory=list)
     stations: list[FieldStation] = Field(default_factory=list)
+    other_trackers: list[FieldOtherTracker] = Field(
+        default_factory=list,
+        description="Trackers of other projects the stations served in the last 30 days (D348)",
+    )
 
 
 class FieldBundleRevision(BaseModel):

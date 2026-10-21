@@ -7,6 +7,7 @@ import {
   BookOpen,
   CircleCheck,
   CircleHelp,
+  FolderInput,
   HardDrive,
   Laptop,
   MapPin,
@@ -17,6 +18,7 @@ import {
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  OffloadOtherTracker,
   OffloadOverview,
   OffloadOverviewStation,
   OffloadOverviewTracker,
@@ -26,6 +28,7 @@ import { Callout } from "@/components/common/Callout";
 import { resolveIcon } from "@/components/icons/registry";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { AddTrackerDialog } from "@/components/network/AddTrackerDialog";
 import { CardUploadButton } from "@/components/network/CardUploadButton";
 import { FieldCard } from "@/components/network/FieldCard";
@@ -77,6 +80,8 @@ export function OffloadPage() {
   // Protect Go hands a tracker over
   const [params, setParams] = useSearchParams();
   const [adding, setAdding] = useState<OffloadUnknownAddress | null>(null);
+  // a tracker of another project the stations served, offered the move here (decision D348)
+  const [moving, setMoving] = useState<OffloadOtherTracker | null>(null);
   const [stationsView, setStationsView] = useOffloadView("stations");
   const [trackersView, setTrackersView] = useOffloadView("trackers");
   const [fieldOpen, setFieldOpen] = useState(false);
@@ -700,7 +705,80 @@ export function OffloadPage() {
 
   const stations = data?.stations ?? [];
   const trackers = data?.trackers ?? [];
+  const otherTrackers = data?.other_trackers ?? [];
   const unknown = data?.unknown ?? [];
+  const otherColumns: ColumnDef<OffloadOtherTracker, unknown>[] = [
+    {
+      id: "move",
+      header: "",
+      enableSorting: false,
+      cell: ({ row }) =>
+        row.original.can_move ? (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="size-7"
+            onClick={() => setMoving(row.original)}
+            title={t("Move to this project")}
+          >
+            <FolderInput className="size-4" />
+          </Button>
+        ) : null,
+      meta: { filter: false },
+    } satisfies ColumnDef<OffloadOtherTracker, unknown>,
+    {
+      header: t("Device"),
+      accessorKey: "device_name",
+      cell: ({ row }) =>
+        row.original.project_id ? (
+          <Link
+            className="font-medium underline"
+            to={`/projects/${row.original.project_id}/devices/${row.original.device_id}`}
+          >
+            {row.original.device_name}
+          </Link>
+        ) : (
+          <span className="font-medium">{row.original.device_name}</span>
+        ),
+    },
+    {
+      header: t("Project"),
+      accessorKey: "project_name",
+      cell: ({ row }) =>
+        row.original.project_name ?? (
+          <span className="text-muted-foreground">{t("no project")}</span>
+        ),
+    },
+    {
+      header: t("Entity"),
+      accessorKey: "entity_name",
+      cell: ({ getValue }) => getValue<string | null>() ?? "",
+    },
+    {
+      header: t("Address"),
+      accessorKey: "dev_addr",
+      cell: ({ getValue }) => (
+        <span className="font-mono">{getValue<string | null>() ?? ""}</span>
+      ),
+    },
+    {
+      header: t("Heard by"),
+      accessorKey: "stations",
+      cell: ({ getValue }) => getValue<string[]>().join(", "),
+      meta: { filter: false },
+    },
+    {
+      header: t("Frames"),
+      accessorKey: "receptions",
+      meta: { filter: false },
+    },
+    {
+      header: t("Last offload"),
+      accessorKey: "last_reception_at",
+      cell: ({ getValue }) => formatAgo(getValue<string | null>(), now),
+    },
+  ];
   const wanted = params.get("add");
   const toAdd =
     adding ??
@@ -1020,6 +1098,23 @@ export function OffloadPage() {
             />
           )}
         </section>
+        {otherTrackers.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <FolderInput className="size-4" /> {t("Trackers of other projects")}
+            </h2>
+            <Callout kind="info">
+              {t(
+                "The stations served these trackers, but each belongs to another project, so its records went there: to its own entity, map and pages. A device belongs to one project at a time. To have it here, move it to this project with its history; the arrow does that for a project admin of both projects.",
+              )}
+            </Callout>
+            <DataTable
+              columns={otherColumns}
+              data={otherTrackers}
+              defaultHiddenSmall={["entity_name", "stations"]}
+            />
+          </section>
+        )}
         {unknown.length > 0 && (
           <section className="space-y-2">
             <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -1047,6 +1142,21 @@ export function OffloadPage() {
         )}
         <FilesSection projectId={projectId} canWrite={canUpload} />
       </Page>
+      {moving && (
+        <MoveToProjectDialog
+          subject={{
+            kind: "devices",
+            items: [{ id: moving.device_id, name: moving.device_name }],
+            currentProjectId: moving.project_id,
+            targetProjectId: projectId,
+          }}
+          open
+          onOpenChange={(open) => {
+            if (!open) setMoving(null);
+          }}
+          onMoved={() => void overview.refetch()}
+        />
+      )}
     </>
   );
 }

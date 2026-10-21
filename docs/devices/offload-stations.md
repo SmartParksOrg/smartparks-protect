@@ -177,8 +177,15 @@ and of how many trackers, the gist of its own last report, and whether its place
 tracker with an LP0 address or with frames (its address, whether the keys are set and since when,
 what the device itself reports as its address when that differs, the frames and stations of the
 window, the last station, the last verified counter), and the addresses the stations received
-that no device has, with the tracker's EUI when a line named it. The keys are never on this page;
-they stay on the device page, masked until shown. The page lists and links: a station or a tracker is a
+that no device has, with the tracker's EUI when a line named it, and, in a section of its own,
+the **trackers of other projects** the stations served (decision D348, Tim, 2026-10-21: a card
+was read and nothing seemed to happen, because the tracker lived in another project). A device
+belongs to one project at a time, so such a tracker's records went to its own project, entity
+and map; the section names the device, its project, its entity, its address, the stations that
+heard it and its last offload, links to the device in its project, and offers "Move to this
+project", which opens the move dialog with this project preset (the moment to move from, the
+preview of what comes along, then the move), to a server admin or a project admin of both
+projects. The keys are never on this page; they stay on the device page, masked until shown. The page lists and links: a station or a tracker is a
 link away. **Upload SD card files**, in the page's header, takes the files of any number of
 cards and puts each with its station (step 3 above). The Stations section is a list or a map,
 switched at its heading and remembered per person (Tim, 2026-10-18): the map shows every station
@@ -273,7 +280,9 @@ takes minutes and the row's bar says where it is.
   the rows made, the members skipped with their reason, and the files named after another
   station.
 - `GET /api/v1/devices/{device_id}/offload`: the Offload station card.
-- `GET /api/v1/projects/{project_id}/offload`: the Offload page, for anyone who reads the project.
+- `GET /api/v1/projects/{project_id}/offload`: the Offload page, for anyone who reads the project;
+  `other_trackers` lists the trackers of other projects the stations served, each with
+  `can_move` for the caller.
 - `POST /api/v1/projects/{project_id}/devices` (a device as `POST /devices` takes it, status
   active by default, plus optional `lp0` with `dev_addr`, `app_s_key`, `nwk_s_key` and `source`
   person or device): the device made and assigned to the project from now, its LP0 credentials

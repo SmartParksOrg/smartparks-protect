@@ -7,6 +7,7 @@ the card's `LOG_*` folders (D321), each file a raw log file row of the station w
 `lp0`. The Offload station card reads what the cards brought and whom the station served."""
 
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -19,7 +20,7 @@ from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import flush_or_409, geom_to_geojson, get_or_404
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import ProjectContext, is_project_admin, require_permission
 from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
 from protect_api.routers.entities import _new_entity, _project_entity
@@ -32,6 +33,7 @@ from protect_api.schemas.offload import (
     Lp0CredentialsUpdate,
     Lp0Readback,
     Lp0WalkResult,
+    OffloadOtherTracker,
     OffloadOverviewRead,
     OffloadOverviewStation,
     OffloadOverviewTracker,
@@ -82,6 +84,7 @@ from shared.models import (
     ExternalIdentity,
     Gateway,
     GatewayReception,
+    Project,
     SourceEvent,
     User,
 )
@@ -571,6 +574,91 @@ async def offload_station(
         read.state_time = current.latest_state_time if current else None
         read.is_station = True
     return read
+
+
+@dataclass(slots=True)
+class ServedElsewhere:
+    """A tracker the project's stations received that is a device of another project
+    (decision D348): its records went where the device lives, which the Offload page and the
+    field bundle say rather than letting a station's work look like nothing happened."""
+
+    device: Device
+    project_id: uuid.UUID | None
+    project_name: str | None
+    dev_addr: str | None
+    receptions: int
+    last: datetime | None
+    gateways: list[str] = field(default_factory=list)
+
+
+async def served_from_elsewhere(
+    session: AsyncSession,
+    source_id: uuid.UUID,
+    station_gateway_ids: list[str],
+    device_ids: set[uuid.UUID],
+    since: datetime,
+    until: datetime,
+) -> list[ServedElsewhere]:
+    """The devices outside `device_ids` that the given stations received in the window, newest
+    first, with the project each belongs to now and its LP0 address."""
+    if not station_gateway_ids:
+        return []
+    statement = (
+        select(
+            GatewayReception.device_id,
+            func.count().label("receptions"),
+            func.max(GatewayReception.time).label("last"),
+            func.array_agg(func.distinct(GatewayReception.gateway_id)).label("gateways"),
+        )
+        .where(
+            GatewayReception.data_source_id == source_id,
+            GatewayReception.gateway_id.in_(station_gateway_ids),
+            GatewayReception.device_id.is_not(None),
+            GatewayReception.source_event_ingested_at >= since,
+            GatewayReception.source_event_ingested_at <= until,
+        )
+        .group_by(GatewayReception.device_id)
+        .order_by(func.max(GatewayReception.time).desc())
+        .limit(MAX_TRACKERS)
+    )
+    if device_ids:
+        statement = statement.where(GatewayReception.device_id.not_in(list(device_ids)))
+    rows = (await session.execute(statement)).all()
+    if not rows:
+        return []
+    devices = {
+        d.id: d
+        for d in (
+            await session.scalars(select(Device).where(Device.id.in_([r.device_id for r in rows])))
+        ).all()
+    }
+    addresses = await addresses_of(session, list(devices))
+    projects: dict[uuid.UUID, uuid.UUID | None] = {}
+    for device_id in devices:
+        projects[device_id] = (await resolve_attribution(session, device_id, until)).project_id
+    names = {
+        p.id: p.name
+        for p in (
+            await session.scalars(
+                select(Project).where(
+                    Project.id.in_([pid for pid in projects.values() if pid is not None])
+                )
+            )
+        ).all()
+    }
+    return [
+        ServedElsewhere(
+            device=devices[r.device_id],
+            project_id=projects.get(r.device_id),
+            project_name=names.get(projects.get(r.device_id) or uuid.UUID(int=0)),
+            dev_addr=addresses.get(r.device_id),
+            receptions=int(r.receptions),
+            last=r.last,
+            gateways=list(r.gateways or []),
+        )
+        for r in rows
+        if r.device_id in devices
+    ]
 
 
 async def _project_device_ids(session: AsyncSession, context: ProjectContext) -> list[uuid.UUID]:
@@ -1242,11 +1330,49 @@ async def project_offload(
                 )
             )
 
+    # the trackers of other projects the stations served (decision D348): their records went
+    # to the project each belongs to; the page says so and offers the move to whoever may
+    elsewhere = await served_from_elsewhere(
+        session, source.id, list(station_by_eui), set(device_ids), since, until
+    )
+    other_entities = await _current_entities(session, [e.device.id for e in elsewhere])
+    admin_here = await is_project_admin(session, context.user, context.project.id)
+    admin_of: dict[uuid.UUID, bool] = {}
+    other_trackers: list[OffloadOtherTracker] = []
+    for served in elsewhere:
+        if served.project_id is not None and served.project_id not in admin_of:
+            admin_of[served.project_id] = await is_project_admin(
+                session, context.user, served.project_id
+            )
+        entity = other_entities.get(served.device.id)
+        other_trackers.append(
+            OffloadOtherTracker(
+                device_id=served.device.id,
+                device_name=served.device.name,
+                project_id=served.project_id,
+                project_name=served.project_name,
+                entity_name=entity[1] if entity else None,
+                dev_addr=served.dev_addr,
+                stations=sorted(
+                    {
+                        devices[station_by_eui[g]].name
+                        for g in served.gateways
+                        if g in station_by_eui and station_by_eui[g] in devices
+                    }
+                ),
+                receptions=served.receptions,
+                last_reception_at=served.last,
+                can_move=admin_here
+                and (served.project_id is None or admin_of.get(served.project_id, False)),
+            )
+        )
+
     without = len(set(devices) - set(credentials) - station_ids)
     return OffloadOverviewRead(
         window_days=TRACKERS_WINDOW.days,
         stations=stations,
         trackers=trackers,
+        other_trackers=other_trackers,
         unknown=unknown,
         devices_without_address=without,
     )

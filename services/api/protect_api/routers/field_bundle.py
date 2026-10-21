@@ -20,7 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.audit import record_audit
 from protect_api.bus import get_bus
 from protect_api.deps import ProjectContext, require_permission
-from protect_api.routers.offload import STATION_TYPE_KEY, _current_entities, _project_device_ids
+from protect_api.routers.offload import (
+    STATION_TYPE_KEY,
+    TRACKERS_WINDOW,
+    _current_entities,
+    _project_device_ids,
+    served_from_elsewhere,
+)
 from protect_api.schemas.field_bundle import (
     FieldArea,
     FieldBundleRead,
@@ -31,6 +37,7 @@ from protect_api.schemas.field_bundle import (
     FieldMapRead,
     FieldMapRequest,
     FieldMetric,
+    FieldOtherTracker,
     FieldProject,
     FieldStation,
 )
@@ -239,8 +246,19 @@ async def _build_bundle(
     # the metric registry is shared by every project and small; the app names and units the
     # values it decodes with it (decision D334)
     metric_rows = (await session.scalars(select(Metric).order_by(Metric.key))).all()
+    # the trackers of other projects the stations served (decision D348), so the app names a
+    # card's frames of them rather than offering to add a device Protect has
+    now = utc_now()
+    elsewhere = await served_from_elsewhere(
+        session,
+        source.id,
+        [g.external_id for g in gateways.values()],
+        set(device_ids),
+        now - TRACKERS_WINDOW,
+        now,
+    )
     bundle = FieldBundleRead(
-        generated_at=utc_now(),
+        generated_at=now,
         protect_version=__version__,
         protect_commit=os.environ.get("GIT_COMMIT", "unknown"),
         server_url=get_settings().public_url,
@@ -266,6 +284,16 @@ async def _build_bundle(
             for entity, key, label, geometry in entity_rows
         ],
         stations=stations,
+        other_trackers=[
+            FieldOtherTracker(
+                dev_addr=served.dev_addr,
+                device_id=served.device.id,
+                device_name=served.device.name,
+                project_name=served.project_name,
+            )
+            for served in elsewhere
+            if served.dev_addr
+        ],
         metrics=[
             FieldMetric(
                 key=m.key,

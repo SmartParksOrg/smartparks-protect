@@ -3280,5 +3280,9 @@
   "SD card missing": "SD-kaart ontbreekt",
   "SD card space": "Ruimte op de SD-kaart",
   "Storage fault": "Opslagfout",
-  "The station's own report says its SD card is out, faulted or cannot be written": "Het eigen rapport van het station zegt dat zijn SD-kaart eruit is, een fout heeft of niet beschreven kan worden"
+  "The station's own report says its SD card is out, faulted or cannot be written": "Het eigen rapport van het station zegt dat zijn SD-kaart eruit is, een fout heeft of niet beschreven kan worden",
+  "no project": "geen project",
+  "Trackers of other projects": "Trackers van andere projecten",
+  "The stations served these trackers, but each belongs to another project, so its records went there: to its own entity, map and pages. A device belongs to one project at a time. To have it here, move it to this project with its history; the arrow does that for a project admin of both projects.": "De stations hebben deze trackers bediend, maar elk hoort bij een ander project, dus de records zijn daarheen gegaan: naar de eigen entiteit, kaart en pagina's. Een apparaat hoort op elk moment bij één project. Om het hier te hebben, verplaats je het met zijn geschiedenis naar dit project; de pijl doet dat voor een projectbeheerder van beide projecten.",
+  "Move to this project": "Verplaats naar dit project"
 }

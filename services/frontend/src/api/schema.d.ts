@@ -9981,6 +9981,11 @@ export interface components {
             entities?: components["schemas"]["FieldEntity"][];
             /** Stations */
             stations?: components["schemas"]["FieldStation"][];
+            /**
+             * Other Trackers
+             * @description Trackers of other projects the stations served in the last 30 days (D348)
+             */
+            other_trackers?: components["schemas"]["FieldOtherTracker"][];
         };
         /**
          * FieldBundleRevision
@@ -10146,6 +10151,25 @@ export interface components {
             category: string;
             /** Description */
             description?: string | null;
+        };
+        /**
+         * FieldOtherTracker
+         * @description A tracker of another project the project's stations served (decision D348): the address
+         *     and the names, never a key, so Protect Go names a card's frames of it instead of offering
+         *     to add a device Protect already has.
+         */
+        FieldOtherTracker: {
+            /** Dev Addr */
+            dev_addr: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Project Name */
+            project_name?: string | null;
         };
         /** FieldProject */
         FieldProject: {
@@ -11848,10 +11872,54 @@ export interface components {
             stations?: components["schemas"]["OffloadStation"][];
         };
         /**
+         * OffloadOtherTracker
+         * @description A tracker the project's stations served that belongs to another project (decision
+         *     D348): its records went to that project, and this page says so and offers the move. Never
+         *     a key.
+         */
+        OffloadOtherTracker: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /**
+             * Project Id
+             * @description The project the device belongs to now; none while unassigned
+             */
+            project_id?: string | null;
+            /** Project Name */
+            project_name?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /** Dev Addr */
+            dev_addr?: string | null;
+            /**
+             * Stations
+             * @description The stations of this project that received it
+             */
+            stations?: string[];
+            /**
+             * Receptions
+             * @default 0
+             */
+            receptions: number;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+            /**
+             * Can Move
+             * @description The caller may move it here: a server admin, or a project admin of both projects, the move's own rule
+             * @default false
+             */
+            can_move: boolean;
+        };
+        /**
          * OffloadOverviewRead
          * @description The project's LP0 network on one page (phase 42): every offload station, every tracker
-         *     with an address or frames, the addresses nobody has, and how many of the project's devices
-         *     have no address yet.
+         *     with an address or frames, the trackers of other projects the stations served, the
+         *     addresses nobody has, and how many of the project's devices have no address yet.
          */
         OffloadOverviewRead: {
             /** Window Days */
@@ -11860,6 +11928,11 @@ export interface components {
             stations?: components["schemas"]["OffloadOverviewStation"][];
             /** Trackers */
             trackers?: components["schemas"]["OffloadOverviewTracker"][];
+            /**
+             * Other Trackers
+             * @description Trackers of other projects the stations served in the window (D348)
+             */
+            other_trackers?: components["schemas"]["OffloadOtherTracker"][];
             /** Unknown */
             unknown?: components["schemas"]["OffloadUnknownAddress"][];
             /**

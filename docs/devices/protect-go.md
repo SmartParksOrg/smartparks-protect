@@ -15,6 +15,7 @@ The Offload page's "Protect Go" button opens a card with two buttons and one lin
 - each tracker's LP0 address, and its two session keys when the caller may set keys in this project (device control in the project, or a server admin, the rule of the device page's credentials card); a viewer gets the address and `keys_set` and no key;
 - the entities those devices track, with type and icon and a place set by hand;
 - the offload stations with their EUI and where they stand;
+- the trackers of other projects the stations served in the last 30 days (decision D348): address, device and project name, never a key, so the app names a card's frames of such a tracker instead of offering to add a device Protect already has;
 - the metric registry (key, label, unit, value type, category, description; decision D334), so the app's Data explorer names and units the values it decodes as Protect does;
 - the project's area: the bounding box of its features, its entities' places and its devices' places, which Protect Go cuts its offline map for.
 

@@ -223,14 +223,43 @@ class OffloadUnknownAddress(BaseModel):
     last_seen_at: datetime | None = None
 
 
+class OffloadOtherTracker(BaseModel):
+    """A tracker the project's stations served that belongs to another project (decision
+    D348): its records went to that project, and this page says so and offers the move. Never
+    a key."""
+
+    device_id: uuid.UUID
+    device_name: str
+    project_id: uuid.UUID | None = Field(
+        default=None, description="The project the device belongs to now; none while unassigned"
+    )
+    project_name: str | None = None
+    entity_name: str | None = None
+    dev_addr: str | None = None
+    stations: list[str] = Field(
+        default_factory=list, description="The stations of this project that received it"
+    )
+    receptions: int = 0
+    last_reception_at: datetime | None = None
+    can_move: bool = Field(
+        default=False,
+        description="The caller may move it here: a server admin, or a project admin of both "
+        "projects, the move's own rule",
+    )
+
+
 class OffloadOverviewRead(BaseModel):
     """The project's LP0 network on one page (phase 42): every offload station, every tracker
-    with an address or frames, the addresses nobody has, and how many of the project's devices
-    have no address yet."""
+    with an address or frames, the trackers of other projects the stations served, the
+    addresses nobody has, and how many of the project's devices have no address yet."""
 
     window_days: int
     stations: list[OffloadOverviewStation] = Field(default_factory=list)
     trackers: list[OffloadOverviewTracker] = Field(default_factory=list)
+    other_trackers: list[OffloadOtherTracker] = Field(
+        default_factory=list,
+        description="Trackers of other projects the stations served in the window (D348)",
+    )
     unknown: list[OffloadUnknownAddress] = Field(default_factory=list)
     devices_without_address: int = Field(
         default=0, description="Devices of the project with no LP0 address, stations apart"

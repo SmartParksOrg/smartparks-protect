@@ -648,6 +648,72 @@ async def test_a_device_without_keys_fails_plainly_and_decodes_again_once_set(cl
     assert got["records_new"] + got["records_duplicate"] == 3
 
 
+async def test_a_tracker_of_another_project_is_named_and_offered_the_move(client, db, bus):
+    """Decision D348 (Tim, 2026-10-21: a station's card was read and nothing seemed to happen;
+    the tracker lived in another project). The page of the station's project lists such a
+    tracker in a section of its own with its project, the stations that heard it and whether
+    the caller may move it here; the tracker's own project lists it as a tracker; the field
+    bundle names its address so Protect Go does not offer to add it."""
+    admin, project, _entity, _source, _live_device, _live_external = await _setup(client, db)
+    h = admin.headers
+    here = project.id
+    other = await create_project(db)
+    elsewhere, other_name = other.id, other.name
+    oc = await _opencollar_type(client, h)
+    station = await _device(client, h, oc["id"], here, serial="0016C001F0D348D3")
+    tracker = await _device(client, h, oc["id"], elsewhere)
+    addr = "26010348"
+    put = await client.put(
+        f"/api/v1/devices/{tracker['id']}/lp0-credentials",
+        json={"dev_addr": addr, "app_s_key": APP_S_KEY.hex(), "nwk_s_key": NWK_S_KEY.hex()},
+        headers=h,
+    )
+    assert put.status_code == 200, put.text
+    frame = build_uplink(Keys(addr, APP_S_KEY, NWK_S_KEY), 1, 29, RECORDS)
+    text = "\n".join(["", line(frame, station="0016C001F0D348D3")]) + "\n"
+    upload = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={"file": ("0016C001F0D348D3_1791795031.jsonl", text.encode(), "text/plain")},
+        headers=h,
+    )
+    assert upload.status_code == 201, upload.text
+    for f in upload.json()["files"]:
+        await _decode(bus, f["id"])
+    await db.rollback()
+
+    page = (await client.get(f"/api/v1/projects/{here}/offload", headers=h)).json()
+    assert page["trackers"] == [] and page["unknown"] == []
+    assert [s["device_name"] for s in page["stations"]] == [station["name"]]
+    assert page["stations"][0]["trackers"] == 1
+    assert len(page["other_trackers"]) == 1
+    served = page["other_trackers"][0]
+    assert served["device_id"] == tracker["id"] and served["device_name"] == tracker["name"]
+    assert served["project_id"] == str(elsewhere) and served["project_name"] == other_name
+    assert served["dev_addr"] == addr and served["stations"] == [station["name"]]
+    assert served["receptions"] == 1 and served["last_reception_at"]
+    assert served["can_move"] is True  # a server admin
+    # the tracker's own project lists it as its tracker, with nothing from elsewhere
+    own = (await client.get(f"/api/v1/projects/{elsewhere}/offload", headers=h)).json()
+    assert [t["device_id"] for t in own["trackers"]] == [tracker["id"]]
+    assert own["other_trackers"] == []
+    # a viewer of the station's project sees the row and cannot move it
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    seen = (await client.get(f"/api/v1/projects/{here}/offload", headers=viewer.headers)).json()
+    assert [o["device_id"] for o in seen["other_trackers"]] == [tracker["id"]]
+    assert seen["other_trackers"][0]["can_move"] is False
+    # the field bundle names the address and the names, never a key
+    bundle = (await client.get(f"/api/v1/projects/{here}/field-bundle", headers=h)).json()
+    assert bundle["other_trackers"] == [
+        {
+            "dev_addr": addr,
+            "device_id": tracker["id"],
+            "device_name": tracker["name"],
+            "project_name": other_name,
+        }
+    ]
+    assert tracker["id"] not in [d["id"] for d in bundle["devices"]]
+
+
 async def test_a_file_that_is_not_a_card_is_refused(client, db):
     admin = await actor(client, db, superuser=True)
     h = admin.headers

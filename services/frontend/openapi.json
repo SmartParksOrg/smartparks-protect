@@ -35211,6 +35211,14 @@
       },
       "type": "array",
       "title": "Stations"
+     },
+     "other_trackers": {
+      "items": {
+       "$ref": "#/components/schemas/FieldOtherTracker"
+      },
+      "type": "array",
+      "title": "Other Trackers",
+      "description": "Trackers of other projects the stations served in the last 30 days (D348)"
      }
     },
     "type": "object",
@@ -35643,6 +35651,42 @@
     ],
     "title": "FieldMetric",
     "description": "A metric's definition from Protect's registry, so Protect Go names and units the values\nit decodes as Protect does (decision D334)."
+   },
+   "FieldOtherTracker": {
+    "properties": {
+     "dev_addr": {
+      "type": "string",
+      "title": "Dev Addr"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "dev_addr",
+     "device_id",
+     "device_name"
+    ],
+    "title": "FieldOtherTracker",
+    "description": "A tracker of another project the project's stations served (decision D348): the address\nand the names, never a key, so Protect Go names a card's frames of it instead of offering\nto add a device Protect already has."
    },
    "FieldProject": {
     "properties": {
@@ -40254,6 +40298,103 @@
     "title": "OffloadLink",
     "description": "What offload stations carried for the device in the period (decision D322): the frames\nstored for it on their cards, by station, with repeats and the frames that did not\nverify counted apart."
    },
+   "OffloadOtherTracker": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id",
+      "description": "The project the device belongs to now; none while unassigned"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr"
+     },
+     "stations": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Stations",
+      "description": "The stations of this project that received it"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions",
+      "default": 0
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "can_move": {
+      "type": "boolean",
+      "title": "Can Move",
+      "description": "The caller may move it here: a server admin, or a project admin of both projects, the move's own rule",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name"
+    ],
+    "title": "OffloadOtherTracker",
+    "description": "A tracker the project's stations served that belongs to another project (decision\nD348): its records went to that project, and this page says so and offers the move. Never\na key."
+   },
    "OffloadOverviewRead": {
     "properties": {
      "window_days": {
@@ -40274,6 +40415,14 @@
       "type": "array",
       "title": "Trackers"
      },
+     "other_trackers": {
+      "items": {
+       "$ref": "#/components/schemas/OffloadOtherTracker"
+      },
+      "type": "array",
+      "title": "Other Trackers",
+      "description": "Trackers of other projects the stations served in the window (D348)"
+     },
      "unknown": {
       "items": {
        "$ref": "#/components/schemas/OffloadUnknownAddress"
@@ -40293,7 +40442,7 @@
      "window_days"
     ],
     "title": "OffloadOverviewRead",
-    "description": "The project's LP0 network on one page (phase 42): every offload station, every tracker\nwith an address or frames, the addresses nobody has, and how many of the project's devices\nhave no address yet."
+    "description": "The project's LP0 network on one page (phase 42): every offload station, every tracker\nwith an address or frames, the trackers of other projects the stations served, the\naddresses nobody has, and how many of the project's devices have no address yet."
    },
    "OffloadOverviewStation": {
     "properties": {

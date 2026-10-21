@@ -166,6 +166,7 @@ export type OffloadStation = Schemas["OffloadStationRead"];
 export type OffloadOverview = Schemas["OffloadOverviewRead"];
 export type OffloadOverviewStation = Schemas["OffloadOverviewStation"];
 export type OffloadOverviewTracker = Schemas["OffloadOverviewTracker"];
+export type OffloadOtherTracker = Schemas["OffloadOtherTracker"];
 export type OffloadUnknownAddress = Schemas["OffloadUnknownAddress"];
 export type OffloadUpload = Schemas["OffloadUpload"];
 export type OffloadStationSetup = Schemas["OffloadStationSetup"];

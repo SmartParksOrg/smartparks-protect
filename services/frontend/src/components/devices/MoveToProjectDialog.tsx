@@ -18,8 +18,8 @@ import { formatTime } from "@/lib/format";
 
 /** What is being moved: devices from a moment each, or entities of one project whole. */
 export type MoveSubject =
-  | { kind: "devices"; items: { id: string; name: string }[]; currentProjectId?: string | null }
-  | { kind: "entities"; projectId: string; items: { id: string; name: string }[] };
+  | { kind: "devices"; items: { id: string; name: string }[]; currentProjectId?: string | null; targetProjectId?: string }
+  | { kind: "entities"; projectId: string; items: { id: string; name: string }[]; targetProjectId?: string };
 
 /** Move devices or entities to another project with their history (decisions D292, D293):
  * the target, the moment for devices, a group of the target and a reason; the preview the
@@ -50,7 +50,8 @@ function MoveForm({ subject, onDone, onCancel }: { subject: MoveSubject; onDone:
   const { t } = useTranslation();
   const projects = useProjects();
   const exclude = subject.kind === "entities" ? subject.projectId : (subject.currentProjectId ?? null);
-  const [projectId, setProjectId] = useState("");
+  // the Offload page presets the target: the project whose stations served the device (D348)
+  const [projectId, setProjectId] = useState(subject.targetProjectId ?? "");
   const [start, setStart] = useState<BulkStart>("first_data");
   const [groupId, setGroupId] = useState("");
   const [reason, setReason] = useState("");
