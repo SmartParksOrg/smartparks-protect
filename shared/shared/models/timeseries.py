@@ -53,6 +53,9 @@ class SourceEvent(Base):
     __tablename__ = "source_events"
     __table_args__ = (
         Index("ix_source_events_source_external", "data_source_id", "external_id", "ingested_at"),
+        # "when did this source last deliver", per source, without walking the time index
+        # through every other source's newer events (migration 0057, decision D347)
+        Index("ix_source_events_source_time", "data_source_id", "ingested_at"),
         Index("ix_source_events_device_time", "device_id", "ingested_at"),
         Index("ix_source_events_status", "processing_status", "ingested_at"),
         Index("ix_source_events_trace", "trace_id"),

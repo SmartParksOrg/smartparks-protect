@@ -19,6 +19,7 @@ export function HealthPage() {
     <>
       <PageHeader title={t("System health")} description={t("Pipeline state per area, workers, throughput, failures, data sources")} actions={h && <StatusBadge value={h.status} />} />
       <Page>
+        {health.isPending && <p className="text-sm text-muted-foreground">{t("Loading…")}</p>}
         {health.isError && <Callout kind="error">{health.error.message}</Callout>}
         {h && (
           <>
