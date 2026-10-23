@@ -19976,7 +19976,7 @@
      "offload stations"
     ],
     "summary": "Upload Offload Files",
-    "description": "The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of\nthe card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a\nraw log file row of the station with channel `lp0`; a file seen before is skipped with\nits reason, as is a member that is not a station file.",
+    "description": "The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of\nthe card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a\nraw log file row of the station with channel `lp0`; a file seen before is left out and\nnamed with `duplicate` (decision D353), as is, with its reason, a member that is not a\nstation file. An upload of files all seen before answers 201 with no files.",
     "operationId": "upload_offload_files_api_v1_devices__device_id__offload_files_post",
     "security": [
      {
@@ -20143,7 +20143,7 @@
      "offload stations"
     ],
     "summary": "Upload Project Offload Files",
-    "description": "The files of one or more offload stations' SD cards, uploaded on the Offload page\n(Tim, 2026-10-18: the person who collected the cards should not have to find each\nstation's page): one `.jsonl`, or a zip of `LOG_*` folders, every file put with the station\nits name carries, the EUI matched to a device of the project by serial number or DevEUI\nidentity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of\nthe project has is skipped with that EUI, so the person sees which station is missing,\nand nothing is guessed; a file seen before is skipped as on the device page.",
+    "description": "The files of one or more offload stations' SD cards, uploaded on the Offload page\n(Tim, 2026-10-18: the person who collected the cards should not have to find each\nstation's page): one `.jsonl`, or a zip of `LOG_*` folders, every file put with the station\nits name carries, the EUI matched to a device of the project by serial number or DevEUI\nidentity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of\nthe project has is skipped with that EUI, so the person sees which station is missing,\nand nothing is guessed; a file seen before is left out and named as on the device page.",
     "operationId": "upload_project_offload_files_api_v1_projects__project_id__offload_files_post",
     "security": [
      {
@@ -41757,7 +41757,8 @@
        "$ref": "#/components/schemas/SkippedMember"
       },
       "type": "array",
-      "title": "Skipped"
+      "title": "Skipped",
+      "description": "The members not kept, each with its reason; a member uploaded before carries `duplicate` (D353). An upload whose every member was uploaded before is answered here with no files, not refused"
      },
      "other_station": {
       "items": {
@@ -46459,6 +46460,38 @@
      "reason": {
       "type": "string",
       "title": "Reason"
+     },
+     "duplicate": {
+      "type": "boolean",
+      "title": "Duplicate",
+      "description": "The same bytes were uploaded for this station before (D353): the file was left out, the earlier row holds its frames; nothing to do",
+      "default": false
+     },
+     "uploaded_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Uploaded At",
+      "description": "When the earlier copy was uploaded, for a duplicate"
+     },
+     "log_file_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Log File Id",
+      "description": "The earlier copy's row"
      }
     },
     "type": "object",

@@ -87,7 +87,7 @@ days is a repeat and stored as a duplicate of the first. A reception time before
 | Seen | Meaning | What to do |
 | --- | --- | --- |
 | The upload answers "Not a station file" | The file is not one JSON document per line, nor a zip of `LOG_*` folders | Upload the `.jsonl` files or a zip of the card's folders; a raw log `.txt` goes through "Upload raw log" as before |
-| A member "uploaded before" | The same bytes were uploaded for this station | Nothing; the earlier row holds the frames |
+| A member "uploaded before" (`duplicate` on the answer's `skipped` row, with the earlier upload's time and row) | The same bytes were uploaded for this station; the file was left out and nothing was decoded twice. An upload whose every file was uploaded before answers 201 with no files, not an error | Nothing; the earlier row holds the frames. The page says "Nothing new" or how many files were left out |
 | Frames "of trackers not known yet" | Addresses no device has | Needs attention: link each address to its device, then set the keys on the device |
 | Frames "of a tracker without keys" | The device is known, its keys are not | Set the keys on the device, then "Decode again" on the file |
 | Frames "that did not verify" | A wrong key, or a frame of another device under this address | Check the keys against the device's provisioning; the frames stay failed, never guessed |

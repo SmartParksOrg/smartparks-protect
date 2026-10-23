@@ -388,6 +388,25 @@ async def _read_card_upload(file: UploadFile) -> tuple[str, list[CardMember], li
     return name, members, skipped
 
 
+def _uploaded_before(member_name: str, duplicate: DuplicateLogFile) -> SkippedMember:
+    """A member whose bytes this station holds already (decision D353): left out with the
+    earlier row named, never an error. Protect Go reads the words "uploaded before" too."""
+    return SkippedMember(
+        name=member_name,
+        reason="uploaded before",
+        duplicate=True,
+        uploaded_at=duplicate.existing.uploaded_at,
+        log_file_id=duplicate.existing.id,
+    )
+
+
+def _refused_whole(skipped: list[SkippedMember]) -> bool:
+    """Nothing was kept and nothing was a file seen before: the upload itself was wrong (not a
+    station file, no frame in it), which is a 422. An upload whose files were all uploaded before
+    is a result, not an error: the caller reads `skipped` with `duplicate` on every member."""
+    return bool(skipped) and not any(s.duplicate for s in skipped)
+
+
 def _nothing_stored(skipped: list[SkippedMember]) -> HTTPException:
     return HTTPException(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -409,8 +428,9 @@ async def upload_offload_files(
 ) -> OffloadUpload:
     """The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of
     the card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a
-    raw log file row of the station with channel `lp0`; a file seen before is skipped with
-    its reason, as is a member that is not a station file."""
+    raw log file row of the station with channel `lp0`; a file seen before is left out and
+    named with `duplicate` (decision D353), as is, with its reason, a member that is not a
+    station file. An upload of files all seen before answers 201 with no files."""
     device = await _writable_device(session, user, device_id)
     name, members, skipped = await _read_card_upload(file)
     serial = (device.serial_number or "").upper()
@@ -445,14 +465,14 @@ async def upload_offload_files(
                     "frames_in_file": len(parsed.frames),
                 },
             )
-        except DuplicateLogFile:
-            skipped.append(SkippedMember(name=member_name, reason="uploaded before"))
+        except DuplicateLogFile as duplicate:
+            skipped.append(_uploaded_before(member_name, duplicate))
             continue
         except ApplicationError as error:
             skipped.append(SkippedMember(name=member_name, reason=str(error)))
             continue
         rows.append(row)
-    if not rows and skipped:
+    if not rows and _refused_whole(skipped):
         raise _nothing_stored(skipped)
     await record_audit(
         session,
@@ -464,7 +484,8 @@ async def upload_offload_files(
         details={
             "upload": name,
             "files": [r.original_filename for r in rows],
-            "skipped": [s.name for s in skipped],
+            "skipped": [s.name for s in skipped if not s.duplicate],
+            "uploaded_before": [s.name for s in skipped if s.duplicate],
         },
     )
     await session.commit()
@@ -850,7 +871,7 @@ async def upload_project_offload_files(
     its name carries, the EUI matched to a device of the project by serial number or DevEUI
     identity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of
     the project has is skipped with that EUI, so the person sees which station is missing,
-    and nothing is guessed; a file seen before is skipped as on the device page."""
+    and nothing is guessed; a file seen before is left out and named as on the device page."""
     name, members, skipped = await _read_card_upload(file)
     visible = set(await _project_device_ids(session, context))
     stations: dict[str, Device | None] = {}
@@ -896,14 +917,14 @@ async def upload_project_offload_files(
                     "frames_in_file": len(parsed.frames),
                 },
             )
-        except DuplicateLogFile:
-            skipped.append(SkippedMember(name=member_name, reason="uploaded before"))
+        except DuplicateLogFile as duplicate:
+            skipped.append(_uploaded_before(member_name, duplicate))
             continue
         except ApplicationError as error:
             skipped.append(SkippedMember(name=member_name, reason=str(error)))
             continue
         rows.append((row, station))
-    if not rows and skipped and not unknown_stations:
+    if not rows and not unknown_stations and _refused_whole(skipped):
         raise _nothing_stored(skipped)
     per_station: dict[str, list[str]] = {}
     for row, station in rows:
@@ -918,7 +939,8 @@ async def upload_project_offload_files(
         details={
             "upload": name,
             "files": per_station,
-            "skipped": [s.name for s in skipped],
+            "skipped": [s.name for s in skipped if not s.duplicate],
+            "uploaded_before": [s.name for s in skipped if s.duplicate],
         },
     )
     await session.commit()

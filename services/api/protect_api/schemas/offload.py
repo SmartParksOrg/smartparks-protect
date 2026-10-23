@@ -60,11 +60,25 @@ class Lp0CredentialsResult(Lp0CredentialsRead):
 class SkippedMember(BaseModel):
     name: str
     reason: str
+    duplicate: bool = Field(
+        default=False,
+        description="The same bytes were uploaded for this station before (D353): the file "
+        "was left out, the earlier row holds its frames; nothing to do",
+    )
+    uploaded_at: datetime | None = Field(
+        default=None, description="When the earlier copy was uploaded, for a duplicate"
+    )
+    log_file_id: uuid.UUID | None = Field(default=None, description="The earlier copy's row")
 
 
 class OffloadUpload(BaseModel):
     files: list[DeviceLogFileRead]
-    skipped: list[SkippedMember] = Field(default_factory=list)
+    skipped: list[SkippedMember] = Field(
+        default_factory=list,
+        description="The members not kept, each with its reason; a member uploaded before "
+        "carries `duplicate` (D353). An upload whose every member was uploaded before is "
+        "answered here with no files, not refused",
+    )
     other_station: list[str] = Field(
         default_factory=list,
         description="Files named after another station's EUI, accepted as they are",

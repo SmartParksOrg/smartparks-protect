@@ -257,12 +257,25 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert all(f["acquisition_channel"] == "lp0" for f in rows.values())
     assert rows[f"{STATION_EUI}_1791795031.jsonl"]["attributes"]["folder"] == "LOG_1"
 
+    # the same file again is left out and named, not refused (decision D353): the answer
+    # carries no file, and the member says when its earlier copy was uploaded
     again = await client.post(
         f"/api/v1/devices/{station['id']}/offload-files",
         files={"file": (f"{STATION_EUI}_1791795031.jsonl", first.encode(), "text/plain")},
         headers=h,
     )
-    assert again.status_code == 422 and "uploaded before" in again.text
+    assert again.status_code == 201, again.text
+    earlier = rows[f"{STATION_EUI}_1791795031.jsonl"]
+    assert again.json()["files"] == []
+    assert again.json()["skipped"] == [
+        {
+            "name": f"{STATION_EUI}_1791795031.jsonl",
+            "reason": "uploaded before",
+            "duplicate": True,
+            "uploaded_at": earlier["uploaded_at"],
+            "log_file_id": earlier["id"],
+        }
+    ]
 
     for f in result["files"]:
         await _decode(bus, f["id"])
@@ -586,6 +599,39 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     await bus.redis.xgroup_destroy(Topic.IDENTITY_REPROCESS_REQUESTED, group)
     _ = DeviceType, live_device
 
+    # a zip that mixes a file seen before with a new one keeps the new one alone
+    third = "\n".join(["", line(frames[0], time="2026-10-12T09:30:00Z")]) + "\n"
+    mixed = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={
+            "file": (
+                "card.zip",
+                card_zip(
+                    {
+                        f"LOG_1/{STATION_EUI}_1791795031.jsonl": first,
+                        f"LOG_3/{STATION_EUI}_1791797000.jsonl": third,
+                    }
+                ),
+                "application/zip",
+            )
+        },
+        headers=h,
+    )
+    assert mixed.status_code == 201, mixed.text
+    assert [f["original_filename"] for f in mixed.json()["files"]] == [
+        f"{STATION_EUI}_1791797000.jsonl"
+    ]
+    assert [(s["name"], s["duplicate"]) for s in mixed.json()["skipped"]] == [
+        (f"{STATION_EUI}_1791795031.jsonl", True)
+    ]
+    # a zip of nothing but members that are no station files is still refused
+    junk = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={"file": ("card.zip", card_zip({"LOG_1/notes.txt": "hello"}), "application/zip")},
+        headers=h,
+    )
+    assert junk.status_code == 422
+
 
 async def test_a_device_without_keys_fails_plainly_and_decodes_again_once_set(client, db, bus):
     admin = await actor(client, db, superuser=True)
@@ -783,11 +829,12 @@ async def test_cards_uploaded_on_the_offload_page_find_their_stations(client, db
     assert by_name["0016C001F0AB1002_1791795032.jsonl"]["device_id"] == second["id"]
     assert by_name["0016C001F0AB1002_1791795032.jsonl"]["device_name"] == second["name"]
     assert all(f["acquisition_channel"] == "lp0" for f in result["files"])
-    assert result["skipped"] == [
-        {
-            "name": "0016C001F0AB1999_1791795033.jsonl",
-            "reason": "no offload station of this project has EUI 0016C001F0AB1999",
-        }
+    assert [(s["name"], s["reason"], s["duplicate"]) for s in result["skipped"]] == [
+        (
+            "0016C001F0AB1999_1791795033.jsonl",
+            "no offload station of this project has EUI 0016C001F0AB1999",
+            False,
+        )
     ]
     assert result["unknown_stations"] == ["0016C001F0AB1999"]  # the page offers to make it (D343)
 
@@ -799,7 +846,9 @@ async def test_cards_uploaded_on_the_offload_page_find_their_stations(client, db
         },
         headers=h,
     )
-    assert again.status_code == 422 and "uploaded before" in again.text
+    assert again.status_code == 201, again.text
+    assert again.json()["files"] == [] and again.json()["skipped"][0]["duplicate"] is True
+    assert again.json()["skipped"][0]["reason"] == "uploaded before"
     lone = await client.post(
         f"/api/v1/projects/{project_id}/offload-files",
         files={
@@ -1144,7 +1193,8 @@ async def test_a_v5_card_is_read_per_device_and_contradictions_are_refused(clien
             files={"file": (again_name, text.encode(), "text/plain")},
             headers=h,
         )
-        assert again.status_code == 422 and "uploaded before" in again.text
+        assert again.status_code == 201, again.text
+        assert again.json()["files"] == [] and again.json()["skipped"][0]["duplicate"] is True
     # the same frames in a later file, as a station writes them after a lost receipt (other
     # reception times, so other content): every frame a repeat, nothing decoded again
     later = (

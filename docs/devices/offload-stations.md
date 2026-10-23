@@ -71,7 +71,10 @@ deduplicates nothing and leaves that to Protect.
    operators (`devices:control`) set them, as they upload log files.
 3. **A card.** On the Offload page, **Upload SD card files** takes one or more `.jsonl` files or
    zips of the cards' `LOG_*` folders, of any number of stations at once, and puts each file
-   with the station named in it: the EUI in the file's name, matched to a device of the project
+   with the station named in it. A file the station holds already, the same bytes uploaded
+   before, is left out and never decoded twice: a notice names the files left out with the date
+   of the earlier upload, and a card whose every file was uploaded before says "Nothing new"
+   (decision D353; a card that grew since adds its new files alone). The EUI in the file's name is matched to a device of the project
    by serial number or DevEUI identity (`POST /projects/{id}/offload-files`, `devices:control`;
    Tim, 2026-10-18: the person who collected the cards should not have to find each station's
    page). A file of an EUI no station of the project has is kept back and the EUI is named: the
@@ -282,8 +285,9 @@ takes minutes and the row's bar says where it is.
   the keys are set; `PUT` takes `dev_addr`, `app_s_key` and `nwk_s_key`, or `from_device: true`;
   answers how many retained frames were handed to the decoder.
 - `POST /api/v1/devices/{device_id}/offload-files` (multipart `file`, a `.jsonl` or a zip):
-  the rows made, the members skipped with their reason, and the files named after another
-  station.
+  the rows made, the members skipped with their reason (a member whose bytes the station holds
+  already carries `duplicate` with the earlier upload's time; an upload of such files alone answers
+  201 with no files, decision D353), and the files named after another station.
 - `GET /api/v1/devices/{device_id}/offload`: the Offload station card.
 - `GET /api/v1/projects/{project_id}/offload`: the Offload page, for anyone who reads the project;
   `other_trackers` lists the trackers of other projects the stations served, each with

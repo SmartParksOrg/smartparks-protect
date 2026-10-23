@@ -31,7 +31,7 @@ Protect Go draws positions on a map where there is no connection, so the map mus
 
 ## What the app gives Protect
 
-The card's files, exactly as read, through `POST /devices/{id}/offload-files`, the same upload the station's device page makes. Protect decodes them, attributes the records as of their record time, and refuses a file it already holds by its content digest and a frame it already holds by its hash, so a card read in the field and uploaded later costs nothing twice.
+The card's files, exactly as read, through `POST /devices/{id}/offload-files`, the same upload the station's device page makes. Protect decodes them, attributes the records as of their record time, and leaves out a file it already holds by its content digest (the answer names it with `duplicate`, decision D353, never a refusal) and a frame it already holds by its hash, so a card read in the field and uploaded later costs nothing twice. The app itself leaves out a file whose bytes it read before (its decision D30), so a card read twice on the laptop is read and uploaded once.
 
 ## What never travels
 

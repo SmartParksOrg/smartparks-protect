@@ -4780,8 +4780,9 @@ export interface paths {
          * Upload Offload Files
          * @description The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of
          *     the card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a
-         *     raw log file row of the station with channel `lp0`; a file seen before is skipped with
-         *     its reason, as is a member that is not a station file.
+         *     raw log file row of the station with channel `lp0`; a file seen before is left out and
+         *     named with `duplicate` (decision D353), as is, with its reason, a member that is not a
+         *     station file. An upload of files all seen before answers 201 with no files.
          */
         post: operations["upload_offload_files_api_v1_devices__device_id__offload_files_post"];
         delete?: never;
@@ -4857,7 +4858,7 @@ export interface paths {
          *     its name carries, the EUI matched to a device of the project by serial number or DevEUI
          *     identity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of
          *     the project has is skipped with that EUI, so the person sees which station is missing,
-         *     and nothing is guessed; a file seen before is skipped as on the device page.
+         *     and nothing is guessed; a file seen before is left out and named as on the device page.
          */
         post: operations["upload_project_offload_files_api_v1_projects__project_id__offload_files_post"];
         delete?: never;
@@ -12442,7 +12443,10 @@ export interface components {
         OffloadUpload: {
             /** Files */
             files: components["schemas"]["DeviceLogFileRead"][];
-            /** Skipped */
+            /**
+             * Skipped
+             * @description The members not kept, each with its reason; a member uploaded before carries `duplicate` (D353). An upload whose every member was uploaded before is answered here with no files, not refused
+             */
             skipped?: components["schemas"]["SkippedMember"][];
             /**
              * Other Station
@@ -14094,6 +14098,22 @@ export interface components {
             name: string;
             /** Reason */
             reason: string;
+            /**
+             * Duplicate
+             * @description The same bytes were uploaded for this station before (D353): the file was left out, the earlier row holds its frames; nothing to do
+             * @default false
+             */
+            duplicate: boolean;
+            /**
+             * Uploaded At
+             * @description When the earlier copy was uploaded, for a duplicate
+             */
+            uploaded_at?: string | null;
+            /**
+             * Log File Id
+             * @description The earlier copy's row
+             */
+            log_file_id?: string | null;
         };
         /** SourceConnectivity */
         SourceConnectivity: {

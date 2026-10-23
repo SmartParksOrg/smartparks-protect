@@ -46,16 +46,34 @@ export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrit
         const result = await api.post<OffloadUpload>(`/api/v1/devices/${deviceId}/offload-files`, {
           body,
         });
-        return { name: file.name, files: result.files.length, skipped: (result.skipped ?? []).length };
+        const notes = result.skipped ?? [];
+        return {
+          name: file.name,
+          files: result.files.length,
+          // the station holds these bytes already: left out, named, no error (decision D353)
+          duplicates: notes.filter((s) => s.duplicate).length,
+          skipped: notes.filter((s) => !s.duplicate).length,
+        };
       }
       const row = await api.post<DeviceLogFile>(`/api/v1/devices/${deviceId}/log-files`, { body });
-      return { name: row.original_filename, files: 1, skipped: 0 };
+      return { name: row.original_filename, files: 1, duplicates: 0, skipped: 0 };
     },
     invalidate: [queryKeys.logFiles(deviceId), queryKeys.offloadStation(deviceId)],
-    success: (r) =>
-      r.files === 1 && r.skipped === 0
-        ? `${r.name} uploaded, decoding`
-        : t("{{name}}: {{files}} files uploaded, {{skipped}} skipped, decoding", r),
+    onSuccess: (r) => {
+      if (r.files === 0 && r.duplicates > 0 && r.skipped === 0)
+        toast.info(
+          t("Nothing new: all {{count}} files of {{name}} were uploaded before", {
+            count: r.duplicates,
+            name: r.name,
+          }),
+        );
+      else if (r.files === 1 && r.duplicates === 0 && r.skipped === 0)
+        toast.success(`${r.name} uploaded, decoding`);
+      else
+        toast.success(t("{{name}}: {{files}} files uploaded, {{skipped}} skipped, decoding", r));
+      if (r.duplicates > 0 && r.files > 0)
+        toast.info(t("{{count}} files were uploaded before and were left out", { count: r.duplicates }));
+    },
     onError: (error) =>
       toast.error(
         error.message.includes("uploaded before")
