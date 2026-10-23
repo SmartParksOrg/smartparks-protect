@@ -15,7 +15,7 @@ dependencies = [
     "email-validator==2.3.0",
     "shapely==2.1.2",
     "mcp==2.2.0",
-    "opentelemetry-instrumentation-fastapi==0.65b0",
+    "opentelemetry-instrumentation-fastapi==0.66b1",
 ]
 
 [build-system]
