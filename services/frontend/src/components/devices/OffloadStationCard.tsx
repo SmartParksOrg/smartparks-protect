@@ -145,6 +145,14 @@ export function OffloadStationCard({
               <dt className="text-muted-foreground">{t("Last offload")}</dt>
               <dd title={formatTime(s.last_reception_at)}>
                 {formatAgo(s.last_reception_at, now)}
+                {s.clock_behind_s ? (
+                  <span className="block text-xs text-muted-foreground">
+                    {t(
+                      "The station's clock runs at least {{behind}} behind, so the time is the newest record the frames carried.",
+                      { behind: formatDuration(s.clock_behind_s) },
+                    )}
+                  </span>
+                ) : null}
               </dd>
             </>
           )}

@@ -12100,8 +12100,16 @@ export interface components {
              * @default 0
              */
             receptions: number;
-            /** Last Reception At */
+            /**
+             * Last Reception At
+             * @description The last offload: the station's stamp, or the newest record a frame carried when the station's clock runs behind it (decision D354)
+             */
             last_reception_at?: string | null;
+            /**
+             * Clock Behind S
+             * @description Seconds the station's clock ran behind the records its frames carried, when beyond the tolerance (decision D354)
+             */
+            clock_behind_s?: number | null;
             /**
              * Card Ok
              * @description From the station's own report: the card is in and writable, and the station reports no missing card or storage fault (decision D345)
@@ -12196,8 +12204,16 @@ export interface components {
              * @default 0
              */
             stations: number;
-            /** Last Reception At */
+            /**
+             * Last Reception At
+             * @description The last offload: the station's stamp, or the newest record a frame carried when the station's clock runs behind it (decision D354)
+             */
             last_reception_at?: string | null;
+            /**
+             * Clock Behind S
+             * @description Seconds a station's clock ran behind this tracker's records, when beyond the tolerance (decision D354)
+             */
+            clock_behind_s?: number | null;
             /** Last Station Device Id */
             last_station_device_id?: string | null;
             /** Last Station Name */
@@ -12278,8 +12294,16 @@ export interface components {
             records_known: number;
             /** Last Upload At */
             last_upload_at?: string | null;
-            /** Last Reception At */
+            /**
+             * Last Reception At
+             * @description The last offload: the station's stamp, or the newest record a frame carried when the station's clock runs behind it (decision D354)
+             */
             last_reception_at?: string | null;
+            /**
+             * Clock Behind S
+             * @description Seconds the station's clock ran behind the records its frames carried, when beyond the tolerance (decision D354)
+             */
+            clock_behind_s?: number | null;
             /** Trackers */
             trackers?: components["schemas"]["OffloadTracker"][];
             /**

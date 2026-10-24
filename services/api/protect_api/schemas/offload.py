@@ -116,7 +116,16 @@ class OffloadStationRead(BaseModel):
     records_new: int = 0
     records_known: int = 0
     last_upload_at: datetime | None = None
-    last_reception_at: datetime | None = None
+    last_reception_at: datetime | None = Field(
+        default=None,
+        description="The last offload: the station's stamp, or the newest record a frame "
+        "carried when the station's clock runs behind it (decision D354)",
+    )
+    clock_behind_s: int | None = Field(
+        default=None,
+        description="Seconds the station's clock ran behind the records its frames carried, "
+        "when beyond the tolerance (decision D354)",
+    )
     trackers: list[OffloadTracker] = Field(default_factory=list)
     state: dict[str, Any] | None = Field(
         default=None, description="The station's last port 23 report (decision D323)"
@@ -168,7 +177,16 @@ class OffloadOverviewStation(BaseModel):
         default=0, description="Addresses no device has that it received in the window"
     )
     receptions: int = Field(default=0, description="Frames received in the window")
-    last_reception_at: datetime | None = None
+    last_reception_at: datetime | None = Field(
+        default=None,
+        description="The last offload: the station's stamp, or the newest record a frame "
+        "carried when the station's clock runs behind it (decision D354)",
+    )
+    clock_behind_s: int | None = Field(
+        default=None,
+        description="Seconds the station's clock ran behind the records its frames carried, "
+        "when beyond the tolerance (decision D354)",
+    )
     card_ok: bool | None = Field(
         default=None,
         description="From the station's own report: the card is in and writable, and the "
@@ -215,7 +233,16 @@ class OffloadOverviewTracker(BaseModel):
     )
     receptions: int = 0
     stations: int = Field(default=0, description="Stations that received it in the window")
-    last_reception_at: datetime | None = None
+    last_reception_at: datetime | None = Field(
+        default=None,
+        description="The last offload: the station's stamp, or the newest record a frame "
+        "carried when the station's clock runs behind it (decision D354)",
+    )
+    clock_behind_s: int | None = Field(
+        default=None,
+        description="Seconds a station's clock ran behind this tracker's records, when "
+        "beyond the tolerance (decision D354)",
+    )
     last_station_device_id: uuid.UUID | None = None
     last_station_name: str | None = None
 

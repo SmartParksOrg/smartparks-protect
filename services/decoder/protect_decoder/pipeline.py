@@ -204,6 +204,39 @@ def _delivery_time(event: SourceEvent, record_time: datetime) -> datetime:
     return received
 
 
+def _note_station_clock(event: SourceEvent, records: DecodedRecords, step: Any) -> None:
+    """What a station's frame says of the station's clock (decision D354; Tim, 2026-10-24: the
+    Offload page said SP052104's last offload was two days ago while the card came off the
+    station that morning; the station stamped 2026-10-22 on frames carrying fixes of
+    2026-10-24). A frame cannot be received before the tracker made the records it carries,
+    so the newest record time of a frame is a floor under its reception; when the station's
+    stamp runs behind it beyond the tolerance, the clock is behind by at least that much. The
+    frame's metadata keeps `newest_record_at` and `station_clock_behind_s`, and the Offload
+    page reads the moment of an offload as the later of the stamp and the records. A record
+    past the upload itself (a tracker whose own clock runs ahead, decision D119) says nothing
+    of the station and is left out."""
+    tolerance = get_settings().clock_ahead_tolerance_seconds
+    ceiling = event.ingested_at + timedelta(seconds=tolerance)
+    times = [
+        r.time
+        for group in (records.positions, records.measurements, records.states, records.events)
+        for r in group
+        if r.time <= ceiling
+    ]
+    meta = dict(event.provider_metadata or {})
+    meta.pop("newest_record_at", None)
+    meta.pop("station_clock_behind_s", None)
+    if times:
+        newest = max(times)
+        meta["newest_record_at"] = newest.isoformat()
+        if event.network_received_at is not None:
+            behind = (newest - event.network_received_at).total_seconds()
+            if behind > tolerance:
+                meta["station_clock_behind_s"] = int(behind)
+                step.metadata["station_clock_behind_s"] = int(behind)
+    event.provider_metadata = meta
+
+
 def _ahead_of_delivery(event: SourceEvent, record_time: datetime) -> float:
     """Seconds the record's device time runs ahead of the delivery beyond the tolerance."""
     return clock_ahead(
@@ -482,6 +515,8 @@ async def process_source_event(
             _note_estimate_disagreement(event, records)
             _add_network_position(event, records)
             _summarize(outcome, records)
+            if event.acquisition_channel == AcquisitionChannel.LP0:
+                _note_station_clock(event, records, step)
             if records.notes:
                 step.metadata["notes"] = list(records.notes)
             if records.empty:

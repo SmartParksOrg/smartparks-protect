@@ -12,9 +12,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import DateTime, cast, func, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
@@ -105,6 +106,44 @@ router = APIRouter(tags=["offload stations"])
 #: station's clock (Tim, 2026-10-19: SP052099 stamps a month behind, so "frames of 1 trackers"
 #: counted 46 of 13,671); the first and last reception keep the station's time.
 TRACKERS_WINDOW = timedelta(days=30)
+
+
+def _newest_record() -> Any:
+    """The newest record time a frame carried, as the decoder noted it (decision D354)."""
+    return cast(SourceEvent.provider_metadata["newest_record_at"].astext, DateTime(timezone=True))
+
+
+def _offload_moment() -> Any:
+    """When a frame was received at the earliest: the station's own stamp, or the newest
+    record it carried when the station's clock runs behind that (decision D354; Tim,
+    2026-10-24: SP052104 stamped two days early and the page said the last offload was two
+    days ago while the card came off the station that morning)."""
+    return func.greatest(
+        GatewayReception.time, func.coalesce(_newest_record(), GatewayReception.time)
+    )
+
+
+def _clock_behind() -> Any:
+    """Seconds the station's stamp ran behind the records its frames carried, the most seen."""
+    return func.max(func.extract("epoch", _newest_record() - GatewayReception.time))
+
+
+def _with_events(statement: Select[Any]) -> Select[Any]:
+    """A receptions read joined to its source events, for the records' times."""
+    return statement.join(
+        SourceEvent,
+        (SourceEvent.id == GatewayReception.source_event_id)
+        & (SourceEvent.ingested_at == GatewayReception.source_event_ingested_at),
+    )
+
+
+def _behind_seconds(value: Any) -> int | None:
+    """A station's clock behind the records, when beyond the tolerance; else nothing."""
+    if value is None or float(value) <= get_settings().clock_ahead_tolerance_seconds:
+        return None
+    return int(value)
+
+
 MAX_TRACKERS = 200
 READBACK_KEYS = ("lp0_dev_addr", "lp0_app_key", "lp0_network_key")
 #: The catalogue row a station's entity is made of (migration 0053, under Equipment).
@@ -546,11 +585,14 @@ async def offload_station(
         since = until - TRACKERS_WINDOW
         stats = (
             await session.execute(
-                select(
-                    GatewayReception.device_id,
-                    func.count().label("frames"),
-                    func.max(GatewayReception.time).label("last"),
-                    func.avg(GatewayReception.rssi).label("rssi"),
+                _with_events(
+                    select(
+                        GatewayReception.device_id,
+                        func.count().label("frames"),
+                        func.max(_offload_moment()).label("last"),
+                        func.avg(GatewayReception.rssi).label("rssi"),
+                        _clock_behind().label("behind"),
+                    )
                 )
                 .where(
                     GatewayReception.data_source_id == source.id,
@@ -559,7 +601,7 @@ async def offload_station(
                     GatewayReception.source_event_ingested_at <= until,
                 )
                 .group_by(GatewayReception.device_id)
-                .order_by(func.max(GatewayReception.time).desc())
+                .order_by(func.max(_offload_moment()).desc())
                 .limit(MAX_TRACKERS)
             )
         ).all()
@@ -577,6 +619,9 @@ async def offload_station(
         }
         read.is_station = read.is_station or bool(stats)
         read.last_reception_at = max((s.last for s in stats), default=None)
+        read.clock_behind_s = _behind_seconds(
+            max((float(s.behind) for s in stats if s.behind is not None), default=None)
+        )
         read.trackers = [
             OffloadTracker(
                 dev_addr=addresses.get(s.device_id) if s.device_id else None,
@@ -626,11 +671,13 @@ async def served_from_elsewhere(
     if not station_gateway_ids:
         return []
     statement = (
-        select(
-            GatewayReception.device_id,
-            func.count().label("receptions"),
-            func.max(GatewayReception.time).label("last"),
-            func.array_agg(func.distinct(GatewayReception.gateway_id)).label("gateways"),
+        _with_events(
+            select(
+                GatewayReception.device_id,
+                func.count().label("receptions"),
+                func.max(_offload_moment()).label("last"),
+                func.array_agg(func.distinct(GatewayReception.gateway_id)).label("gateways"),
+            )
         )
         .where(
             GatewayReception.data_source_id == source_id,
@@ -640,7 +687,7 @@ async def served_from_elsewhere(
             GatewayReception.source_event_ingested_at <= until,
         )
         .group_by(GatewayReception.device_id)
-        .order_by(func.max(GatewayReception.time).desc())
+        .order_by(func.max(_offload_moment()).desc())
         .limit(MAX_TRACKERS)
     )
     if device_ids:
@@ -1040,11 +1087,14 @@ async def project_offload(
             row.gateway_id: row
             for row in (
                 await session.execute(
-                    select(
-                        GatewayReception.gateway_id,
-                        func.count().label("receptions"),
-                        func.count(func.distinct(GatewayReception.device_id)).label("trackers"),
-                        func.max(GatewayReception.time).label("last"),
+                    _with_events(
+                        select(
+                            GatewayReception.gateway_id,
+                            func.count().label("receptions"),
+                            func.count(func.distinct(GatewayReception.device_id)).label("trackers"),
+                            func.max(_offload_moment()).label("last"),
+                            _clock_behind().label("behind"),
+                        )
                     )
                     .where(
                         GatewayReception.data_source_id == source.id,
@@ -1091,11 +1141,14 @@ async def project_offload(
         row.device_id: row
         for row in (
             await session.execute(
-                select(
-                    GatewayReception.device_id,
-                    func.count().label("receptions"),
-                    func.count(func.distinct(GatewayReception.gateway_id)).label("stations"),
-                    func.max(GatewayReception.time).label("last"),
+                _with_events(
+                    select(
+                        GatewayReception.device_id,
+                        func.count().label("receptions"),
+                        func.count(func.distinct(GatewayReception.gateway_id)).label("stations"),
+                        func.max(_offload_moment()).label("last"),
+                        _clock_behind().label("behind"),
+                    )
                 )
                 .where(
                     GatewayReception.data_source_id == source.id,
@@ -1110,7 +1163,7 @@ async def project_offload(
     last_station: dict[uuid.UUID, str] = {}
     if per_tracker:
         newest = (
-            select(GatewayReception.device_id, GatewayReception.gateway_id)
+            _with_events(select(GatewayReception.device_id, GatewayReception.gateway_id))
             .where(
                 GatewayReception.data_source_id == source.id,
                 GatewayReception.device_id.in_(list(per_tracker)),
@@ -1118,7 +1171,7 @@ async def project_offload(
                 GatewayReception.source_event_ingested_at <= until,
             )
             .distinct(GatewayReception.device_id)
-            .order_by(GatewayReception.device_id, GatewayReception.time.desc())
+            .order_by(GatewayReception.device_id, _offload_moment().desc())
         )
         last_station = {
             device_id: gateway_id for device_id, gateway_id in (await session.execute(newest)).all()
@@ -1191,6 +1244,7 @@ async def project_offload(
                 else 0,
                 receptions=int(received.receptions) if received else 0,
                 last_reception_at=received.last if received else None,
+                clock_behind_s=_behind_seconds(received.behind) if received else None,
                 card_ok=card_ok,
                 sd_free_percent=(report or {}).get("sd_free_percent"),
                 listening=status_bits.get("lp0_listening"),
@@ -1250,6 +1304,7 @@ async def project_offload(
                 receptions=int(got.receptions) if got else 0,
                 stations=int(got.stations) if got else 0,
                 last_reception_at=got.last if got else None,
+                clock_behind_s=_behind_seconds(got.behind) if got else None,
                 last_station_device_id=station[0],
                 last_station_name=station[1],
             )

@@ -45,7 +45,7 @@ import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
 import { useOffloadView } from "@/hooks/useOffloadView";
-import { formatAgo, formatTime } from "@/lib/format";
+import { formatAgo, formatTime, formatDuration } from "@/lib/format";
 
 /**
  * The project's LP0 network on one page (phase 42, Tim, 2026-10-16): every offload station
@@ -121,6 +121,24 @@ export function OffloadPage() {
     ) : (
       <span className="text-muted-foreground">{t("none in 30 days")}</span>
     );
+  // a station's clock behind the records its frames carried (decision D354): the time shown
+  // is the newest record then, and the note says by how much the station is behind
+  const clockNote = (behind: number | null | undefined) =>
+    behind
+      ? t(
+          "The station's clock runs at least {{behind}} behind, so the time is the newest record the frames carried.",
+          { behind: formatDuration(behind) },
+        )
+      : null;
+  const clockBehind = (behind: number | null | undefined) =>
+    behind ? (
+      <span
+        className="ml-1 text-xs text-muted-foreground"
+        title={clockNote(behind) ?? undefined}
+      >
+        {t("(clock behind)")}
+      </span>
+    ) : null;
 
   // What a station still misses before a card can be read into it, in the order of the
   // guide; a piece the dialog sets opens the dialog, the card is uploaded on the device page.
@@ -447,7 +465,12 @@ export function OffloadPage() {
     {
       header: t("Last offload"),
       accessorKey: "last_reception_at",
-      cell: ({ getValue }) => ago(getValue<string | null>()),
+      cell: ({ row }) => (
+        <span>
+          {ago(row.original.last_reception_at)}
+          {clockBehind(row.original.clock_behind_s)}
+        </span>
+      ),
     },
     {
       header: t("Own report"),
@@ -572,6 +595,7 @@ export function OffloadPage() {
       cell: ({ row }) => (
         <span>
           {ago(row.original.last_reception_at)}
+          {clockBehind(row.original.clock_behind_s)}
           {row.original.last_station_name && (
             <span className="ml-1 text-xs text-muted-foreground">
               {t("at")}{" "}
@@ -990,9 +1014,14 @@ export function OffloadPage() {
                           : t("{{frames}} frames of {{trackers}} trackers", {
                               frames: s.receptions,
                               trackers: s.trackers,
-                            })) + `, ${formatAgo(s.last_reception_at, now)}`
+                            })) +
+                        `, ${formatAgo(s.last_reception_at, now)}` +
+                        (s.clock_behind_s ? ` ${t("(clock behind)")}` : "")
                       : t("No offload in 30 days")}
                   </div>
+                  {s.clock_behind_s ? (
+                    <div className="text-xs text-muted-foreground">{clockNote(s.clock_behind_s)}</div>
+                  ) : null}
                   {s.state_time && (
                     <div className="text-xs text-muted-foreground">
                       {t("card {{ok}}", { ok: yesNo(s.card_ok) })}
@@ -1091,7 +1120,8 @@ export function OffloadPage() {
                         `, ${formatAgo(tr.last_reception_at, now)}` +
                         (tr.last_station_name
                           ? ` ${t("at")} ${tr.last_station_name}`
-                          : "")
+                          : "") +
+                        (tr.clock_behind_s ? ` ${t("(clock behind)")}` : "")
                       : t("No offload in 30 days")}
                   </div>
                   {trackerGaps(tr).length > 0 && (

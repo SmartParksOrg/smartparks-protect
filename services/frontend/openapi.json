@@ -40908,7 +40908,20 @@
         "type": "null"
        }
       ],
-      "title": "Last Reception At"
+      "title": "Last Reception At",
+      "description": "The last offload: the station's stamp, or the newest record a frame carried when the station's clock runs behind it (decision D354)"
+     },
+     "clock_behind_s": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clock Behind S",
+      "description": "Seconds the station's clock ran behind the records its frames carried, when beyond the tolerance (decision D354)"
      },
      "card_ok": {
       "anyOf": [
@@ -41179,7 +41192,20 @@
         "type": "null"
        }
       ],
-      "title": "Last Reception At"
+      "title": "Last Reception At",
+      "description": "The last offload: the station's stamp, or the newest record a frame carried when the station's clock runs behind it (decision D354)"
+     },
+     "clock_behind_s": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clock Behind S",
+      "description": "Seconds a station's clock ran behind this tracker's records, when beyond the tolerance (decision D354)"
      },
      "last_station_device_id": {
       "anyOf": [
@@ -41381,7 +41407,20 @@
         "type": "null"
        }
       ],
-      "title": "Last Reception At"
+      "title": "Last Reception At",
+      "description": "The last offload: the station's stamp, or the newest record a frame carried when the station's clock runs behind it (decision D354)"
+     },
+     "clock_behind_s": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clock Behind S",
+      "description": "Seconds the station's clock ran behind the records its frames carried, when beyond the tolerance (decision D354)"
      },
      "trackers": {
       "items": {

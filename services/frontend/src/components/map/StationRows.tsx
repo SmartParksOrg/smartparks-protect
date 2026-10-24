@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { OffloadStation } from "@/api/types";
 import { PanelRow } from "@/components/map/MapObjectPanel";
-import { formatAgo, formatTime } from "@/lib/format";
+import { formatAgo, formatTime, formatDuration } from "@/lib/format";
 
 /**
  * What an offload station's panel on the live map says about the station itself (decision
@@ -67,11 +67,22 @@ export function StationRows({
           })}
         </PanelRow>
       )}
-      <PanelRow label={t("Trackers")} title={formatTime(station.last_reception_at)}>
+      <PanelRow
+        label={t("Trackers")}
+        title={
+          station.clock_behind_s
+            ? t(
+                "The station's clock runs at least {{behind}} behind, so the time is the newest record the frames carried.",
+                { behind: formatDuration(station.clock_behind_s) },
+              )
+            : formatTime(station.last_reception_at)
+        }
+      >
         {(station.trackers ?? []).length > 0
           ? t("{{count}} served in 30 days", { count: (station.trackers ?? []).length }) +
             (station.last_reception_at
-              ? `, ${t("last offload {{ago}}", { ago: formatAgo(station.last_reception_at, now) })}`
+              ? `, ${t("last offload {{ago}}", { ago: formatAgo(station.last_reception_at, now) })}` +
+                (station.clock_behind_s ? ` ${t("(clock behind)")}` : "")
               : "")
           : t("none served in 30 days")}
       </PanelRow>

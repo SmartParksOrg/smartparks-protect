@@ -102,7 +102,7 @@ the cards it read and hands one over to this page with `?add=<address>`.
 When a tracker is added after its cards were read, the decoder walks the frames that waited for it
 and sums the card files it touched anew (decision D342), so the Files section shows the records,
 the period and the figures per tracker without a second decode. The stations' figures on the
-page count by arrival at Protect, the upload of a card, not by the station's clock.
+page count by arrival at Protect, the upload of a card, not by the station's clock. "Last offload" is the later of the station's stamp and the newest record a frame carried: a frame cannot be received before the tracker made its records, so when a station's clock runs behind, the page shows the records' time and says "(clock behind)" with how far the clock is behind at least; a card decoded before that rule keeps the station's time until "Decode again" on its file.
 
 With the newer firmware a station also records the status reports of the other stations in
 range, so an unknown device may be a station rather than a tracker (decision D341). The ports a

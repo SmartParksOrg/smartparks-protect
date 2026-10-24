@@ -8,11 +8,12 @@ import io
 import json
 import uuid
 import zipfile
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
 from geoalchemy2.shape import to_shape
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from protect_decoder.pipeline import process_source_event
 from shared.bus import RedisStreamsBus, Topic
@@ -1379,3 +1380,86 @@ async def test_a_cards_history_moves_a_new_devices_assignments_back(client, db, 
     span = (await client.get(f"/api/v1/devices/{station['id']}/data-span", headers=h)).json()
     assert span["first_log_at"] is None
     assert span["first_data_at"] is None or span["first_data_at"] >= now
+
+
+async def test_a_stations_clock_behind_the_records_does_not_date_the_offload(client, db, bus):
+    """Decision D354 (Tim, 2026-10-24: SP052104 stamped two days early, and the Offload page
+    said the last offload was two days ago while the card came off the station that morning).
+    A frame cannot be received before the tracker made the records it carries: the decoder
+    notes the newest record of a frame and how far the station's stamp ran behind it, and the
+    page reads the moment of the offload as the later of the two, saying the clock is behind."""
+    admin = await actor(client, db, superuser=True)
+    h = admin.headers
+    project = await create_project(db)
+    project_id = project.id
+    oc = await _opencollar_type(client, h)
+    station_eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
+    station = await _device(client, h, oc["id"], project_id, serial=station_eui)
+    tracker = await _device(client, h, oc["id"], project_id)
+    addr = "27D" + uuid.uuid4().hex[:5].upper()
+    keys = Keys(addr, APP_S_KEY, NWK_S_KEY)
+    put = await client.put(
+        f"/api/v1/devices/{tracker['id']}/lp0-credentials",
+        json={"dev_addr": addr, "app_s_key": APP_S_KEY.hex(), "nwk_s_key": NWK_S_KEY.hex()},
+        headers=h,
+    )
+    assert put.status_code == 200, put.text
+    # two fixes of the last hours, built as the demo cards script builds them; the station
+    # stamps the frame two days earlier, long before the fixes it carries
+    import importlib.util
+    import random
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "lp0_demo_cards", Path(__file__).parents[2] / "scripts/lp0_demo_cards.py"
+    )
+    assert spec is not None and spec.loader is not None
+    demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(demo)
+    rng = random.Random(7)
+    now = utc_now().replace(microsecond=0)
+    fixes = [now - timedelta(hours=2), now - timedelta(hours=1)]
+    stream = b"".join(
+        demo.record(2, demo.position(52.1, 5.1, when, rng, 90.0), when + timedelta(seconds=5))
+        for when in fixes
+    )
+    stamp = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    text = "\n".join(["", line(build_uplink(keys, 1, 29, stream), time=stamp, station=station_eui)])
+    text += "\n"
+    upload = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={
+            "file": (f"{station_eui}_1706745600.jsonl", text.encode(), "application/octet-stream")
+        },
+        headers=h,
+    )
+    assert upload.status_code == 201, upload.text
+    for f in upload.json()["files"]:
+        await _decode(bus, f["id"])
+    await db.rollback()
+    newest = await db.scalar(
+        select(func.max(Position.time)).where(Position.device_id == uuid.UUID(tracker["id"]))
+    )
+    assert newest == fixes[-1]
+    event = await db.scalar(
+        select(SourceEvent).where(
+            SourceEvent.device_id == uuid.UUID(tracker["id"]),
+            SourceEvent.acquisition_channel == AcquisitionChannel.LP0,
+        )
+    )
+    assert event is not None and event.network_received_at == now - timedelta(days=2)
+    assert event.provider_metadata["newest_record_at"] == newest.isoformat()
+    behind = int(event.provider_metadata["station_clock_behind_s"])
+    assert behind == int((newest - event.network_received_at).total_seconds())
+
+    overview = (await client.get(f"/api/v1/projects/{project_id}/offload", headers=h)).json()
+    listed = next(s for s in overview["stations"] if s["device_id"] == station["id"])
+    assert listed["last_reception_at"] == newest.isoformat().replace("+00:00", "Z")
+    assert listed["clock_behind_s"] == behind
+    served = next(t for t in overview["trackers"] if t["device_id"] == tracker["id"])
+    assert served["last_reception_at"] == listed["last_reception_at"]
+    assert served["clock_behind_s"] == behind
+    card = (await client.get(f"/api/v1/devices/{station['id']}/offload", headers=h)).json()
+    assert card["last_reception_at"] == listed["last_reception_at"]
+    assert card["clock_behind_s"] == behind
+    assert card["trackers"][0]["last_reception_at"] == listed["last_reception_at"]

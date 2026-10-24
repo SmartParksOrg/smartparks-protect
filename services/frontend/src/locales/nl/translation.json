@@ -3340,5 +3340,7 @@
   "Problems only": "Alleen problemen",
   "The device's traffic tab": "Het verkeerstabblad van het apparaat",
   "traffic": "verkeer",
-  "With the project's traffic": "Bij het verkeer van het project"
+  "With the project's traffic": "Bij het verkeer van het project",
+  "The station's clock runs at least {{behind}} behind, so the time is the newest record the frames carried.": "De klok van het station loopt minstens {{behind}} achter, dus de tijd is het nieuwste record dat de frames droegen.",
+  "(clock behind)": "(klok loopt achter)"
 }
