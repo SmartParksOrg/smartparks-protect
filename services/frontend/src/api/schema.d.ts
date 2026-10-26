@@ -1529,6 +1529,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Assignments
+         * @description The device's project and entity assignments in time order, within the caller's
+         *     projects, each with the newest attribution job touching it and the last change recorded
+         *     on it, and whether the caller may move boundaries.
+         */
+        get: operations["device_assignments_api_v1_devices__device_id__assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/last-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Last Message
+         * @description The device's newest live message before an instant and the instant one second after
+         *     it: what "snap to the last uplink" offers in the boundary dialog.
+         */
+        get: operations["device_last_message_api_v1_devices__device_id__last_message_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/project-assignments/{assignment_id}/boundary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Move Project Boundary
+         * @description Move the start, the end or both edges of a project assignment, each together with the
+         *     neighbouring row's touching edge (decision D355). Server admins and project admins of every
+         *     project whose row changes. `preview` answers what would change without writing.
+         */
+        patch: operations["move_project_boundary_api_v1_devices__device_id__project_assignments__assignment_id__boundary_patch"];
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/entity-assignments/{assignment_id}/boundary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Move Entity Boundary
+         * @description The same for an entity assignment: `devices:write` in the project of every entity whose
+         *     row changes; the rows must stay inside the device's project assignments.
+         */
+        patch: operations["move_entity_boundary_api_v1_devices__device_id__entity_assignments__assignment_id__boundary_patch"];
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/assignments/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correct Boundaries
+         * @description A project boundary and an entity boundary moved to one instant in one call (the
+         *     chained correction of decision D355): a transfer made "from now" corrected to the moment
+         *     the device really changed hands. Each row's edge nearest the instant moves unless named;
+         *     the neighbours follow; one attribution job covers both windows.
+         */
+        post: operations["correct_boundaries_api_v1_devices__device_id__assignments_correct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/data-sources": {
         parameters: {
             query?: never;
@@ -6365,6 +6474,33 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /**
+         * AssignmentChangeRead
+         * @description The last change recorded on an assignment row: the audit row in short.
+         */
+        AssignmentChangeRead: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Action */
+            action: string;
+            /**
+             * User Name
+             * @description Who made it; null for the system
+             */
+            user_name?: string | null;
+            /**
+             * Reason
+             * @description The reason the person gave
+             */
+            reason?: string | null;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            };
+        };
         /** AssignmentEnd */
         AssignmentEnd: {
             /**
@@ -6842,6 +6978,72 @@ export interface components {
         Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post: {
             /** File */
             file: string;
+        };
+        /**
+         * BoundaryCorrection
+         * @description A project boundary and an entity boundary moved to one instant together (the chained
+         *     correction of decision D355): each row's edge nearest the instant unless named.
+         */
+        BoundaryCorrection: {
+            /** Project Assignment Id */
+            project_assignment_id?: string | null;
+            /** Entity Assignment Id */
+            entity_assignment_id?: string | null;
+            /**
+             * Instant
+             * Format: date-time
+             */
+            instant: string;
+            /** Reason */
+            reason: string;
+            /** Project Edge */
+            project_edge?: ("start" | "end") | null;
+            /** Entity Edge */
+            entity_edge?: ("start" | "end") | null;
+            /**
+             * Preview
+             * @default false
+             */
+            preview: boolean;
+        };
+        /**
+         * BoundaryEdit
+         * @description Move the start, the end or both edges of one assignment to new instants, each with the
+         *     neighbouring row's touching edge (decision D355). `preview` answers what would change
+         *     without writing.
+         */
+        BoundaryEdit: {
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Preview
+             * @default false
+             */
+            preview: boolean;
+        };
+        /**
+         * BoundaryResult
+         * @description What a boundary move does or did: the edges that change with their rows, the window
+         *     the records are attributed again over, whether unassigned time opens or closes, the job,
+         *     and the timeline after it (as it stands, for a preview).
+         */
+        BoundaryResult: {
+            /** Preview */
+            preview: boolean;
+            /** Changes */
+            changes: components["schemas"]["EdgeChangeRead"][];
+            /** Window From */
+            window_from: string | null;
+            /** Window To */
+            window_to: string | null;
+            /** Gap */
+            gap?: ("opens" | "closes") | null;
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
+            timeline: components["schemas"]["DeviceAssignmentsRead"];
         };
         /**
          * BrowserResult
@@ -8029,6 +8231,38 @@ export interface components {
             error?: string | null;
         };
         /**
+         * DeviceAssignmentsRead
+         * @description The device's whole timeline: project and entity assignments in time order, each with
+         *     its attribution job and last change; the device's active job once.
+         */
+        DeviceAssignmentsRead: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
+            /** Project Assignments */
+            project_assignments: components["schemas"]["ProjectTimelineRow"][];
+            /** Entity Assignments */
+            entity_assignments: components["schemas"]["EntityTimelineRow"][];
+            active_job?: components["schemas"]["AttributionJobRead"] | null;
+            /**
+             * Can Edit Project
+             * @description The caller may move project boundaries (server admin or project admin of every project involved, decision D355)
+             */
+            can_edit_project: boolean;
+            /**
+             * Can Edit Entity
+             * @description The caller may move entity boundaries (devices:write in the entities' projects)
+             */
+            can_edit_entity: boolean;
+        };
+        /**
          * DeviceBattery
          * @description The battery type this device is judged by (decision D248): the type in force and where
          *     it came from, the last voltage read with that chemistry, and the types to choose from.
@@ -8904,6 +9138,42 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** EdgeChangeRead */
+        EdgeChangeRead: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "project" | "entity";
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /**
+             * Target Id
+             * Format: uuid
+             * @description The project or the entity of the row
+             */
+            target_id: string;
+            /** Target Name */
+            target_name?: string | null;
+            /**
+             * Edge
+             * @enum {string}
+             */
+            edge: "start" | "end";
+            /**
+             * Old
+             * @description Null for an end that was open
+             */
+            old: string | null;
+            /**
+             * New
+             * Format: date-time
+             */
+            new: string;
+        };
         /**
          * EntitiesMove
          * @description Move entities of this project to another one, whole, with their devices over the spans
@@ -9311,6 +9581,51 @@ export interface components {
          * @enum {string}
          */
         EntityStatus: "active" | "inactive" | "archived";
+        /** EntityTimelineRow */
+        EntityTimelineRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** @description Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none */
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /**
+             * Device Name
+             * @description Filled by the project's assignment list (decision D106)
+             */
+            device_name?: string | null;
+            /**
+             * Entity Name
+             * @description Filled by the device read (decision D106)
+             */
+            entity_name?: string | null;
+            last_change?: components["schemas"]["AssignmentChangeRead"] | null;
+        };
         /**
          * EntityTracking
          * @description An entity as its devices report it: the devices tracking it today with their health, the
@@ -11177,6 +11492,22 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * LastMessageRead
+         * @description The newest live message of the device before an instant: what the boundary dialog
+         *     offers as "the last uplink before" (decision D355). `snap_to` is one second after it, so
+         *     that message stays in the earlier assignment under the half-open range.
+         */
+        LastMessageRead: {
+            /** Time */
+            time: string | null;
+            /** Snap To */
+            snap_to: string | null;
+            /** Acquisition Channel */
+            acquisition_channel?: string | null;
+            /** Data Source Name */
+            data_source_name?: string | null;
         };
         /**
          * LayerChoiceRead
@@ -13264,6 +13595,50 @@ export interface components {
             description?: string | null;
             /** Permissions */
             permissions?: string[] | null;
+        };
+        /**
+         * ProjectTimelineRow
+         * @description A project assignment on the device's timeline, with the newest attribution job whose
+         *     window touches it and the last change recorded on it.
+         */
+        ProjectTimelineRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** @description Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none */
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Project Name
+             * @description Filled by the device read, so the page names the project
+             */
+            project_name?: string | null;
+            last_change?: components["schemas"]["AssignmentChangeRead"] | null;
         };
         /** ProjectUpdate */
         ProjectUpdate: {
@@ -18416,6 +18791,184 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceConnectivityRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_assignments_api_v1_devices__device_id__assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceAssignmentsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_last_message_api_v1_devices__device_id__last_message_get: {
+        parameters: {
+            query: {
+                /** @description The instant to look back from */
+                before: string;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastMessageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_project_boundary_api_v1_devices__device_id__project_assignments__assignment_id__boundary_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
+            path: {
+                device_id: string;
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoundaryEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoundaryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_entity_boundary_api_v1_devices__device_id__entity_assignments__assignment_id__boundary_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
+            path: {
+                device_id: string;
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoundaryEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoundaryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_boundaries_api_v1_devices__device_id__assignments_correct_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoundaryCorrection"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoundaryResult"];
                 };
             };
             /** @description Validation Error */

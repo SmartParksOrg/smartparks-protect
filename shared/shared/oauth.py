@@ -31,9 +31,15 @@ class Scope(StrEnum):
     EVENTS_WRITE = "events:write"
     ALERTS_WRITE = "alerts:write"
     DEVICES_CONTROL = "devices:control"
+    ASSIGNMENTS_WRITE = "assignments:write"
 
 
-WRITE_SCOPES: tuple[str, ...] = (Scope.EVENTS_WRITE, Scope.ALERTS_WRITE, Scope.DEVICES_CONTROL)
+WRITE_SCOPES: tuple[str, ...] = (
+    Scope.EVENTS_WRITE,
+    Scope.ALERTS_WRITE,
+    Scope.DEVICES_CONTROL,
+    Scope.ASSIGNMENTS_WRITE,
+)
 READ_SCOPES: tuple[str, ...] = tuple(s.value for s in Scope if s not in WRITE_SCOPES)
 ALL_SCOPES: tuple[str, ...] = tuple(scope.value for scope in Scope)
 
@@ -49,6 +55,8 @@ SCOPE_DESCRIPTIONS: dict[str, str] = {
     Scope.ALERTS_WRITE: "Acknowledge alerts, subject to the AI action policy",
     Scope.DEVICES_CONTROL: "Ask a device for its status or position, subject to the AI action "
     "policy and your device control permission",
+    Scope.ASSIGNMENTS_WRITE: "Move the boundary between a device's assignments to the moment it "
+    "really changed hands, subject to the AI action policy and your assignment permissions",
     OFFLINE_ACCESS: "Stay connected without signing in again (refresh token)",
 }
 

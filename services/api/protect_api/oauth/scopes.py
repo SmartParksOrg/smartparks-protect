@@ -15,6 +15,10 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
         Scope.ENTITIES_READ,
     ),
     (re.compile(r"^/api/v1/devices(/[^/]+)?$"), Scope.DEVICES_READ),
+    (
+        re.compile(r"^/api/v1/devices/[^/]+/(assignments|attribution-jobs|last-message)$"),
+        Scope.DEVICES_READ,
+    ),
     (re.compile(r"^/api/v1/projects/[^/]+/(positions|tracks|map/current)$"), Scope.POSITIONS_READ),
     (
         re.compile(r"^/api/v1/projects/[^/]+/analytics/(series|rows|metrics)$"),

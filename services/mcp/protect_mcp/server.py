@@ -502,6 +502,86 @@ def build_server(api: ProtectApi) -> MCPServer[None]:
         )
 
     @mcp.tool()
+    async def get_device_assignments(device_id: Uuid) -> dict[str, Any]:
+        """A device's whole assignment timeline: its project assignments and its entity
+        assignments in time order, each with the attribution job touching it and the last
+        change recorded on it, and whether the user may move boundaries. Read this before
+        `update_assignment_boundary` to find the assignment ids and the instant a transfer
+        was stamped with."""
+        timeline = await api.get(f"/devices/{device_id}/assignments", tool="get_device_assignments")
+        return {
+            "device_id": timeline["device_id"],
+            "now": timeline["now"],
+            "can_edit_project": timeline["can_edit_project"],
+            "can_edit_entity": timeline["can_edit_entity"],
+            "active_attribution_job": timeline.get("active_job"),
+            "project_assignments": [
+                {
+                    "id": a["id"],
+                    "project_id": a["project_id"],
+                    "project_name": a.get("project_name"),
+                    "valid_from": a["valid_from"],
+                    "valid_to": a["valid_to"],
+                    "reason": a.get("reason"),
+                    "attribution_job": a.get("attribution_job"),
+                    "last_change": a.get("last_change"),
+                }
+                for a in timeline["project_assignments"]
+            ],
+            "entity_assignments": [
+                {
+                    "id": a["id"],
+                    "entity_id": a["entity_id"],
+                    "entity_name": a.get("entity_name"),
+                    "valid_from": a["valid_from"],
+                    "valid_to": a["valid_to"],
+                    "reason": a.get("reason"),
+                    "attribution_job": a.get("attribution_job"),
+                    "last_change": a.get("last_change"),
+                }
+                for a in timeline["entity_assignments"]
+            ],
+        }
+
+    @mcp.tool()
+    async def update_assignment_boundary(
+        device_id: Uuid,
+        new_boundary: Annotated[
+            datetime, Field(description="The instant the device really changed hands (ISO 8601)")
+        ],
+        reason: Annotated[str, Field(min_length=1, max_length=500)],
+        project_assignment_id: Annotated[
+            Uuid | None, Field(description="The project assignment whose edge moves")
+        ] = None,
+        entity_assignment_id: Annotated[
+            Uuid | None, Field(description="The entity assignment whose edge moves")
+        ] = None,
+    ) -> dict[str, Any]:
+        """Move the boundary between a device's assignments to the moment it really changed
+        hands: the project boundary and the entity boundary together, each row's edge nearest
+        the instant with the neighbouring row's touching edge, so the timeline stays
+        contiguous. The records between the old and the new instant are attributed again to
+        the project and entity of that time; raw messages never change. Refused when the
+        instant lies in the future, would leave a row empty or would cross another row. A
+        write under the AI action policy: by default this tool returns a summary of every
+        row that changes, old and new instants and the re-attribution window, with an action
+        id for `confirm_action`."""
+        _needs_scope(str(Scope.ASSIGNMENTS_WRITE))
+        return await _action(
+            "update_assignment_boundary",
+            "update_assignment_boundary",
+            {
+                "device_id": str(device_id),
+                "project_assignment_id": str(project_assignment_id)
+                if project_assignment_id
+                else None,
+                "entity_assignment_id": str(entity_assignment_id) if entity_assignment_id else None,
+                "instant": new_boundary.isoformat(),
+                "reason": reason,
+            },
+        )
+
+    @mcp.tool()
     async def confirm_action(action_id: Uuid) -> dict[str, Any]:
         """Execute an action that was proposed by another tool and held for confirmation.
         Call this only after the user explicitly confirmed the summary; the proposal expires

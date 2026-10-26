@@ -33,7 +33,8 @@ class EventCreate(BaseModel):
 
 class AiActionRequest(BaseModel):
     action: str = Field(
-        pattern="^(create_event|acknowledge_alert|request_device_status|request_device_position)$"
+        pattern="^(create_event|acknowledge_alert|request_device_status|request_device_position"
+        "|update_assignment_boundary)$"
     )
     parameters: dict[str, Any] = Field(default_factory=dict)
 

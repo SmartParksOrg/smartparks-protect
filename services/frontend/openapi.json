@@ -6079,6 +6079,361 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/assignments": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Assignments",
+    "description": "The device's project and entity assignments in time order, within the caller's\nprojects, each with the newest attribution job touching it and the last change recorded\non it, and whether the caller may move boundaries.",
+    "operationId": "device_assignments_api_v1_devices__device_id__assignments_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceAssignmentsRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/last-message": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Last Message",
+    "description": "The device's newest live message before an instant and the instant one second after\nit: what \"snap to the last uplink\" offers in the boundary dialog.",
+    "operationId": "device_last_message_api_v1_devices__device_id__last_message_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "before",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date-time",
+       "description": "The instant to look back from",
+       "title": "Before"
+      },
+      "description": "The instant to look back from"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LastMessageRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/project-assignments/{assignment_id}/boundary": {
+   "patch": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Move Project Boundary",
+    "description": "Move the start, the end or both edges of a project assignment, each together with the\nneighbouring row's touching edge (decision D355). Server admins and project admins of every\nproject whose row changes. `preview` answers what would change without writing.",
+    "operationId": "move_project_boundary_api_v1_devices__device_id__project_assignments__assignment_id__boundary_patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "assignment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Assignment Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BoundaryEdit"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BoundaryResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/entity-assignments/{assignment_id}/boundary": {
+   "patch": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Move Entity Boundary",
+    "description": "The same for an entity assignment: `devices:write` in the project of every entity whose\nrow changes; the rows must stay inside the device's project assignments.",
+    "operationId": "move_entity_boundary_api_v1_devices__device_id__entity_assignments__assignment_id__boundary_patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "assignment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Assignment Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BoundaryEdit"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BoundaryResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/assignments/correct": {
+   "post": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Correct Boundaries",
+    "description": "A project boundary and an entity boundary moved to one instant in one call (the\nchained correction of decision D355): a transfer made \"from now\" corrected to the moment\nthe device really changed hands. Each row's edge nearest the instant moves unless named;\nthe neighbours follow; one attribution job covers both windows.",
+    "operationId": "correct_boundaries_api_v1_devices__device_id__assignments_correct_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BoundaryCorrection"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BoundaryResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/data-sources": {
    "get": {
     "tags": [
@@ -24794,7 +25149,7 @@
     "properties": {
      "action": {
       "type": "string",
-      "pattern": "^(create_event|acknowledge_alert|request_device_status|request_device_position)$",
+      "pattern": "^(create_event|acknowledge_alert|request_device_status|request_device_position|update_assignment_boundary)$",
       "title": "Action"
      },
      "parameters": {
@@ -25672,6 +26027,55 @@
     "type": "object",
     "title": "AssignmentChange",
     "description": "Move the start or the end of an assignment (or both). Records between the old and the\nnew bounds are attributed again; `valid_to` null reopens an ended assignment."
+   },
+   "AssignmentChangeRead": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "action": {
+      "type": "string",
+      "title": "Action"
+     },
+     "user_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Name",
+      "description": "Who made it; null for the system"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason",
+      "description": "The reason the person gave"
+     },
+     "details": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Details"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "action"
+    ],
+    "title": "AssignmentChangeRead",
+    "description": "The last change recorded on an assignment row: the audit row in short."
    },
    "AssignmentEnd": {
     "properties": {
@@ -26880,6 +27284,209 @@
      "file"
     ],
     "title": "Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post"
+   },
+   "BoundaryCorrection": {
+    "properties": {
+     "project_assignment_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Assignment Id"
+     },
+     "entity_assignment_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Assignment Id"
+     },
+     "instant": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Instant"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason"
+     },
+     "project_edge": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "start",
+         "end"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Edge"
+     },
+     "entity_edge": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "start",
+         "end"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Edge"
+     },
+     "preview": {
+      "type": "boolean",
+      "title": "Preview",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "instant",
+     "reason"
+    ],
+    "title": "BoundaryCorrection",
+    "description": "A project boundary and an entity boundary moved to one instant together (the chained\ncorrection of decision D355): each row's edge nearest the instant unless named."
+   },
+   "BoundaryEdit": {
+    "properties": {
+     "valid_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason"
+     },
+     "preview": {
+      "type": "boolean",
+      "title": "Preview",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "BoundaryEdit",
+    "description": "Move the start, the end or both edges of one assignment to new instants, each with the\nneighbouring row's touching edge (decision D355). `preview` answers what would change\nwithout writing."
+   },
+   "BoundaryResult": {
+    "properties": {
+     "preview": {
+      "type": "boolean",
+      "title": "Preview"
+     },
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/EdgeChangeRead"
+      },
+      "type": "array",
+      "title": "Changes"
+     },
+     "window_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Window From"
+     },
+     "window_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Window To"
+     },
+     "gap": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "opens",
+         "closes"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gap"
+     },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "timeline": {
+      "$ref": "#/components/schemas/DeviceAssignmentsRead"
+     }
+    },
+    "type": "object",
+    "required": [
+     "preview",
+     "changes",
+     "window_from",
+     "window_to",
+     "timeline"
+    ],
+    "title": "BoundaryResult",
+    "description": "What a boundary move does or did: the edges that change with their rows, the window\nthe records are attributed again over, whether unassigned time opens or closes, the job,\nand the timeline after it (as it stands, for a preview)."
    },
    "BrowserResult": {
     "properties": {
@@ -30013,6 +30620,65 @@
     ],
     "title": "DependencyStatus"
    },
+   "DeviceAssignmentsRead": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "now": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Now"
+     },
+     "project_assignments": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectTimelineRow"
+      },
+      "type": "array",
+      "title": "Project Assignments"
+     },
+     "entity_assignments": {
+      "items": {
+       "$ref": "#/components/schemas/EntityTimelineRow"
+      },
+      "type": "array",
+      "title": "Entity Assignments"
+     },
+     "active_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "can_edit_project": {
+      "type": "boolean",
+      "title": "Can Edit Project",
+      "description": "The caller may move project boundaries (server admin or project admin of every project involved, decision D355)"
+     },
+     "can_edit_entity": {
+      "type": "boolean",
+      "title": "Can Edit Entity",
+      "description": "The caller may move entity boundaries (devices:write in the entities' projects)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "now",
+     "project_assignments",
+     "entity_assignments",
+     "can_edit_project",
+     "can_edit_entity"
+    ],
+    "title": "DeviceAssignmentsRead",
+    "description": "The device's whole timeline: project and entity assignments in time order, each with\nits attribution job and last change; the device's active job once."
+   },
    "DeviceBattery": {
     "properties": {
      "battery_type": {
@@ -32443,6 +33109,76 @@
     ],
     "title": "DriverCatalog"
    },
+   "EdgeChangeRead": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "project",
+       "entity"
+      ],
+      "title": "Kind"
+     },
+     "assignment_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Assignment Id"
+     },
+     "target_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Target Id",
+      "description": "The project or the entity of the row"
+     },
+     "target_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Name"
+     },
+     "edge": {
+      "type": "string",
+      "enum": [
+       "start",
+       "end"
+      ],
+      "title": "Edge"
+     },
+     "old": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Old",
+      "description": "Null for an end that was open"
+     },
+     "new": {
+      "type": "string",
+      "format": "date-time",
+      "title": "New"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "assignment_id",
+     "target_id",
+     "edge",
+     "old",
+     "new"
+    ],
+    "title": "EdgeChangeRead"
+   },
    "EntitiesMove": {
     "properties": {
      "entity_ids": {
@@ -33488,6 +34224,114 @@
      "archived"
     ],
     "title": "EntityStatus"
+   },
+   "EntityTimelineRow": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none"
+     },
+     "entity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name",
+      "description": "Filled by the project's assignment list (decision D106)"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name",
+      "description": "Filled by the device read (decision D106)"
+     },
+     "last_change": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AssignmentChangeRead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "valid_from",
+     "valid_to",
+     "reason",
+     "created_at",
+     "entity_id"
+    ],
+    "title": "EntityTimelineRow"
    },
    "EntityTracking": {
     "properties": {
@@ -38704,6 +39548,63 @@
      "updated_at"
     ],
     "title": "JobRead"
+   },
+   "LastMessageRead": {
+    "properties": {
+     "time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Time"
+     },
+     "snap_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Snap To"
+     },
+     "acquisition_channel": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acquisition Channel"
+     },
+     "data_source_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "snap_to"
+    ],
+    "title": "LastMessageRead",
+    "description": "The newest live message of the device before an instant: what the boundary dialog\noffers as \"the last uplink before\" (decision D355). `snap_to` is one second after it, so\nthat message stays in the earlier assignment under the half-open range."
    },
    "LayerChoiceRead": {
     "properties": {
@@ -44129,6 +45030,103 @@
     },
     "type": "object",
     "title": "ProjectRoleUpdate"
+   },
+   "ProjectTimelineRow": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name",
+      "description": "Filled by the device read, so the page names the project"
+     },
+     "last_change": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AssignmentChangeRead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "valid_from",
+     "valid_to",
+     "reason",
+     "created_at",
+     "project_id"
+    ],
+    "title": "ProjectTimelineRow",
+    "description": "A project assignment on the device's timeline, with the newest attribution job whose\nwindow touches it and the last change recorded on it."
    },
    "ProjectUpdate": {
     "properties": {

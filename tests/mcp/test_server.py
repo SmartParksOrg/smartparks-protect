@@ -354,3 +354,120 @@ async def test_write_tools_follow_the_policy_and_confirmation(db, client):
             )
         )
         assert refused.get("isError") and "alerts:write" in refused["content"][0]["text"]
+
+
+async def test_assignment_boundaries_are_read_and_corrected_with_confirmation(db, client):
+    """`get_device_assignments` reads the timeline; `update_assignment_boundary` (decisions
+    D355 to D358) proposes the combined correction with a summary naming every row, old and
+    new instant and the window, and `confirm_action` runs it. A token without the
+    assignments:write scope is refused."""
+    async with mcp_session() as mcp_client:
+        _project, _viewer, entity, device = await _fixture(client, db)
+        admin = await actor(client, db, superuser=True)
+        # a second project and entity the device moves to from now, the SP051307 shape
+        other = await create_project(db)
+        moved = await client.post(
+            "/api/v1/devices/move",
+            json={"device_ids": [device["id"]], "project_id": str(other.id), "start": "now"},
+            headers=admin.headers,
+        )
+        assert moved.status_code == 200, moved.text
+        timeline = (
+            await client.get(f"/api/v1/devices/{device['id']}/assignments", headers=admin.headers)
+        ).json()
+        [old_row, new_row] = timeline["project_assignments"]
+        transfer = new_row["valid_from"]
+        entity_type_id = entity["entity_type_id"]
+        tracked = await client.post(
+            f"/api/v1/projects/{other.id}/entity-assignments",
+            json={
+                "device_id": device["id"],
+                "valid_from": transfer,
+                "new_entity": {"name": "SP051307", "entity_type_id": entity_type_id},
+            },
+            headers=admin.headers,
+        )
+        assert tracked.status_code == 201, tracked.text
+        token, _ = mint_access_token(admin.user.id, "test-client", list(ALL_SCOPES))
+        read = structured(
+            await call(mcp_client, token, "get_device_assignments", {"device_id": device["id"]})
+        )
+        assert read["can_edit_project"] and read["can_edit_entity"]
+        assert [a["id"] for a in read["project_assignments"]] == [old_row["id"], new_row["id"]]
+        [tim_row, sp_row] = read["entity_assignments"]
+        assert sp_row["entity_name"] == "SP051307" and sp_row["valid_from"] == transfer
+        assert tim_row["valid_to"] == transfer
+
+        boundary = (datetime.now(UTC) - timedelta(hours=12)).isoformat()
+        arguments = {
+            "device_id": device["id"],
+            "project_assignment_id": new_row["id"],
+            "entity_assignment_id": sp_row["id"],
+            "new_boundary": boundary,
+            "reason": "the collar went on at noon",
+        }
+        proposed = structured(
+            await call(mcp_client, token, "update_assignment_boundary", arguments)
+        )
+        assert proposed["status"] == "confirmation_required"
+        summary = proposed["summary"]
+        for row in (old_row["id"], new_row["id"], tim_row["id"], sp_row["id"]):
+            assert row in summary
+        assert "Rhino 14" in summary and "SP051307" in summary
+        assert transfer[:19] in summary and boundary[:19] in summary
+        assert "attributed again" in summary
+        # nothing moved yet
+        before = (
+            await client.get(f"/api/v1/devices/{device['id']}/assignments", headers=admin.headers)
+        ).json()
+        assert before["project_assignments"][1]["valid_from"] == transfer
+
+        done = structured(
+            await call(mcp_client, token, "confirm_action", {"action_id": proposed["id"]})
+        )
+        assert done["status"] == "executed"
+        assert {c["assignment_id"] for c in done["result"]["changes"]} == {
+            old_row["id"],
+            new_row["id"],
+            tim_row["id"],
+            sp_row["id"],
+        }
+        assert done["result"]["window_to"][:19] == transfer[:19]
+        after = (
+            await client.get(f"/api/v1/devices/{device['id']}/assignments", headers=admin.headers)
+        ).json()
+        for row in after["project_assignments"] + after["entity_assignments"]:
+            assert row["last_change"]["action"].endswith("boundary_moved")
+            assert row["last_change"]["reason"] == "the collar went on at noon"
+        assert after["project_assignments"][0]["valid_to"][:19] == boundary[:19]
+        assert after["entity_assignments"][1]["valid_from"][:19] == boundary[:19]
+        await db.rollback()
+        audited = (
+            await db.scalars(
+                select(AuditLog).where(
+                    AuditLog.action == "project_assignment.boundary_moved",
+                    AuditLog.details["device_id"].as_string() == device["id"],
+                )
+            )
+        ).all()
+        assert audited and all(a.actor_type == "mcp" for a in audited)
+
+        # a refusal comes back as the tool's error, in words
+        refused = result_of(
+            await call(
+                mcp_client,
+                token,
+                "update_assignment_boundary",
+                {**arguments, "new_boundary": (datetime.now(UTC) + timedelta(days=1)).isoformat()},
+            )
+        )
+        assert refused.get("isError") and "future" in refused["content"][0]["text"]
+        # without the scope, nothing
+        read_token, _ = mint_access_token(admin.user.id, "test-client", list(READ_SCOPES))
+        refused = result_of(
+            await call(mcp_client, read_token, "update_assignment_boundary", arguments)
+        )
+        assert refused.get("isError") and "assignments:write" in refused["content"][0]["text"]
+        # the policy page lists the action
+        policy = structured(await call(mcp_client, token, "get_ai_policy", {}))
+        assert policy["policy"]["update_assignment_boundary"] == "confirmation"

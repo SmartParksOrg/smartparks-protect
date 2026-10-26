@@ -13,11 +13,13 @@ from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
+from protect_api.boundaries import describe, refuse, run_plan, summary_text
 from protect_api.bus import get_bus
 from protect_api.deps import require_server_admin
 from protect_api.oauth.middleware import mcp_access_var
@@ -25,6 +27,7 @@ from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
 from protect_api.routers.events import _scoped_alert, alert_read
 from protect_api.routers.platform import create_manual_event
+from protect_api.schemas.domain import BoundaryCorrection
 from protect_api.schemas.platform import (
     AiActionInfo,
     AiActionRead,
@@ -36,8 +39,18 @@ from protect_api.schemas.platform import (
 from shared.bus import RedisStreamsBus
 from shared.control.commands import Actor, command_message, request_command
 from shared.database import get_session
+from shared.domain.boundaries import CorrectionPlan, Kind, plan_correction
 from shared.enums import ActorType, AlertStatus, Role
-from shared.models import McpPendingAction, Project, ProjectMembership, ServerSetting, User
+from shared.models import (
+    Device,
+    DeviceEntityAssignment,
+    DeviceProjectAssignment,
+    McpPendingAction,
+    Project,
+    ProjectMembership,
+    ServerSetting,
+    User,
+)
 from shared.oauth import MCPAccessToken, Scope
 from shared.permissions import Permission, permissions_for
 from shared.rules.events import close_alert
@@ -75,12 +88,18 @@ ACTIONS: dict[str, dict[str, Any]] = {
         "permission": Permission.DEVICES_CONTROL,
         "action_key": "REQUEST_POSITION",
     },
+    "update_assignment_boundary": {
+        "class": "history_write",
+        "scope": Scope.ASSIGNMENTS_WRITE,
+        "permission": Permission.DEVICES_WRITE,
+    },
 }
 DEFAULT_POLICY: dict[str, str] = {
     "create_event": "confirmation",
     "acknowledge_alert": "confirmation",
     "request_device_status": "confirmation",
     "request_device_position": "confirmation",
+    "update_assignment_boundary": "confirmation",
     "high_impact_control": "disabled",
 }
 
@@ -212,7 +231,13 @@ def _uuid(parameters: dict[str, Any], key: str) -> uuid.UUID:
         ) from None
 
 
-async def _summary(session: AsyncSession, action: str, parameters: dict[str, Any]) -> str:
+async def _summary(
+    session: AsyncSession, user: User, action: str, parameters: dict[str, Any]
+) -> str:
+    if action == "update_assignment_boundary":
+        device, plan, _body = await _boundary_plan(session, user, parameters)
+        changes = await describe(session, plan)
+        return summary_text(device, changes, plan.window)
     if action == "create_event":
         return (
             f'Create event {parameters.get("event_type")} "{parameters.get("title")}" in '
@@ -226,6 +251,40 @@ async def _summary(session: AsyncSession, action: str, parameters: dict[str, Any
     return f"{action.replace('_', ' ')} for device {parameters.get('device_id')}"
 
 
+async def _boundary_plan(
+    session: AsyncSession, user: User, parameters: dict[str, Any]
+) -> tuple[Device, CorrectionPlan, BoundaryCorrection]:
+    """The combined correction's plan from the action's parameters, refused in words as the
+    device endpoint refuses it (the summary and the execution read the same plan)."""
+    try:
+        body = BoundaryCorrection.model_validate(
+            {k: v for k, v in parameters.items() if k != "device_id"}
+        )
+    except ValidationError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
+    device = await _visible_device(session, user, _uuid(parameters, "device_id"))
+    if body.project_assignment_id is not None:
+        project_row = await session.get(DeviceProjectAssignment, body.project_assignment_id)
+        if project_row is None or project_row.device_id != device.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "project assignment not found")
+    if body.entity_assignment_id is not None:
+        entity_row = await session.get(DeviceEntityAssignment, body.entity_assignment_id)
+        if entity_row is None or entity_row.device_id != device.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "entity assignment not found")
+    plan = await plan_correction(
+        session,
+        device.id,
+        project_assignment_id=body.project_assignment_id,
+        entity_assignment_id=body.entity_assignment_id,
+        instant=body.instant,
+        now=utc_now(),
+        project_edge=body.project_edge,
+        entity_edge=body.entity_edge,
+    )
+    refuse(plan, "en")
+    return device, plan, body
+
+
 async def execute_action(
     session: AsyncSession,
     bus: RedisStreamsBus,
@@ -236,6 +295,36 @@ async def execute_action(
     parameters: dict[str, Any],
 ) -> dict[str, Any]:
     spec = ACTIONS[action]
+    if action == "update_assignment_boundary":
+        device, plan, body = await _boundary_plan(session, user, parameters)
+        named: list[tuple[Kind, uuid.UUID]] = [
+            (part.kind, c.target_id)
+            for part in (plan.project, plan.entity)
+            if part is not None
+            for c in part.changes
+        ]
+        result = await run_plan(
+            session,
+            bus,
+            user=user,
+            device=device,
+            plan=plan,
+            reason=body.reason,
+            preview=False,
+            language="en",
+            named=named,
+            actor_type=ActorType.MCP,
+            client_id=access.client_id,
+        )
+        return {
+            "device_id": str(device.id),
+            "changes": [c.model_dump(mode="json") for c in result.changes],
+            "window_from": result.window_from.isoformat() if result.window_from else None,
+            "window_to": result.window_to.isoformat() if result.window_to else None,
+            "attribution_job_id": str(result.attribution_job.id)
+            if result.attribution_job
+            else None,
+        }
     if action == "create_event":
         project_id = _uuid(parameters, "project_id")
         permissions = await _project_permissions(session, user, project_id)
@@ -243,7 +332,7 @@ async def execute_action(
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, f"Permission {spec['permission']} required"
             )
-        body = EventCreate.model_validate(
+        event_body = EventCreate.model_validate(
             {k: v for k, v in parameters.items() if k != "project_id"}
         )
         created = await create_manual_event(
@@ -251,7 +340,7 @@ async def execute_action(
             bus,
             user=user,
             project_id=project_id,
-            body=body,
+            body=event_body,
             actor_type=ActorType.MCP,
             client_id=access.client_id,
         )
@@ -350,7 +439,7 @@ async def propose_action(
             status.HTTP_403_FORBIDDEN,
             f"{body.action} is disabled for AI clients by the server's AI action policy",
         )
-    summary = await _summary(session, body.action, body.parameters)
+    summary = await _summary(session, user, body.action, body.parameters)
     if mode == "allowed":
         result = await execute_action(
             session, bus, user=user, access=access, action=body.action, parameters=body.parameters
