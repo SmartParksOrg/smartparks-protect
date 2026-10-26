@@ -23,6 +23,13 @@ NL: dict[str, str] = {
     "an entity of that name exists": "er bestaat al een entiteit met die naam",
     "not in this project at the start": "zat bij het begin niet in dit project",
     "tracks an entity from the start on; release it first": "volgt vanaf het begin al een entiteit; maak het eerst los",
+    # assignment boundaries moved after the fact (shared/domain/boundaries.py, D355 to D358)
+    "the new instant lies in the future": "het nieuwe moment ligt in de toekomst",
+    "the new instant would leave the assignment empty": "het nieuwe moment zou de toewijzing leeg laten",
+    "the new instant would leave the previous assignment empty": "het nieuwe moment zou de vorige toewijzing leeg laten",
+    "the new instant would leave the next assignment empty": "het nieuwe moment zou de volgende toewijzing leeg laten",
+    "the new instant crosses another assignment": "het nieuwe moment loopt over een andere toewijzing heen",
+    "the device is not in the entity's project over the new period": "het apparaat zit in de nieuwe periode niet in het project van de entiteit",
     # offload stations (phase 42)
     "The offload station reports that its SD card is absent or cannot be written, so trackers that visit it cannot offload. Check the card and the reader; a card that was swapped needs its files read into Protect first.": "Het offloadstation meldt dat zijn SD-kaart ontbreekt of niet beschreven kan worden, dus trackers die het bezoeken kunnen niets offloaden. Controleer de kaart en de lezer; van een verwisselde kaart moeten eerst de bestanden in Protect worden ingelezen.",
     "An offload station reports that its SD card is absent, faulted or not writable (phase 42, decision D323; the storage bits of report version 3, decision D345): nothing a tracker offloads there is kept. Reminds once a day.": "Een offloadstation meldt dat zijn SD-kaart ontbreekt, een fout heeft of niet beschrijfbaar is (fase 42, besluit D323; de opslagbits van rapportversie 3, besluit D345): niets wat een tracker daar offloadt blijft bewaard. Herinnert eens per dag.",
