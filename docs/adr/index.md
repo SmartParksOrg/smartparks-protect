@@ -46,3 +46,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0038 Moves take the history along, and assignment changes never wait for a job](0038-moves-take-history-and-jobs-never-block.md)
 - [0039 Habitat selection through hrHSA, in an image of the analysis worker's own](0039-habitat-selection-through-hrhsa-in-a-worker-image.md)
 - [0040 An offload station's card is read by Protect, frame by frame, with keys held per device](0040-offload-station-cards-as-deliveries-keyed-per-device.md)
+- [0041 An assignment boundary moves after the fact, with its neighbour, under audit](0041-assignment-boundaries-moved-after-the-fact.md)

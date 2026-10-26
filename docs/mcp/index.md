@@ -33,6 +33,7 @@ Tools, all read-only and bounded:
 | `search_entities` | Entities of a project by name, type or status (at most 100) |
 | `get_entity` | One entity with its type, current device, assignment history and latest position |
 | `get_device` | One device with type, assignments, external identities and deep links |
+| `get_device_assignments` | A device's whole assignment timeline: project and entity assignments in time order with the attribution job and the last change per row, and whether the user may move boundaries |
 | `get_latest_position` | The newest position of an entity or device |
 | `query_measurements` | Aggregated measurements per metric and entity (the Data Explorer's series endpoint, at most five metrics per call) |
 | `list_metrics` | Metric keys with data in the project |
@@ -56,6 +57,7 @@ A client can also act, within the AI action policy (decision D87, ADR 0019):
 | `acknowledge_alert` | Closes an alert with a note | `alerts:write` |
 | `request_device_status` | Queues a status request to a device | `devices:control` |
 | `request_device_position` | Queues a position request to a device | `devices:control` |
+| `update_assignment_boundary` | Moves the boundary between a device's assignments to the moment it really changed hands: the project and the entity boundary together, each with the neighbouring row's edge, the records in between attributed again (decisions D355 to D358). The summary names every row, old and new instant and the window | `assignments:write` |
 | `confirm_action` | Executes a proposal the policy held for confirmation | the action's scope |
 | `get_ai_policy` | The server's policy per action, so the client knows what to expect | none |
 
@@ -74,7 +76,7 @@ scopes is offered all of them, and the person may untick the writes.
 
 ## Authentication in detail
 
-Scopes: `projects:read`, `entities:read`, `devices:read`, `positions:read`, `measurements:read`, `events:read`, `traces:read`, plus `offline_access` for a refresh token. The MCP server requires all read scopes; a token with fewer gets a 403 with `insufficient_scope` and the client asks the user to re-consent.
+Scopes: `projects:read`, `entities:read`, `devices:read`, `positions:read`, `measurements:read`, `events:read`, `traces:read`, the write scopes `events:write`, `alerts:write`, `devices:control` and `assignments:write`, plus `offline_access` for a refresh token. The MCP server requires all read scopes; a token with fewer gets a 403 with `insufficient_scope` and the client asks the user to re-consent.
 
 Access tokens are JWTs signed with the server's `JWT_SECRET`, with the MCP URL as audience, the user as subject, the client id and the scopes as claims, valid for `JWT_LIFETIME_SECONDS`. The API accepts them only for `GET` requests on the paths a scope covers (`protect_api/oauth/scopes.py`); any other request is refused with 403. A session token from the web application is never accepted by the MCP server, and an MCP token cannot do anything a session token can outside its scopes.
 
