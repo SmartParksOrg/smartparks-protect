@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import exists, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
@@ -237,6 +237,24 @@ class TrafficCount(BaseModel):
     count: int
 
 
+def _assigned_at(project_id: uuid.UUID, device_column: Any, at: Any) -> Any:
+    """The device of a row was assigned to the project at that moment (Tim, 2026-10-26: after
+    SP051307's boundary moved, the new project's Traffic still listed the device's messages
+    from its old project, and a member of the new project could read them). A message is
+    judged at its delivery time, the network's else the arrival; a trace at its start. Raw
+    rows carry no project, so this is the one place the cut is made; the all scope keeps
+    everything (decision D359)."""
+    return exists().where(
+        DeviceProjectAssignment.device_id == device_column,
+        DeviceProjectAssignment.project_id == project_id,
+        DeviceProjectAssignment.validity.op("@>", is_comparison=True)(at),
+    )
+
+
+def _delivered_at() -> Any:
+    return func.coalesce(SourceEvent.network_received_at, SourceEvent.ingested_at)
+
+
 def _traffic_statuses(status: list[str] | None) -> list[ProcessingStatus]:
     """The statuses a traffic read narrows to; an unknown one is a 422."""
     out: list[ProcessingStatus] = []
@@ -299,6 +317,10 @@ async def traffic(
             SourceEvent.ingested_at < time_to,
         )
     )
+    if context.project is not None:
+        statement = statement.where(
+            _assigned_at(context.project.id, SourceEvent.device_id, _delivered_at())
+        )
     if event_type is not None:
         statement = statement.where(SourceEvent.event_type == event_type)
     if statuses:
@@ -345,6 +367,10 @@ async def traffic_count(
             SourceEvent.ingested_at < time_to,
         )
     )
+    if context.project is not None:
+        statement = statement.where(
+            _assigned_at(context.project.id, SourceEvent.device_id, _delivered_at())
+        )
     if event_type is not None:
         statement = statement.where(SourceEvent.event_type == event_type)
     if statuses:
@@ -492,10 +518,17 @@ async def search_traces(
         .outerjoin(ApplicationErrorRow, ApplicationErrorRow.id == ProcessingTrace.error_id)
         .where(ProcessingTrace.started_at >= time_from, ProcessingTrace.started_at < time_to)
     )
+    # a device's trace counts for the project it was assigned to when the trace started
+    assigned = _assigned_at(
+        context.project.id, ProcessingTrace.device_id, ProcessingTrace.started_at
+    )
     if device_ids or device_id is not None or external_id is not None:
-        statement = statement.where(ProcessingTrace.device_id.in_(device_ids))
+        statement = statement.where(ProcessingTrace.device_id.in_(device_ids), assigned)
     else:
-        statement = statement.where(ProcessingTrace.project_id == context.project.id)
+        statement = statement.where(
+            ProcessingTrace.project_id == context.project.id,
+            or_(ProcessingTrace.device_id.is_(None), assigned),
+        )
     if data_source_id is not None:
         statement = statement.where(ProcessingTrace.data_source_id == data_source_id)
     if status_filter is not None:

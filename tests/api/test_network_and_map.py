@@ -430,3 +430,53 @@ async def test_traffic_rows_carry_the_channel_and_frame_details(client, db, bus)
     assert ble["ingestion_method"] == "browser_sync" and ble["frame_bytes"] == 8
     assert ble["delivered_at"].startswith("2026-06-01T10:00") and ble["log_file_id"]
     assert ble["f_port"] is None and ble["gateway_count"] == 0
+
+
+async def test_a_project_sees_a_moved_device_s_messages_from_its_own_spans_alone(client, db, bus):
+    """Tim, 2026-10-26: after SP051307's boundary moved, the new project's Traffic still listed
+    the device's messages from its old project. A message belongs to the project the device was
+    assigned to at its delivery time (decision D359); the all scope keeps everything."""
+    from shared.enums import Role
+    from tests.api.conftest import project_actor
+
+    admin, project, _entity, source, device, external_id = await _setup(client, db)
+    h = admin.headers
+    other = await create_project(db)
+    now = datetime.now(UTC)
+    await _feed(db, bus, source["id"], external_id, now - timedelta(hours=3), 1.0, 1.0)
+    await _feed(db, bus, source["id"], external_id, now - timedelta(hours=1), 1.0, 1.0)
+    moment = (now - timedelta(hours=2)).isoformat()
+    moved = await client.post(
+        "/api/v1/devices/move",
+        json={"device_ids": [device["id"]], "project_id": str(other.id), "start": moment},
+        headers=h,
+    )
+    assert moved.status_code == 200, moved.text
+    both = (
+        await client.get(
+            "/api/v1/projects/all/traffic", params={"device_id": device["id"]}, headers=h
+        )
+    ).json()
+    assert len(both) == 2
+    newer, older = sorted(both, key=lambda r: r["time"], reverse=True)
+    ids = lambda rows: {r["source_event_id"] for r in rows}  # noqa: E731
+    old_rows = (await client.get(f"/api/v1/projects/{project.id}/traffic", headers=h)).json()
+    new_rows = (await client.get(f"/api/v1/projects/{other.id}/traffic", headers=h)).json()
+    assert ids(old_rows) == {older["source_event_id"]}
+    assert ids(new_rows) == {newer["source_event_id"]}
+    count = await client.get(f"/api/v1/projects/{other.id}/traffic/count", headers=h)
+    assert count.json()["count"] == 1
+    # a trace is judged at its start, which for both messages lies after the move's moment
+    traces = (await client.get(f"/api/v1/projects/{other.id}/traces", headers=h)).json()
+    assert len([t for t in traces if t["device_id"] == device["id"]]) == 2
+    traces = (await client.get(f"/api/v1/projects/{project.id}/traces", headers=h)).json()
+    assert [t for t in traces if t["device_id"] == device["id"]] == []
+    # a member of the new project opens the newer message, never the older one
+    viewer = await project_actor(client, db, other, Role.PROJECT_VIEWER)
+
+    def url(row: dict) -> str:
+        return f"/api/v1/source-events/{row['source_event_id']}?ingested_at={row['ingested_at']}"
+
+    assert (await client.get(url(newer), headers=viewer.headers)).status_code == 200
+    assert (await client.get(url(older), headers=viewer.headers)).status_code == 404
+    assert (await client.get(url(older), headers=h)).status_code == 200

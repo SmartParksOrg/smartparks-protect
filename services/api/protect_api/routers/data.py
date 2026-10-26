@@ -351,7 +351,12 @@ async def measurement_summary(
     return out
 
 
-async def _device_visible(session: AsyncSession, user: User, device_id: uuid.UUID | None) -> bool:
+async def _device_visible(
+    session: AsyncSession, user: User, device_id: uuid.UUID | None, at: datetime | None = None
+) -> bool:
+    """A member of a project the device was assigned to may see it; with `at`, only when the
+    device was that project's at that moment, so one raw message or trace of a device's time
+    in another project stays out of reach (decision D359)."""
     if user.is_superuser:
         return True
     if device_id is None:
@@ -359,15 +364,15 @@ async def _device_visible(session: AsyncSession, user: User, device_id: uuid.UUI
     from shared.models import DeviceProjectAssignment
 
     projects = await accessible_project_ids(user, session) or []
-    row = await session.scalar(
-        select(DeviceProjectAssignment.project_id)
-        .where(
-            DeviceProjectAssignment.device_id == device_id,
-            DeviceProjectAssignment.project_id.in_(projects),
-        )
-        .order_by(DeviceProjectAssignment.validity.desc())
-        .limit(1)
+    statement = select(DeviceProjectAssignment.project_id).where(
+        DeviceProjectAssignment.device_id == device_id,
+        DeviceProjectAssignment.project_id.in_(projects),
     )
+    if at is not None:
+        statement = statement.where(
+            DeviceProjectAssignment.validity.op("@>", is_comparison=True)(require_aware(at))
+        )
+    row = await session.scalar(statement.order_by(DeviceProjectAssignment.validity.desc()).limit(1))
     if row is None:
         return False
     from protect_api.visibility import visibility_for
@@ -389,7 +394,9 @@ async def get_source_event(
             SourceEvent.id == source_event_id, SourceEvent.ingested_at == require_aware(ingested_at)
         )
     )
-    if event is None or not await _device_visible(session, user, event.device_id):
+    if event is None or not await _device_visible(
+        session, user, event.device_id, event.network_received_at or event.ingested_at
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Source event not found")
     deliveries = (
         await session.scalars(
@@ -526,7 +533,10 @@ async def list_deliveries(
     ).all()
     if not rows:
         return []
-    if not await _device_visible(session, user, rows[0][1].device_id):
+    event = rows[0][1]
+    if not await _device_visible(
+        session, user, event.device_id, event.network_received_at or event.ingested_at
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Record not found")
     sources = {
         s.id: s.name
@@ -588,7 +598,7 @@ async def get_trace(
     if not user.is_superuser:
         projects = await accessible_project_ids(user, session) or []
         allowed = trace.project_id in projects or await _device_visible(
-            session, user, trace.device_id
+            session, user, trace.device_id, trace.started_at
         )
         if not allowed:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Trace not found")
