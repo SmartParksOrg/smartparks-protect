@@ -17,6 +17,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  DeviceAssignments,
   DataSourceBrief,
   DeviceDataSpan,
   DeviceDetail,
@@ -65,6 +66,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
+import { AssignmentsTab } from "@/components/devices/AssignmentsTab";
+import { BoundaryDialog, type BoundaryTarget } from "@/components/devices/BoundaryDialog";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { MeasurementsCard } from "@/components/data/MeasurementsCard";
@@ -86,7 +89,7 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
-import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
+import { useAnalysisModules, usePermissions, useProject } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { courseText, speedText } from "@/lib/speed";
@@ -94,6 +97,7 @@ import { useAuthStore } from "@/stores/auth";
 
 const TABS = [
   "overview",
+  "assignments",
   "data",
   "connectivity",
   "traffic",
@@ -118,6 +122,7 @@ export function DevicePage() {
   const [history, setHistory] = useState<CurationTarget | null>(null);
   const [assigning, setAssigning] = useState<"entity" | "project" | null>(null);
   const [moving, setMoving] = useState(false);
+  const [boundary, setBoundary] = useState<BoundaryTarget | null>(null);
   const navigate = useNavigate();
   const device = useQuery({
     queryKey: queryKeys.device(deviceId),
@@ -165,6 +170,11 @@ export function DevicePage() {
       }),
     enabled: Boolean(projectId) && !device.isPending,
   });
+  const timeline = useQuery({
+    queryKey: queryKeys.deviceAssignments(deviceId),
+    queryFn: () =>
+      api.get<DeviceAssignments>(`/api/v1/devices/${deviceId}/assignments`),
+  });
   const span = useQuery({
     queryKey: queryKeys.deviceSpan(deviceId),
     queryFn: () =>
@@ -175,6 +185,7 @@ export function DevicePage() {
   const [connectivityHours, setConnectivityHours] = useState(168);
   const repairInvalidate = [
     queryKeys.device(deviceId),
+    queryKeys.deviceAssignments(deviceId),
     queryKeys.deviceSpan(deviceId),
     queryKeys.attributionJobs(deviceId),
     queryKeys.positions(projectId ?? "", { deviceId, recent: true }),
@@ -263,6 +274,7 @@ export function DevicePage() {
         ]
       : []),
   ]);
+  const { project: deviceProject } = useProject(deviceProjectId ?? undefined);
   // in a project, the project's own permission; without one, a server admin picks the project in the dialog (D192)
   const mayAssign = deviceProjectId
     ? can("devices:write")
@@ -298,6 +310,7 @@ export function DevicePage() {
       ),
     invalidate: [
       queryKeys.device(deviceId),
+      queryKeys.deviceAssignments(deviceId),
       ...(deviceProjectId
         ? [
             queryKeys.entityAssignments(deviceProjectId),
@@ -516,6 +529,7 @@ export function DevicePage() {
         >
           <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] sm:overflow-visible">
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
+            <TabsTrigger value="assignments">{t("Assignments")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
             <TabsTrigger value="traffic">{t("Traffic")}</TabsTrigger>
@@ -659,104 +673,62 @@ export function DevicePage() {
                 deviceId={d.id}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
               />
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-2">
-                  <CardTitle>{t("Project assignments")}</CardTitle>
-                  {!deviceProjectId && user?.is_superuser && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setAssigning("project")}
-                    >
-                      {t("Assign to project")}
-                    </Button>
-                  )}
-                  {deviceProjectId &&
-                    (user?.is_superuser || can("project:write")) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setMoving(true)}
-                      >
-                        <ArrowRightLeft className="size-4" />{" "}
-                        {t("Move to project…")}
-                      </Button>
-                    )}
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  {d.project_assignments.length === 0 && (
-                    <div className="text-muted-foreground">
-                      {t("Not assigned to a project.")}
-                    </div>
-                  )}
-                  {d.project_assignments.map((a) => (
-                    <div key={a.id}>
-                      <Link
-                        className="underline"
-                        to={`/projects/${a.project_id}/devices/${d.id}`}
-                      >
-                        {a.project_name ?? a.project_id.slice(0, 8)}
-                      </Link>
-                      ,{" "}
-                      {t("{{from}} to {{to}}", {
-                        from: formatTime(a.valid_from),
-                        to: a.valid_to ? formatTime(a.valid_to) : t("now"),
-                      })}
-                      {a.reason ? `, ${a.reason}` : ""}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-2">
-                  <CardTitle>{t("Entity assignments")}</CardTitle>
-                  {mayAssign &&
-                    (currentEntityAssignment ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={release.isPending}
-                        onClick={() =>
-                          release.mutate(currentEntityAssignment.id)
-                        }
-                      >
-                        {t("Release")}
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={() => setAssigning("entity")}>
-                        {t("Assign to entity")}
-                      </Button>
-                    ))}
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  {d.entity_assignments.length === 0 && (
-                    <div className="text-muted-foreground">
-                      {deviceProjectId
-                        ? t("Not assigned to an entity.")
-                        : t(
-                            "Not assigned to an entity; Assign to entity asks for the project first.",
-                          )}
-                    </div>
-                  )}
-                  {d.entity_assignments.map((a) => (
-                    <div key={a.id}>
-                      {entityLink(a) ? (
-                        <Link className="underline" to={entityLink(a) ?? ""}>
-                          {a.entity_name ?? a.entity_id.slice(0, 8)}
-                        </Link>
-                      ) : (
-                        <span>{a.entity_name ?? a.entity_id.slice(0, 8)}</span>
-                      )}
-                      ,{" "}
-                      {t("{{from}} to {{to}}", {
-                        from: formatTime(a.valid_from),
-                        to: a.valid_to ? formatTime(a.valid_to) : t("now"),
-                      })}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
             </div>
+          </TabsContent>
+          <TabsContent value="assignments">
+            <AssignmentsTab
+              timeline={timeline.data}
+              now={new Date(now)}
+              deviceId={d.id}
+              deviceProjectId={deviceProjectId}
+              entityLink={entityLink}
+              onEdit={setBoundary}
+              projectActions={
+                <>
+            {!deviceProjectId && user?.is_superuser && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setAssigning("project")}
+              >
+                {t("Assign to project")}
+              </Button>
+            )}
+            {deviceProjectId &&
+              (user?.is_superuser || can("project:write")) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMoving(true)}
+                >
+                  <ArrowRightLeft className="size-4" />{" "}
+                  {t("Move to project…")}
+                </Button>
+              )}
+                </>
+              }
+              entityActions={
+                <>
+            {mayAssign &&
+              (currentEntityAssignment ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={release.isPending}
+                  onClick={() =>
+                    release.mutate(currentEntityAssignment.id)
+                  }
+                >
+                  {t("Release")}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => setAssigning("entity")}>
+                  {t("Assign to entity")}
+                </Button>
+              ))}
+                </>
+              }
+            />
           </TabsContent>
           <TabsContent value="settings">
             <DeviceSettingsTab
@@ -1029,6 +1001,22 @@ export function DevicePage() {
         entity={assigning !== "project"}
         open={assigning !== null}
         onOpenChange={(open) => !open && setAssigning(null)}
+      />
+      <BoundaryDialog
+        deviceId={d.id}
+        target={boundary}
+        timeZone={deviceProject?.timezone ?? "UTC"}
+        open={boundary !== null}
+        onOpenChange={(open) => !open && setBoundary(null)}
+        invalidate={[
+          ...repairInvalidate,
+          ...(deviceProjectId
+            ? [
+                queryKeys.currentState(deviceProjectId),
+                queryKeys.entityAssignments(deviceProjectId),
+              ]
+            : []),
+        ]}
       />
       <MoveToProjectDialog
         subject={{

@@ -64,6 +64,11 @@ export const queryKeys = {
   deviceSettings: (id: string) => ["devices", id, "settings"] as const,
   deviceSpan: (id: string) => ["devices", id, "span"] as const,
   attributionJobs: (id: string) => ["devices", id, "attribution-jobs"] as const,
+  deviceAssignments: (id: string) => ["devices", id, "assignments"] as const,
+  deviceLastMessage: (id: string, before: string) =>
+    ["devices", id, "last-message", before] as const,
+  boundaryPreview: (id: string, body: Record<string, unknown>) =>
+    ["devices", id, "boundary-preview", body] as const,
   deviceConnectivity: (id: string, hours: number) =>
     ["devices", id, "connectivity", hours] as const,
   deviceTypes: ["device-types"] as const,

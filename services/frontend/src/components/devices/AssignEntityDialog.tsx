@@ -98,7 +98,7 @@ function AssignEntityForm({ projectId: fixedProjectId, device, entity: entitySte
         },
       });
     },
-    invalidate: [queryKeys.device(device.id), queryKeys.deviceSpan(device.id), queryKeys.attributionJobs(device.id), queryKeys.devices({}), queryKeys.entities(projectId), queryKeys.entityAssignments(projectId), queryKeys.currentState(projectId), queryKeys.devices({ projectId, unassigned: true })],
+    invalidate: [queryKeys.device(device.id), queryKeys.deviceAssignments(device.id), queryKeys.deviceSpan(device.id), queryKeys.attributionJobs(device.id), queryKeys.devices({}), queryKeys.entities(projectId), queryKeys.entityAssignments(projectId), queryKeys.currentState(projectId), queryKeys.devices({ projectId, unassigned: true })],
     // the records already inside the range follow through a job the page shows (decision D206)
     success: (a: EntityAssignment | null) =>
       a
