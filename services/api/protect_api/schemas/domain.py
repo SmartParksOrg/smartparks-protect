@@ -1155,3 +1155,127 @@ class ImportRowResult(BaseModel):
 class ImportResult(BaseModel):
     created: int
     rows: list[ImportRowResult]
+
+
+# Assignment boundaries moved after the fact (decisions D355 to D358)
+
+
+class AssignmentChangeRead(BaseModel):
+    """The last change recorded on an assignment row: the audit row in short."""
+
+    time: datetime
+    action: str
+    user_name: str | None = Field(default=None, description="Who made it; null for the system")
+    reason: str | None = Field(default=None, description="The reason the person gave")
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectTimelineRow(ProjectAssignmentRead):
+    """A project assignment on the device's timeline, with the newest attribution job whose
+    window touches it and the last change recorded on it."""
+
+    last_change: AssignmentChangeRead | None = None
+
+
+class EntityTimelineRow(EntityAssignmentRead):
+    last_change: AssignmentChangeRead | None = None
+
+
+class DeviceAssignmentsRead(BaseModel):
+    """The device's whole timeline: project and entity assignments in time order, each with
+    its attribution job and last change; the device's active job once."""
+
+    device_id: uuid.UUID
+    now: datetime
+    project_assignments: list[ProjectTimelineRow]
+    entity_assignments: list[EntityTimelineRow]
+    active_job: AttributionJobRead | None = None
+    can_edit_project: bool = Field(
+        description="The caller may move project boundaries (server admin or project admin of "
+        "every project involved, decision D355)"
+    )
+    can_edit_entity: bool = Field(
+        description="The caller may move entity boundaries (devices:write in the entities' "
+        "projects)"
+    )
+
+
+class LastMessageRead(BaseModel):
+    """The newest live message of the device before an instant: what the boundary dialog
+    offers as "the last uplink before" (decision D355). `snap_to` is one second after it, so
+    that message stays in the earlier assignment under the half-open range."""
+
+    time: datetime | None
+    snap_to: datetime | None
+    acquisition_channel: str | None = None
+    data_source_name: str | None = None
+
+
+class BoundaryEdit(BaseModel):
+    """Move the start, the end or both edges of one assignment to new instants, each with the
+    neighbouring row's touching edge (decision D355). `preview` answers what would change
+    without writing."""
+
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    reason: str = Field(min_length=1, max_length=500)
+    preview: bool = False
+
+    @field_validator("valid_from", "valid_to")
+    @classmethod
+    def _aware_edit(cls, value: datetime | None) -> datetime | None:
+        return require_aware(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def _one_edge(self) -> "BoundaryEdit":
+        if self.valid_from is None and self.valid_to is None:
+            raise ValueError("valid_from or valid_to is required")
+        return self
+
+
+class BoundaryCorrection(BaseModel):
+    """A project boundary and an entity boundary moved to one instant together (the chained
+    correction of decision D355): each row's edge nearest the instant unless named."""
+
+    project_assignment_id: uuid.UUID | None = None
+    entity_assignment_id: uuid.UUID | None = None
+    instant: datetime
+    reason: str = Field(min_length=1, max_length=500)
+    project_edge: Literal["start", "end"] | None = None
+    entity_edge: Literal["start", "end"] | None = None
+    preview: bool = False
+
+    @field_validator("instant")
+    @classmethod
+    def _aware_instant(cls, value: datetime) -> datetime:
+        return require_aware(value)
+
+    @model_validator(mode="after")
+    def _one_row(self) -> "BoundaryCorrection":
+        if self.project_assignment_id is None and self.entity_assignment_id is None:
+            raise ValueError("project_assignment_id or entity_assignment_id is required")
+        return self
+
+
+class EdgeChangeRead(BaseModel):
+    kind: Literal["project", "entity"]
+    assignment_id: uuid.UUID
+    target_id: uuid.UUID = Field(description="The project or the entity of the row")
+    target_name: str | None = None
+    edge: Literal["start", "end"]
+    old: datetime | None = Field(description="Null for an end that was open")
+    new: datetime
+
+
+class BoundaryResult(BaseModel):
+    """What a boundary move does or did: the edges that change with their rows, the window
+    the records are attributed again over, whether unassigned time opens or closes, the job,
+    and the timeline after it (as it stands, for a preview)."""
+
+    preview: bool
+    changes: list[EdgeChangeRead]
+    window_from: datetime | None
+    window_to: datetime | None
+    gap: Literal["opens", "closes"] | None = None
+    attribution_job: AttributionJobRead | None = None
+    timeline: DeviceAssignmentsRead
