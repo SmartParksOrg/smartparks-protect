@@ -20,7 +20,8 @@ async def _features(client, project, admin):
 
 async def test_speed_and_course_ride_with_the_newest_fix(client, db, bus):  # noqa: F811
     admin, project, _entity, source, device, external_id = await _setup(client, db)
-    start = datetime(2026, 9, 25, 15, 0, tzinfo=UTC)
+    # inside the summary's thirty days whatever the date: a fixed day fell out of it on 2026-10-26
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(days=1)
     await _feed(db, bus, source["id"], external_id, start, 51.54, 3.78, speed=12.0, heading=52.5)
 
     entity_props, device_props = await _features(client, project, admin)
