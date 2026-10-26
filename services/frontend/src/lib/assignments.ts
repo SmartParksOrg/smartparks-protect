@@ -1,7 +1,7 @@
-/** The pure part of the Assignments tab (decisions D355 to D358): the lanes of a device's
- * timeline laid out on one time axis, the boundaries a project and an entity row share (the
- * ones "Correct both" moves together), and the wall-clock text of an instant in a timezone
- * for the boundary dialog's picker. */
+/** The pure part of the Assignments tab (decisions D355 to D358): the boundaries a project
+ * row and an entity row share (a transfer that changed both at once, which the edit dialog
+ * offers to move together), the counterpart of a row's edge on the other list, and the
+ * wall-clock text of an instant in a timezone for the dialog's date fields. */
 
 export interface TimelineRow {
   id: string;
@@ -9,50 +9,8 @@ export interface TimelineRow {
   valid_to: string | null;
 }
 
-export interface LaidOut<T extends TimelineRow> {
-  row: T;
-  /** Percent of the axis from its start. */
-  left: number;
-  /** Percent of the axis. */
-  width: number;
-  current: boolean;
-}
-
-export interface Axis {
-  start: number;
-  end: number;
-}
-
-/** One axis for both lanes: from the earliest start to now (or the latest end when nothing is
- * open and the newest end lies in the future, which a clock error could make). */
-export function axisOf(rows: TimelineRow[], now: Date): Axis | null {
-  if (rows.length === 0) return null;
-  const starts = rows.map((r) => new Date(r.valid_from).getTime());
-  const ends = rows.map((r) =>
-    r.valid_to ? new Date(r.valid_to).getTime() : now.getTime(),
-  );
-  const start = Math.min(...starts);
-  const end = Math.max(now.getTime(), ...ends);
-  return end > start ? { start, end } : { start, end: start + 1 };
-}
-
-export function layOut<T extends TimelineRow>(
-  rows: T[],
-  axis: Axis,
-  now: Date,
-): LaidOut<T>[] {
-  const span = axis.end - axis.start;
-  return rows.map((row) => {
-    const from = new Date(row.valid_from).getTime();
-    const to = row.valid_to ? new Date(row.valid_to).getTime() : now.getTime();
-    const left = ((from - axis.start) / span) * 100;
-    // a row of a moment still shows as a sliver
-    const width = Math.max(((to - from) / span) * 100, 0.5);
-    return { row, left, width, current: row.valid_to === null };
-  });
-}
-
 export type Edge = "start" | "end";
+export type Kind = "project" | "entity";
 
 export interface SharedBoundary {
   instant: string;
@@ -78,7 +36,7 @@ function edgesOf(rows: TimelineRow[]): Map<number, { id: string; edge: Edge }> {
 
 /** The instants where a project edge and an entity edge coincide: a transfer that changed
  * both at once, which is corrected as one (the chained correction). The earliest start of
- * both lanes is left out: it is where the device's history begins, not a transfer. */
+ * both lists is left out: it is where the device's history begins, not a transfer. */
 export function sharedBoundaries(
   projects: TimelineRow[],
   entities: TimelineRow[],
@@ -101,6 +59,30 @@ export function sharedBoundaries(
     });
   }
   return out.sort((a, b) => a.instant.localeCompare(b.instant));
+}
+
+/** The row of the other kind whose edge sits on the same instant as one of this row's. */
+export interface Counterpart {
+  kind: Kind;
+  assignmentId: string;
+  edge: Edge;
+}
+
+/** For one row, the counterpart of each of its edges that a row of the other kind shares:
+ * what the edit dialog offers to move along with that edge. */
+export function counterpartsOf(
+  shared: SharedBoundary[],
+  kind: Kind,
+  assignmentId: string,
+): Partial<Record<Edge, Counterpart>> {
+  const out: Partial<Record<Edge, Counterpart>> = {};
+  for (const b of shared) {
+    if (kind === "project" && b.projectAssignmentId === assignmentId)
+      out[b.projectEdge] = { kind: "entity", assignmentId: b.entityAssignmentId, edge: b.entityEdge };
+    if (kind === "entity" && b.entityAssignmentId === assignmentId)
+      out[b.entityEdge] = { kind: "project", assignmentId: b.projectAssignmentId, edge: b.projectEdge };
+  }
+  return out;
 }
 
 function partsOf(date: Date, timeZone: string): Record<string, number> {

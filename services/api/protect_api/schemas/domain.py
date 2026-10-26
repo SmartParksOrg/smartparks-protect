@@ -1214,11 +1214,12 @@ class LastMessageRead(BaseModel):
 class BoundaryEdit(BaseModel):
     """Move the start, the end or both edges of one assignment to new instants, each with the
     neighbouring row's touching edge (decision D355). `preview` answers what would change
-    without writing."""
+    without writing. `reason` is a note kept on the audit row, optional for a person (Tim,
+    2026-10-26); the MCP tool asks its AI client for one."""
 
     valid_from: datetime | None = None
     valid_to: datetime | None = None
-    reason: str = Field(min_length=1, max_length=500)
+    reason: str = Field(default="", max_length=500)
     preview: bool = False
 
     @field_validator("valid_from", "valid_to")
@@ -1240,7 +1241,7 @@ class BoundaryCorrection(BaseModel):
     project_assignment_id: uuid.UUID | None = None
     entity_assignment_id: uuid.UUID | None = None
     instant: datetime
-    reason: str = Field(min_length=1, max_length=500)
+    reason: str = Field(default="", max_length=500)
     project_edge: Literal["start", "end"] | None = None
     entity_edge: Literal["start", "end"] | None = None
     preview: bool = False

@@ -421,7 +421,7 @@ async def run_plan(
                 "edge": change.edge,
                 "from": change.old.isoformat() if change.old else None,
                 "to": change.new.isoformat(),
-                "reason": reason,
+                "reason": reason or None,
                 "target_name": by_id[change.assignment_id].target_name,
                 "with": others,
                 "window": [window[0].isoformat(), window[1].isoformat()] if window else None,

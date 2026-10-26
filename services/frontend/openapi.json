@@ -27319,8 +27319,8 @@
      "reason": {
       "type": "string",
       "maxLength": 500,
-      "minLength": 1,
-      "title": "Reason"
+      "title": "Reason",
+      "default": ""
      },
      "project_edge": {
       "anyOf": [
@@ -27360,8 +27360,7 @@
     },
     "type": "object",
     "required": [
-     "instant",
-     "reason"
+     "instant"
     ],
     "title": "BoundaryCorrection",
     "description": "A project boundary and an entity boundary moved to one instant together (the chained\ncorrection of decision D355): each row's edge nearest the instant unless named."
@@ -27395,8 +27394,8 @@
      "reason": {
       "type": "string",
       "maxLength": 500,
-      "minLength": 1,
-      "title": "Reason"
+      "title": "Reason",
+      "default": ""
      },
      "preview": {
       "type": "boolean",
@@ -27405,11 +27404,8 @@
      }
     },
     "type": "object",
-    "required": [
-     "reason"
-    ],
     "title": "BoundaryEdit",
-    "description": "Move the start, the end or both edges of one assignment to new instants, each with the\nneighbouring row's touching edge (decision D355). `preview` answers what would change\nwithout writing."
+    "description": "Move the start, the end or both edges of one assignment to new instants, each with the\nneighbouring row's touching edge (decision D355). `preview` answers what would change\nwithout writing. `reason` is a note kept on the audit row, optional for a person (Tim,\n2026-10-26); the MCP tool asks its AI client for one."
    },
    "BoundaryResult": {
     "properties": {

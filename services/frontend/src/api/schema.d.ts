@@ -6994,7 +6994,10 @@ export interface components {
              * Format: date-time
              */
             instant: string;
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
             /** Project Edge */
             project_edge?: ("start" | "end") | null;
@@ -7010,14 +7013,18 @@ export interface components {
          * BoundaryEdit
          * @description Move the start, the end or both edges of one assignment to new instants, each with the
          *     neighbouring row's touching edge (decision D355). `preview` answers what would change
-         *     without writing.
+         *     without writing. `reason` is a note kept on the audit row, optional for a person (Tim,
+         *     2026-10-26); the MCP tool asks its AI client for one.
          */
         BoundaryEdit: {
             /** Valid From */
             valid_from?: string | null;
             /** Valid To */
             valid_to?: string | null;
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
             /**
              * Preview

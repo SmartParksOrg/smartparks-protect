@@ -1,16 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  axisOf,
+  counterpartsOf,
   isoToWall,
-  layOut,
   sharedBoundaries,
   wallToIso,
 } from "@/lib/assignments";
 
 const JOINED = "2026-07-16T12:53:20.000Z";
 const TRANSFER = "2026-10-26T15:21:13.517Z";
-const now = new Date("2026-10-26T17:00:00.000Z");
 
 const projects = [
   { id: "sp", valid_from: JOINED, valid_to: TRANSFER },
@@ -20,28 +18,6 @@ const entities = [
   { id: "tim", valid_from: JOINED, valid_to: TRANSFER },
   { id: "sp051307", valid_from: TRANSFER, valid_to: null },
 ];
-
-describe("the timeline's lanes", () => {
-  it("lays both lanes on one axis from the first start to now", () => {
-    const axis = axisOf([...projects, ...entities], now);
-    expect(axis).not.toBeNull();
-    const laid = layOut(projects, axis!, now);
-    expect(laid[0].left).toBe(0);
-    expect(laid[1].left).toBeCloseTo(laid[0].width, 5);
-    // the second row is a few hours of three months: a sliver of the minimum width
-    expect(laid[1].width).toBe(0.5);
-    expect(laid[0].width).toBeGreaterThan(99);
-    expect(laid[1].current).toBe(true);
-    expect(laid[0].current).toBe(false);
-  });
-
-  it("has no axis without rows and gives a momentary row a sliver", () => {
-    expect(axisOf([], now)).toBeNull();
-    const moment = [{ id: "x", valid_from: TRANSFER, valid_to: TRANSFER }];
-    const axis = axisOf(moment, now)!;
-    expect(layOut(moment, axis, now)[0].width).toBe(0.5);
-  });
-});
 
 describe("shared boundaries", () => {
   it("finds the transfer where a project edge and an entity edge meet, never the first start", () => {
@@ -74,6 +50,24 @@ describe("shared boundaries", () => {
   it("finds nothing when the edges differ", () => {
     const later = [{ id: "e", valid_from: "2026-10-26T16:00:00.000Z", valid_to: null }];
     expect(sharedBoundaries(projects, later)).toEqual([]);
+  });
+});
+
+describe("the counterpart of a row's edge", () => {
+  const shared = sharedBoundaries(projects, entities);
+
+  it("names the entity row that started with the new project row, on its start alone", () => {
+    expect(counterpartsOf(shared, "project", "lp0")).toEqual({
+      start: { kind: "entity", assignmentId: "sp051307", edge: "start" },
+    });
+    expect(counterpartsOf(shared, "entity", "sp051307")).toEqual({
+      start: { kind: "project", assignmentId: "lp0", edge: "start" },
+    });
+  });
+
+  it("gives the old rows nothing: the transfer belongs to the rows that start there", () => {
+    expect(counterpartsOf(shared, "project", "sp")).toEqual({});
+    expect(counterpartsOf(shared, "entity", "tim")).toEqual({});
   });
 });
 

@@ -228,11 +228,10 @@ async def test_refusals_come_as_422_in_words(client, db, bus):
         headers=h,
     )
     assert refused.status_code == 422 and "entity's project" in refused.json()["detail"]
-    # a reason is required, and so is an edge
-    assert (await client.patch(url, json={"valid_from": BOUNDARY}, headers=h)).status_code == 422
+    # an edge is required; a note is not
     assert (await client.patch(url, json={"reason": "x"}, headers=h)).status_code == 422
     # the same instant changes nothing and says so
-    same = await client.patch(url, json={"valid_from": transfer, "reason": "x"}, headers=h)
+    same = await client.patch(url, json={"valid_from": transfer}, headers=h)
     assert same.status_code == 200 and same.json()["changes"] == []
 
 

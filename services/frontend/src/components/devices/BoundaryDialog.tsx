@@ -1,39 +1,42 @@
 import { useTranslation } from "react-i18next";
-import { type QueryKey, useQuery } from "@tanstack/react-query";
+import { type QueryKey, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { api, ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { BoundaryResult, EdgeChange, LastMessage } from "@/api/types";
+import type { BoundaryResult, LastMessage } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
-import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { type Edge, isoToWall, wallToIso } from "@/lib/assignments";
+import { type Counterpart, type Edge, isoToWall, type Kind, wallToIso } from "@/lib/assignments";
 import { formatTime } from "@/lib/format";
 import { zoneLabel } from "@/lib/timezones";
 
-/** Which boundary the dialog moves: one edge of one row, or a project edge and an entity edge
- * that share an instant, moved together (the chained correction of decision D355). */
-export type BoundaryTarget =
-  | { kind: "project" | "entity"; assignmentId: string; edge: Edge; current: string; name: string }
-  | {
-      kind: "both";
-      projectAssignmentId: string;
-      projectEdge: Edge;
-      entityAssignmentId: string;
-      entityEdge: Edge;
-      current: string;
-    };
+export interface NamedCounterpart extends Counterpart {
+  name: string;
+}
 
-/** Move an assignment boundary after the fact (decisions D355 to D358): a wall-clock time in
- * the project's timezone (any zone can be picked), "the last uplink before" offered from the
- * device's own messages, a required reason, and the API's preview of every row that moves
- * and the window the records are attributed again over; a refusal (future, empty, crossing,
- * outside the project) shows inline in the reader's words. */
+/** The row the dialog edits, with the row of the other list that shares each of its edges
+ * (a transfer that changed the project and the entity at once, decision D355). */
+export interface BoundaryTarget {
+  kind: Kind;
+  assignmentId: string;
+  name: string;
+  validFrom: string;
+  validTo: string | null;
+  shared: { start?: NamedCounterpart; end?: NamedCounterpart };
+}
+
+/** Edit the dates of one assignment after the fact (decisions D355 to D358, simplified at
+ * Tim's word on 2026-10-26): From and, for a row that ended, To, as wall-clock times in the
+ * project's timezone, "Use the last uplink" beside From, a tick to move the row of the other
+ * list that changed at the same moment along, and an optional note. The neighbouring row's
+ * edge follows on the server; one line under the fields says what else moves, and a refusal
+ * (future, empty, crossing, outside the project) shows in the reader's words. */
 export function BoundaryDialog({ deviceId, target, timeZone, open, onOpenChange, invalidate }: {
   deviceId: string;
   target: BoundaryTarget | null;
@@ -43,20 +46,14 @@ export function BoundaryDialog({ deviceId, target, timeZone, open, onOpenChange,
   invalidate: QueryKey[];
 }) {
   const { t } = useTranslation();
-  const title =
-    target?.kind === "both"
-      ? t("Correct the project and the entity boundary together")
-      : target?.kind === "project"
-        ? target.edge === "start"
-          ? t("Move the start of the project assignment")
-          : t("Move the end of the project assignment")
-        : target?.edge === "start"
-          ? t("Move the start of the entity assignment")
-          : t("Move the end of the entity assignment");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {target?.kind === "project" ? t("Edit the project assignment") : t("Edit the entity assignment")}
+          </DialogTitle>
+        </DialogHeader>
         {open && target && (
           <BoundaryForm deviceId={deviceId} target={target} timeZone={timeZone} invalidate={invalidate} onDone={() => onOpenChange(false)} onCancel={() => onOpenChange(false)} />
         )}
@@ -65,30 +62,66 @@ export function BoundaryDialog({ deviceId, target, timeZone, open, onOpenChange,
   );
 }
 
-function requestOf(deviceId: string, target: BoundaryTarget, iso: string, reason: string, preview: boolean) {
-  if (target.kind === "both")
-    return {
-      url: `/api/v1/devices/${deviceId}/assignments/correct`,
-      method: "post" as const,
-      body: {
-        project_assignment_id: target.projectAssignmentId,
-        entity_assignment_id: target.entityAssignmentId,
-        project_edge: target.projectEdge,
-        entity_edge: target.entityEdge,
-        instant: iso,
-        reason,
-        preview,
-      },
-    };
-  return {
-    url: `/api/v1/devices/${deviceId}/${target.kind}-assignments/${target.assignmentId}/boundary`,
-    method: "patch" as const,
-    body: { [target.edge === "start" ? "valid_from" : "valid_to"]: iso, reason, preview },
-  };
+interface Request {
+  url: string;
+  method: "post" | "patch";
+  body: Record<string, unknown>;
 }
 
-/** Mounted while the dialog is open, so every opening starts from the current boundary. */
-function BoundaryForm({ deviceId, target, timeZone: projectZone, invalidate, onDone, onCancel }: {
+/** The calls an edit takes: an edge moved together with its counterpart goes through the
+ * combined correction, the rest of the row's edges through one PATCH. */
+function requestsOf(
+  deviceId: string,
+  target: BoundaryTarget,
+  edits: Record<Edge, string | null>,
+  also: Record<Edge, boolean>,
+  note: string,
+  preview: boolean,
+): Request[] {
+  const out: Request[] = [];
+  const own: Record<string, unknown> = {};
+  for (const edge of ["start", "end"] as const) {
+    const iso = edits[edge];
+    if (!iso) continue;
+    const other = target.shared[edge];
+    if (other && also[edge]) {
+      out.push({
+        url: `/api/v1/devices/${deviceId}/assignments/correct`,
+        method: "post",
+        body: {
+          project_assignment_id: target.kind === "project" ? target.assignmentId : other.assignmentId,
+          entity_assignment_id: target.kind === "entity" ? target.assignmentId : other.assignmentId,
+          project_edge: target.kind === "project" ? edge : other.edge,
+          entity_edge: target.kind === "entity" ? edge : other.edge,
+          instant: iso,
+          reason: note,
+          preview,
+        },
+      });
+    } else own[edge === "start" ? "valid_from" : "valid_to"] = iso;
+  }
+  if (Object.keys(own).length > 0)
+    out.push({
+      url: `/api/v1/devices/${deviceId}/${target.kind}-assignments/${target.assignmentId}/boundary`,
+      method: "patch",
+      body: { ...own, reason: note, preview },
+    });
+  return out;
+}
+
+async function sendAll(requests: Request[]): Promise<BoundaryResult[]> {
+  const out: BoundaryResult[] = [];
+  for (const r of requests)
+    out.push(r.method === "post" ? await api.post<BoundaryResult>(r.url, { body: r.body }) : await api.patch<BoundaryResult>(r.url, { body: r.body }));
+  return out;
+}
+
+// the date fields hold whole seconds, a row's instant may carry milliseconds
+const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+const differs = (a: string, b: string) => seconds(a) !== seconds(b);
+
+/** Mounted while the dialog is open, so every opening starts from the row's own dates. */
+function BoundaryForm({ deviceId, target, timeZone, invalidate, onDone, onCancel }: {
   deviceId: string;
   target: BoundaryTarget;
   timeZone: string;
@@ -97,120 +130,127 @@ function BoundaryForm({ deviceId, target, timeZone: projectZone, invalidate, onD
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const [zone, setZone] = useState(projectZone);
-  const [wall, setWall] = useState(() => isoToWall(target.current, projectZone));
-  const [reason, setReason] = useState("");
-  const [snapAsked, setSnapAsked] = useState(false);
-  const iso = wallToIso(wall, zone);
-  const changed = iso !== null && new Date(iso).getTime() !== new Date(target.current).getTime();
-  const last = useQuery({
-    queryKey: queryKeys.deviceLastMessage(deviceId, target.current),
-    queryFn: () => api.get<LastMessage>(`/api/v1/devices/${deviceId}/last-message`, { query: { before: target.current } }),
-    enabled: snapAsked,
-  });
-  const previewRequest = iso ? requestOf(deviceId, target, iso, reason || "-", true) : null;
+  const [from, setFrom] = useState(() => isoToWall(target.validFrom, timeZone));
+  const [to, setTo] = useState(() => (target.validTo ? isoToWall(target.validTo, timeZone) : ""));
+  const [note, setNote] = useState("");
+  const [also, setAlso] = useState<Record<Edge, boolean>>({ start: true, end: true });
+  const [uplink, setUplink] = useState<{ fetching: boolean; none: boolean }>({ fetching: false, none: false });
+  const queryClient = useQueryClient();
+  const fromIso = wallToIso(from, timeZone);
+  const toIso = target.validTo ? wallToIso(to, timeZone) : null;
+  const fromChanged = fromIso !== null && differs(fromIso, target.validFrom);
+  const toChanged = target.validTo !== null && toIso !== null && differs(toIso, target.validTo);
+  const valid = fromIso !== null && (target.validTo === null || toIso !== null);
+  const changed = fromChanged || toChanged;
+  const edits: Record<Edge, string | null> = { start: fromChanged ? fromIso : null, end: toChanged ? toIso : null };
+  const requests = changed && valid ? requestsOf(deviceId, target, edits, also, note.trim(), true) : [];
   const preview = useQuery({
-    queryKey: queryKeys.boundaryPreview(deviceId, previewRequest?.body ?? {}),
-    queryFn: () => {
-      const r = previewRequest!;
-      return r.method === "post"
-        ? api.post<BoundaryResult>(r.url, { body: r.body })
-        : api.patch<BoundaryResult>(r.url, { body: r.body });
-    },
-    enabled: changed && previewRequest !== null,
+    queryKey: queryKeys.boundaryPreview(deviceId, { requests: requests.map((r) => r.body) }),
+    queryFn: () => sendAll(requests),
+    enabled: requests.length > 0,
     retry: false,
   });
+  // the device's last live message before the row's start, taken as From one second later
+  const useUplink = async () => {
+    setUplink({ fetching: true, none: false });
+    try {
+      const last = await queryClient.fetchQuery({
+        queryKey: queryKeys.deviceLastMessage(deviceId, target.validFrom),
+        queryFn: () => api.get<LastMessage>(`/api/v1/devices/${deviceId}/last-message`, { query: { before: target.validFrom } }),
+      });
+      if (last.snap_to) setFrom(isoToWall(last.snap_to, timeZone));
+      setUplink({ fetching: false, none: !last.snap_to });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      setUplink({ fetching: false, none: false });
+    }
+  };
   const move = useMutationToast({
-    mutationFn: () => {
-      const r = requestOf(deviceId, target, iso!, reason.trim(), false);
-      return r.method === "post"
-        ? api.post<BoundaryResult>(r.url, { body: r.body })
-        : api.patch<BoundaryResult>(r.url, { body: r.body });
-    },
+    mutationFn: () => sendAll(requestsOf(deviceId, target, edits, also, note.trim(), false)),
     invalidate,
-    success: (r: BoundaryResult) =>
-      r.attribution_job
-        ? t("Boundary moved; {{count}} records are given their project and entity in the background", { count: r.attribution_job.records_total })
-        : t("Boundary moved; no record changes hands"),
+    success: (results: BoundaryResult[]) => {
+      const job = results.map((r) => r.attribution_job).find((j) => j);
+      return job
+        ? t("Dates changed; {{count}} records get their project and entity again in the background", { count: job.records_total })
+        : t("Dates changed; no record changes hands");
+    },
     onSuccess: onDone,
   });
-  // the first press asks the server; once the answer is there it is applied at once
-  const snapTo = last.data?.snap_to ?? null;
-  const applySnap = () => {
-    setSnapAsked(true);
-    if (snapTo) setWall(isoToWall(snapTo, zone));
-  };
   const refusal = preview.error instanceof ApiError ? preview.error.message : preview.error?.message;
-  const plan = changed ? preview.data : null;
-  const canSubmit = changed && reason.trim().length > 0 && plan !== undefined && plan !== null && !preview.isError && !move.isPending;
+  const plans = requests.length > 0 && !preview.isError ? preview.data : undefined;
+  // what the person asked for is the row and the counterparts ticked; the rest is the neighbours
+  const chosen = new Set([
+    target.assignmentId,
+    ...(fromChanged && also.start && target.shared.start ? [target.shared.start.assignmentId] : []),
+    ...(toChanged && also.end && target.shared.end ? [target.shared.end.assignmentId] : []),
+  ]);
+  const others = plans?.flatMap((p) => p.changes).filter((c) => !chosen.has(c.assignment_id)) ?? [];
+  const gap = plans?.map((p) => p.gap).find((g) => g) ?? null;
+  const canSubmit = requests.length > 0 && plans !== undefined && !move.isPending;
+  const alsoLine = (edge: Edge) => {
+    const other = target.shared[edge];
+    if (!other) return null;
+    return (
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-primary"
+          checked={also[edge]}
+          onChange={(e) => setAlso({ ...also, [edge]: e.target.checked })}
+        />
+        <span>
+          {other.kind === "entity"
+            ? t("Also move the entity assignment {{name}}, which changed at the same moment", { name: other.name })
+            : t("Also move the project assignment {{name}}, which changed at the same moment", { name: other.name })}
+        </span>
+      </label>
+    );
+  };
   return (
     <>
       <div className="min-w-0 space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {t("Now at {{time}}. The neighbouring assignment's edge moves with it, so the timeline keeps no gap and no overlap; the records between the old and the new moment are attributed again to the project and entity of that time. Raw messages never change.", { time: formatTime(target.current) })}
-        </p>
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-          <Field label={t("New moment")} htmlFor="boundary-time" hint={t("Wall-clock time in {{zone}}", { zone: zoneLabel(zone) })} error={wall && !iso ? t("Not a date and time") : undefined}>
-            <Input id="boundary-time" type="datetime-local" step={1} value={wall} onChange={(e) => setWall(e.target.value)} />
-          </Field>
-          <Field label={t("Timezone")} htmlFor="boundary-zone">
-            <TimezoneSelect id="boundary-zone" value={zone} onChange={(z) => { if (iso) setWall(isoToWall(iso, z)); setZone(z); }} first={[projectZone]} size="sm" />
-          </Field>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Button type="button" variant="outline" size="sm" disabled={last.isFetching} onClick={applySnap}>
-            {t("Snap to the last uplink before")}
-          </Button>
-          {snapAsked && last.data && (
-            <span className="text-muted-foreground">
-              {last.data.time
-                ? t("Last message {{time}} via {{source}}; one second after it", { time: formatTime(last.data.time), source: last.data.data_source_name ?? last.data.acquisition_channel ?? "" })
-                : t("No live message before that moment in the last 90 days")}
-            </span>
-          )}
-        </div>
-        <Field label={t("Reason")} htmlFor="boundary-reason" hint={t("Kept with the change: who moved what, when and why")}>
-          <Input id="boundary-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("One second after the last uplink before the handover")} />
+        <p className="text-sm text-muted-foreground">{target.name}</p>
+        <Field label={t("From")} htmlFor="boundary-from" hint={t("Wall-clock time in {{zone}}", { zone: zoneLabel(timeZone) })} error={from && fromIso === null ? t("Not a date and time") : undefined}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input id="boundary-from" className="w-auto" type="datetime-local" step={1} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Button type="button" variant="ghost" size="sm" disabled={uplink.fetching} onClick={useUplink}>
+              {t("Use the last uplink")}
+            </Button>
+          </div>
         </Field>
-        {changed && preview.isPending && <div className="text-sm text-muted-foreground">{t("Working out what would move…")}</div>}
-        {changed && refusal && <Callout kind="error">{refusal}</Callout>}
-        {plan && !preview.isError && <PlanView plan={plan} />}
+        {uplink.none && (
+          <p className="text-sm text-muted-foreground">{t("No live message before that moment in the last 90 days")}</p>
+        )}
+        {fromChanged && alsoLine("start")}
+        {target.validTo && (
+          <Field label={t("To")} htmlFor="boundary-to" error={to && toIso === null ? t("Not a date and time") : undefined}>
+            <Input id="boundary-to" className="w-auto" type="datetime-local" step={1} value={to} onChange={(e) => setTo(e.target.value)} />
+          </Field>
+        )}
+        {toChanged && alsoLine("end")}
+        <Field label={t("Note")} htmlFor="boundary-note" hint={t("Optional; kept with the change")}>
+          <Input id="boundary-note" value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        {requests.length > 0 && preview.isPending && <div className="text-sm text-muted-foreground">{t("Checking…")}</div>}
+        {refusal && <Callout kind="error">{refusal}</Callout>}
+        {plans && (others.length > 0 || gap) && (
+          <div className="space-y-1 text-sm text-muted-foreground">
+            {others.map((c) => (
+              <div key={`${c.assignment_id}-${c.edge}`}>
+                {c.edge === "end"
+                  ? t("{{name}} then ends at {{time}}", { name: c.target_name ?? c.target_id.slice(0, 8), time: formatTime(c.new) })
+                  : t("{{name}} then starts at {{time}}", { name: c.target_name ?? c.target_id.slice(0, 8), time: formatTime(c.new) })}
+              </div>
+            ))}
+            {gap === "opens" && <div>{t("Nothing else touches this moment: the time in between belongs to no project and no entity.")}</div>}
+            {gap === "closes" && <div>{t("Nothing else touches this moment: the change takes in time that was unassigned.")}</div>}
+          </div>
+        )}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>{t("Cancel")}</Button>
-        <Button type="button" disabled={!canSubmit} onClick={() => move.mutate()}>
-          {target.kind === "both" ? t("Correct both") : t("Move the boundary")}
-        </Button>
+        <Button type="button" disabled={!canSubmit} onClick={() => move.mutate()}>{t("Save")}</Button>
       </DialogFooter>
     </>
-  );
-}
-
-function changeText(c: EdgeChange, t: (key: string, options?: Record<string, unknown>) => string): string {
-  const name = c.target_name ?? c.target_id.slice(0, 8);
-  const old = c.old ? formatTime(c.old) : t("open");
-  const kind = c.kind === "project" ? t("Project") : t("Entity");
-  return c.edge === "start"
-    ? t("{{kind}} {{name}}: start {{old}} to {{new}}", { kind, name, old, new: formatTime(c.new) })
-    : t("{{kind}} {{name}}: end {{old}} to {{new}}", { kind, name, old, new: formatTime(c.new) });
-}
-
-/** The preview: every row that moves, old and new, the gap note and the window. */
-export function PlanView({ plan }: { plan: BoundaryResult }) {
-  const { t } = useTranslation();
-  if (plan.changes.length === 0)
-    return <Callout kind="info">{t("The same moment: nothing changes.")}</Callout>;
-  return (
-    <div className="space-y-2 text-sm">
-      <div className="font-medium">{t("What moves")}</div>
-      <ul className="list-disc space-y-1 pl-5">
-        {plan.changes.map((c) => <li key={`${c.assignment_id}-${c.edge}`}>{changeText(c, t)}</li>)}
-      </ul>
-      {plan.gap === "opens" && <Callout kind="warning">{t("No assignment touches this boundary: unassigned time opens there. Records in it belong to no project and no entity.")}</Callout>}
-      {plan.gap === "closes" && <Callout kind="info">{t("No assignment touches this boundary: the move takes in time that was unassigned.")}</Callout>}
-      {plan.window_from && plan.window_to ? (
-        <Callout kind="info">{t("Records between {{from}} and {{to}} are attributed again in the background.", { from: formatTime(plan.window_from), to: formatTime(plan.window_to) })}</Callout>
-      ) : null}
-    </div>
   );
 }
