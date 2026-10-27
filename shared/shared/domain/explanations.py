@@ -91,6 +91,18 @@ EVENTS: dict[str, str] = {
         "The device started again: its uptime dropped back to zero. A single restart is "
         "harmless; repeated restarts point at a firmware or a power problem."
     ),
+    "position_outlier": (
+        "The fix lies farther from the device's last valid fix than it could have travelled in "
+        "the time between, so it is kept off the map, the charts and the rules. It comes back "
+        "when a person approves it under Curation, or by itself when the next fix agrees with "
+        "it: a device that really moved that far, carried by road, boat or plane, reports from "
+        "near the flagged fix again, and the run is then valid."
+    ),
+    "position_jump_confirmed": (
+        "A fix flagged as an outlier was confirmed by the fix after it: the device really "
+        "moved that far in that time, most likely carried. The flagged fixes are valid again "
+        "and show on the map; nothing needs approving."
+    ),
     "switch_activated": "The external switch on the device became active.",
     "switch_deactivated": "The external switch on the device became inactive.",
     "fence_measurement_failed": (

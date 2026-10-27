@@ -3,7 +3,7 @@ flagged, scatter over a short interval and a long journey over days are not."""
 
 from datetime import UTC, datetime, timedelta
 
-from shared.domain.outliers import outlier_of
+from shared.domain.outliers import Outlier, agrees, outlier_of
 
 T0 = datetime(2026, 9, 15, 22, 42, tzinfo=UTC)
 OKONJIMA = (-20.78273, 16.61707)
@@ -41,3 +41,28 @@ def test_scatter_and_ordinary_movement_are_never_outliers():
         outlier_of((*OKONJIMA, T0), (*highway, T0 + timedelta(hours=1)), max_speed_mps=30)
         is not None
     )
+
+
+def test_the_next_fix_confirms_a_flagged_one_and_the_run_is_the_device_s_move():
+    """Decision D360: a flagged fix that the fix after it agrees with was a real move."""
+    far = (5.18, 52.37)
+    flagged = (*far, T0 + timedelta(hours=1))
+    first = outlier_of((*OKONJIMA, T0), flagged)
+    assert first is not None
+    # ten minutes on, a kilometre further: the two agree, the device was carried there
+    assert agrees(flagged, (far[0] + 0.01, far[1], T0 + timedelta(hours=1, minutes=10)))
+    # back at the old place an hour later: the flagged fix was a wild one
+    assert not agrees(flagged, (*OKONJIMA, T0 + timedelta(hours=2)))
+    # a fix before the flagged one confirms nothing, nor one at the same moment
+    assert not agrees(flagged, (*far, T0))
+    assert not agrees(flagged, flagged)
+    # the bounds are the caller's: 15 km in ten minutes passes at 50 m/s, not at 20
+    onward = (far[0] + 0.135, far[1], T0 + timedelta(hours=1, minutes=10))
+    assert agrees(flagged, onward) and not agrees(flagged, onward, max_speed_mps=20)
+    title = first.confirmed_title()
+    assert title.startswith("Jump of 4853 km") and title.endswith(
+        "km in 1.0 h confirmed by the next fix: the device moved"
+    )
+    back = Outlier.from_attribute(first.attribute(max_speed_mps=50, min_jump_m=1000))
+    assert back.previous_time == T0 and round(back.distance_m) == round(first.distance_m)
+    assert back.confirmed_title() == title

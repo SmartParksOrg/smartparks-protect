@@ -745,6 +745,124 @@ async def test_an_impossible_jump_is_flagged_as_an_outlier_and_kept_out(db, bus,
     assert row3.valid is True
 
 
+async def test_the_next_fix_confirms_a_flagged_run_as_the_device_s_move(db, bus, world):
+    """Decision D360 (Tim, 2026-10-27: the device flew to Namibia and 51 fixes of the drive
+    from the airport were flagged against a fix in Utrecht): a flagged fix that the fix after
+    it agrees with is a real move. Both become valid, the map moves, one jump event says so."""
+    from shared.models import Event
+
+    home = {"time": "2026-03-10T10:00:00+00:00", "lat": -24.9, "lon": 31.5}
+    await _ingest_and_process(db, bus, world, home)
+    jump = {"time": "2026-03-10T11:00:00+00:00", "lat": 52.04, "lon": 5.77}
+    event2, outcome2 = await _ingest_and_process(db, bus, world, jump)
+    assert outcome2.outliers == 1 and outcome2.confirmed_jumps == 0
+    onward = {"time": "2026-03-10T11:10:00+00:00", "lat": 52.05, "lon": 5.78}
+    event3, outcome3 = await _ingest_and_process(db, bus, world, onward)
+    assert outcome3.outliers == 0 and outcome3.confirmed_jumps == 1
+    assert outcome3.created["positions"] == 1 and outcome3.created["events"] == 1
+    topics = [t for t, _ in outcome3.messages]
+    assert topics.count(Topic.POSITION_CREATED) == 2, "the confirmed fix moves the map too"
+    await db.rollback()
+    flagged = (
+        await db.execute(select(Position).where(Position.source_event_id == event2.id))
+    ).scalar_one()
+    assert flagged.valid is True
+    assert flagged.attributes["outlier"]["confirmed_at"] == "2026-03-10T11:10:00+00:00"
+    assert flagged.attributes["outlier"]["distance_m"] > 8_000_000
+    onward_row = (
+        await db.execute(select(Position).where(Position.source_event_id == event3.id))
+    ).scalar_one()
+    assert onward_row.valid is True and "outlier" not in onward_row.attributes
+    confirmed = (
+        (await db.execute(select(Event).where(Event.event_type == "position_jump_confirmed")))
+        .scalars()
+        .all()
+    )
+    assert len(confirmed) == 1
+    assert confirmed[0].time == datetime(2026, 3, 10, 11, tzinfo=UTC)
+    assert "confirmed by the next fix: the device moved" in confirmed[0].title
+    assert confirmed[0].context["confirmed_by"] == "2026-03-10T11:10:00+00:00"
+    assert confirmed[0].context["previous_time"] == "2026-03-10T10:00:00+00:00"
+    state = await db.get(DeviceCurrentState, world.device.id)
+    assert state is not None
+    await db.refresh(state)
+    assert state.latest_position_time == datetime(2026, 3, 10, 11, 10, tzinfo=UTC)
+    # from here on the device is judged from where it is: a fix near Utrecht an hour later
+    # is ordinary movement, and a wild fix back at the old place is the outlier now
+    later = {"time": "2026-03-10T12:10:00+00:00", "lat": 52.1, "lon": 5.8}
+    _, outcome4 = await _ingest_and_process(db, bus, world, later)
+    assert outcome4.outliers == 0 and outcome4.confirmed_jumps == 0
+    wild = {"time": "2026-03-10T12:20:00+00:00", "lat": -24.9, "lon": 31.5}
+    _, outcome5 = await _ingest_and_process(db, bus, world, wild)
+    assert outcome5.outliers == 1 and outcome5.confirmed_jumps == 0
+
+
+async def test_a_frame_that_holds_the_jump_and_the_fixes_after_it_confirms_itself(db, bus, world):
+    """Decision D360 in one delivery, as a card or a raw log brings it: the jump is flagged
+    against the fix before the frame, the next fix of the frame confirms it, and the frame
+    leaves one jump event and no outlier behind; a wild fix at the end stays flagged."""
+    from protect_decoder.pipeline import Outcome, _write_positions
+    from shared.device_drivers.base import DecodedPosition, DecodedRecords
+    from shared.domain.assignments import resolve_attribution
+    from shared.models import Event
+
+    home = {"time": "2026-03-10T10:00:00+00:00", "lat": -24.9, "lon": 31.5}
+    await _ingest_and_process(db, bus, world, home)
+    stored = await store_inbound(db, world.source, inbound(world.external_id, {"lat": 1, "lon": 1}))
+    await commit_and_publish(db, bus, [stored])
+    event = stored.source_event
+    at = datetime(2026, 3, 10, 11, tzinfo=UTC)
+    records = DecodedRecords(
+        positions=[
+            DecodedPosition(time=at, latitude=52.04, longitude=5.77),
+            DecodedPosition(time=at.replace(minute=10), latitude=52.05, longitude=5.78),
+            DecodedPosition(time=at.replace(minute=20), latitude=52.06, longitude=5.79),
+            DecodedPosition(time=at.replace(minute=30), latitude=-24.9, longitude=31.5),
+        ]
+    )
+    outcome = Outcome(source_event_id=event.id, status=ProcessingStatus.PROCESSED)
+
+    async def attribution_at(time: datetime):
+        return await resolve_attribution(db, world.device.id, time)
+
+    await _write_positions(db, event, world.device, records, outcome, attribution_at, set())
+    await db.commit()
+    assert outcome.outliers == 1 and outcome.confirmed_jumps == 1
+    assert outcome.outlier_times == {at.replace(minute=30)}
+    assert outcome.created["positions"] == 4
+    assert [t for t, _ in outcome.messages].count(Topic.POSITION_CREATED) == 3
+    rows = (
+        (
+            await db.execute(
+                select(Position).where(Position.source_event_id == event.id).order_by(Position.time)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert [r.valid for r in rows] == [True, True, True, False]
+    assert rows[0].attributes["outlier"]["confirmed_at"] == at.replace(minute=10).isoformat()
+    assert "outlier" not in rows[1].attributes
+    assert rows[3].attributes["outlier"]["previous_time"] == at.replace(minute=20).isoformat()
+    # the frame's events: one confirmed jump at the first fix, one outlier for the wild fix
+    kinds = [(e.event_type, e.time) for e in records.events]
+    assert kinds == [
+        ("position_jump_confirmed", at),
+        ("position_outlier", at.replace(minute=30)),
+    ]
+    assert "confirmed by the next fix" in records.events[0].title
+    assert records.events[0].context["confirmed_by"] == at.replace(minute=10).isoformat()
+    assert (
+        await db.scalar(
+            select(func.count())
+            .select_from(Event)
+            .where(
+                Event.device_id == world.device.id, Event.event_type == "position_jump_confirmed"
+            )
+        )
+    ) == 0, "the events are the frame's to write after the positions, as the pipeline does"
+
+
 async def test_a_settings_frame_fills_the_settings_protect_knows(db, bus, world):
     """Decisions D228 to D231: a state holding settings TLVs becomes one known value per
     setting the catalogue names, with the source and the time; a newer frame replaces it."""

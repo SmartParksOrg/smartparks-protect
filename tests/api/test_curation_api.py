@@ -663,3 +663,83 @@ async def test_outliers_are_found_in_the_past_listed_and_approved(client, db):
     assert (await client.get(f"{base}/outliers", headers=h)).json()["waiting"] == 0
     everything = (await client.get(f"{base}/outliers?waiting=false", headers=h)).json()
     assert everything["total"] == 1 and everything["items"][0]["valid"] is True
+
+
+async def test_every_waiting_outlier_of_a_device_is_approved_in_one_go(client, db):
+    """Decision D362 (Tim, 2026-10-27: 51 buttons for one drive from the airport): Approve
+    all writes the row's set-valid correction for every flagged fix still waiting, of one
+    device or of the project, and a second call finds nothing left."""
+    from shared.models import DataCorrection, Position
+
+    admin, project, entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    device_id = uuid.UUID(device["id"])
+    # home, then three fixes far away in a row: each judged against the home fix by the job
+    places = [(31.5, -24.9), (5.77, 52.04), (5.78, 52.05), (5.79, 52.06)]
+    rows = []
+    for i, (lon, lat) in enumerate(places):
+        when = T0 + timedelta(minutes=10 * i)
+        rows.append(
+            Position(
+                time=when,
+                device_id=device_id,
+                project_id=project.id,
+                entity_id=uuid.UUID(entity["id"]),
+                data_source_id=uuid.UUID(source["id"]),
+                source_event_id=6000 + i,
+                source_event_ingested_at=when,
+                canonical_key=f"{device['id']}|gnss|run{i}",
+                geom=WKTElement(f"POINT({lon} {lat})", srid=4326),
+                accuracy_m=12.0,
+            )
+        )
+    db.add_all(rows)
+    await db.commit()
+    base = f"/api/v1/projects/{project.id}/curation"
+    job = (
+        await client.post(
+            f"{base}/jobs",
+            json={
+                "target_type": "position",
+                "device_ids": [device["id"]],
+                "time_from": T0.isoformat(),
+                "time_to": (T0 + timedelta(days=1)).isoformat(),
+                "transformation": {"kind": "flag_outliers"},
+                "reason_code": "GPS_OUTLIER",
+            },
+            headers=h,
+        )
+    ).json()
+    await client.post(f"{base}/jobs/{job['id']}/apply", headers=h)
+    await apply_job(uuid.UUID(job["id"]), user_id=admin.user.id)
+    assert (await client.get(f"{base}/outliers", headers=h)).json()["waiting"] == 3
+
+    approved = await client.post(
+        f"{base}/outliers/approve-all",
+        json={"device_id": device["id"], "comment": "the device travelled by plane"},
+        headers=h,
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json() == {"approved": 3, "pending": 0}
+    assert (await client.get(f"{base}/outliers", headers=h)).json()["waiting"] == 0
+    await db.rollback()
+    for row in rows[1:]:
+        kept = await db.get(Position, (row.id, row.time))
+        assert kept is not None and kept.valid is True
+    corrections = (
+        (
+            await db.execute(
+                select(DataCorrection).where(
+                    DataCorrection.device_id == device_id,
+                    DataCorrection.reason_code == "OUTLIER_APPROVED",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(corrections) == 3
+    assert {c.reason_code for c in corrections} == {"OUTLIER_APPROVED"}
+    assert {c.comment for c in corrections} == {"the device travelled by plane"}
+    again = await client.post(f"{base}/outliers/approve-all", json={}, headers=h)
+    assert again.status_code == 200 and again.json() == {"approved": 0, "pending": 0}

@@ -71,8 +71,9 @@ from shared.domain.fence import (
 from shared.domain.lp0 import credentials_for, last_counter, remember_counter
 from shared.domain.movement import derive_activity, movement_times, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
+from shared.domain.outliers import CONFIRMED_EVENT_TYPE as JUMP_CONFIRMED_EVENT_TYPE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
-from shared.domain.outliers import outlier_of
+from shared.domain.outliers import Outlier, agrees, outlier_of
 from shared.domain.reboot import detect_reboots, previous_uptime
 from shared.domain.speed import speed_measurements
 from shared.domain.static_place import Sighting, place_sightings
@@ -152,6 +153,8 @@ class Outcome:
     # the current state skips them
     outliers: int = 0
     outlier_times: set[datetime] = field(default_factory=set)
+    # flagged fixes the next fix confirmed (decision D360): the device moved, the run is valid
+    confirmed_jumps: int = 0
     # settings the device reported that changed what Protect knew (decision D229)
     settings_changed: int = 0
     # contacts whose address named more than one device, so they belong to neither (D254)
@@ -183,6 +186,75 @@ async def _previous_fix(
     if row is None:
         return None
     return float(row[0]), float(row[1]), row[2]
+
+
+@dataclass(slots=True)
+class _Flagged:
+    """A fix flagged as an outlier that the next fix may confirm (decision D360): its point,
+    its figures, and where it sits, in this frame (`index` into the rows to insert and
+    `event_index` into the frame's events) or in the table (`row`)."""
+
+    point: tuple[float, float, datetime]
+    outlier: Outlier
+    index: int | None = None
+    event_index: int | None = None
+    row: Position | None = None
+
+
+async def _flagged_fix(
+    session: AsyncSession, device_id: uuid.UUID, *, after: datetime, before: datetime
+) -> _Flagged | None:
+    """The device's newest own fix before `before` that waits as a flagged outlier and lies
+    after the last valid fix `after`: the one fix the fix at `before` may confirm."""
+    row = (
+        await session.execute(
+            select(
+                Position,
+                func.ST_Y(effective_geom()),
+                func.ST_X(effective_geom()),
+                effective_time(Position).label("at"),
+            )
+            .where(
+                Position.device_id == device_id,
+                effective_time(Position) < before,
+                effective_time(Position) > after,
+                Position.valid.is_(False),
+                Position.attributes.has_key(OUTLIER_ATTRIBUTE),
+                device_fix(),
+            )
+            .order_by(effective_time(Position).desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    position, lat, lon, at = row
+    figures = (position.attributes or {}).get(OUTLIER_ATTRIBUTE) or {}
+    try:
+        outlier = Outlier.from_attribute(figures)
+    except (KeyError, ValueError, TypeError):
+        return None  # flagged by an older version without the figures; a person decides
+    return _Flagged(point=(float(lat), float(lon), at), outlier=outlier, row=position)
+
+
+def _jump_event(flagged: _Flagged, confirmed_by: DecodedPosition) -> DecodedEvent:
+    """One event for a confirmed jump, at the moment of the flagged fix."""
+    return DecodedEvent(
+        time=flagged.point[2],
+        event_type=JUMP_CONFIRMED_EVENT_TYPE,
+        title=flagged.outlier.confirmed_title(),
+        severity=Severity.INFO,
+        context={
+            **flagged.outlier.attribute(
+                max_speed_mps=get_settings().outlier_max_speed_mps,
+                min_jump_m=get_settings().outlier_min_jump_m,
+            ),
+            "confirmed_by": confirmed_by.time.isoformat(),
+            "record_type": confirmed_by.record_type,
+        },
+        latitude=flagged.point[0],
+        longitude=flagged.point[1],
+    )
 
 
 def _delivery_time(event: SourceEvent, record_time: datetime) -> datetime:
@@ -602,6 +674,12 @@ async def process_source_event(
                     f"{outcome.outliers} fixes flagged as outliers (an impossible speed from the "
                     "last valid fix), kept invalid until approved under Curation"
                 )
+            if outcome.confirmed_jumps:
+                step.metadata["confirmed_jumps"] = outcome.confirmed_jumps
+                step.metadata["jump_note"] = (
+                    f"{outcome.confirmed_jumps} flagged fixes confirmed by the fix after them: "
+                    "the device moved, the fixes are valid"
+                )
             if outcome.clock_ahead:
                 step.metadata["clock_ahead_records"] = outcome.clock_ahead
                 step.metadata["clock_ahead_days"] = round(outcome.clock_ahead_seconds / 86400, 2)
@@ -798,6 +876,8 @@ async def _write_positions(
         ).all()
     }
     previous_in_frame: tuple[float, float, datetime] | None = None
+    # the frame's own flagged fix that the next fix may confirm (decision D360)
+    flagged_in_frame: _Flagged | None = None
     new: list[tuple[dict[str, Any], Any, Any]] = []  # the row, its record, its attribution
     deliveries: list[dict[str, Any]] = []
     seen: set[tuple[str, datetime]] = set()
@@ -817,6 +897,7 @@ async def _write_positions(
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         attributes = dict(record.attributes)
         outlier = None
+        confirmed: _Flagged | None = None
         if not ahead and record.record_type not in ESTIMATE_RECORD_TYPES:
             previous = (
                 previous_in_frame
@@ -825,12 +906,74 @@ async def _write_positions(
             )
             if previous is not None:
                 settings = get_settings()
-                outlier = outlier_of(
-                    previous,
-                    (record.latitude, record.longitude, record.time),
-                    max_speed_mps=settings.outlier_max_speed_mps,
-                    min_jump_m=settings.outlier_min_jump_m,
+                bounds = {
+                    "max_speed_mps": settings.outlier_max_speed_mps,
+                    "min_jump_m": settings.outlier_min_jump_m,
+                }
+                point = (record.latitude, record.longitude, record.time)
+                outlier = outlier_of(previous, point, **bounds)
+                if outlier is not None:
+                    # the fix before this one, when it is a flagged outlier newer than the
+                    # last valid fix: this fix confirms it when the two agree (decision D360)
+                    flagged = (
+                        flagged_in_frame
+                        if flagged_in_frame is not None
+                        and previous[2] < flagged_in_frame.point[2] < record.time
+                        else await _flagged_fix(
+                            session, device.id, after=previous[2], before=record.time
+                        )
+                    )
+                    if flagged is not None and agrees(flagged.point, point, **bounds):
+                        confirmed = flagged
+                        outlier = None
+        if confirmed is not None:
+            # the device moved: the flagged fix becomes valid, one jump event stands for the
+            # run (in this frame it replaces the outlier event; a fix flagged by an earlier
+            # delivery keeps its event and gets the confirmation beside it)
+            jump = _jump_event(confirmed, record)
+            if confirmed.index is not None and confirmed.event_index is not None:
+                row = new[confirmed.index][0]
+                row["valid"] = True
+                row["attributes"] = {
+                    **row["attributes"],
+                    OUTLIER_ATTRIBUTE: {
+                        **row["attributes"][OUTLIER_ATTRIBUTE],
+                        "confirmed_at": record.time.isoformat(),
+                    },
+                }
+                records.events[confirmed.event_index] = jump
+                outcome.outliers -= 1
+                outcome.outlier_times.discard(confirmed.point[2])
+            elif confirmed.row is not None:
+                stored = confirmed.row
+                stored.valid = True
+                stored.attributes = {
+                    **(stored.attributes or {}),
+                    OUTLIER_ATTRIBUTE: {
+                        **((stored.attributes or {}).get(OUTLIER_ATTRIBUTE) or {}),
+                        "confirmed_at": record.time.isoformat(),
+                    },
+                }
+                records.events.append(jump)
+                outcome.messages.append(
+                    (
+                        Topic.POSITION_CREATED,
+                        {
+                            "position_id": stored.id,
+                            "time": stored.time.isoformat(),
+                            "record_type": stored.record_type,
+                            "device_id": str(device.id),
+                            "project_id": str(stored.project_id) if stored.project_id else None,
+                            "entity_id": str(stored.entity_id) if stored.entity_id else None,
+                            "latitude": confirmed.point[0],
+                            "longitude": confirmed.point[1],
+                            "source_event_id": stored.source_event_id,
+                            "age_seconds": event_age(stored.time, event.ingested_at),
+                        },
+                    )
                 )
+            outcome.confirmed_jumps += 1
+            flagged_in_frame = None
         if outlier is not None:
             # flagged and kept invalid until a person approves it (decision D221); the event
             # lets rules and the lists say so
@@ -855,6 +998,13 @@ async def _write_positions(
         valid = not ahead and outlier is None
         if valid and record.record_type not in ESTIMATE_RECORD_TYPES:
             previous_in_frame = (record.latitude, record.longitude, record.time)
+        if outlier is not None:
+            flagged_in_frame = _Flagged(
+                point=(record.latitude, record.longitude, record.time),
+                outlier=outlier,
+                index=len(new),
+                event_index=len(records.events) - 1,
+            )
         new.append(
             (
                 {

@@ -21,6 +21,8 @@ from protect_api.schemas.curation import (
     CurationSummary,
     JobCreate,
     JobRead,
+    OutlierApproveAll,
+    OutlierApproveAllResult,
     OutlierList,
     OutlierRead,
     RecordHistory,
@@ -59,6 +61,8 @@ from shared.timeutil import require_aware, utc_now
 from shared.trace import ApplicationError
 
 router = APIRouter(prefix="/projects/{project_id}/curation", tags=["curation"])
+#: Flagged fixes approved per "Approve all" call (decision D362); the rest on the next click.
+MAX_APPROVE_ALL = 1000
 
 APPROVAL_SETTING = "curation_requires_approval"
 
@@ -247,6 +251,75 @@ async def list_outliers(
             )
         )
     return OutlierList(items=items, total=total, waiting=waiting_count)
+
+
+@router.post("/outliers/approve-all", response_model=OutlierApproveAllResult)
+async def approve_all_outliers(
+    body: OutlierApproveAll,
+    context: ProjectContext = Depends(require_permission(Permission.DATA_CURATE)),
+    session: AsyncSession = Depends(get_session),
+) -> OutlierApproveAllResult:
+    """Every flagged fix waiting for review, of one device or of the project, approved in one
+    go (decision D362; Tim, 2026-10-27: 51 buttons for one drive from the airport): one
+    set-valid correction each, as the row's button writes it, applied at once or left pending
+    under the project's approval rule (decision D81); at most `MAX_APPROVE_ALL` per call."""
+    conditions = [
+        Position.project_id == context.project.id,
+        Position.attributes.has_key(OUTLIER_ATTRIBUTE),
+        Position.valid.is_(False),
+        context.visibility.rows(Position.entity_id, Position.device_id),
+    ]
+    if body.device_id is not None:
+        conditions.append(Position.device_id == body.device_id)
+    rows = (
+        await session.scalars(
+            select(Position).where(*conditions).order_by(Position.time).limit(MAX_APPROVE_ALL)
+        )
+    ).all()
+    apply_now = not _requires_approval(context)
+    touched: dict[uuid.UUID, set[uuid.UUID | None]] = {}
+    approved = pending = 0
+    for position in rows:
+        correction = DataCorrection(
+            project_id=context.project.id,
+            target_type="position",
+            target_id=position.id,
+            target_time=position.time,
+            device_id=position.device_id,
+            entity_id=position.entity_id,
+            metric_key=None,
+            field="valid",
+            original_value=effective_of(position, "valid"),
+            corrected_value=normalize_value("position", "valid", True),
+            reason_code=_reason(CurationReason.OUTLIER_APPROVED),
+            comment=body.comment,
+            status=CorrectionStatus.PENDING,
+            created_by_user_id=context.user.id,
+        )
+        session.add(correction)
+        await session.flush()
+        if apply_now:
+            try:
+                applied = await apply_correction(session, correction)
+            except ApplicationError as error:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
+            touched.setdefault(applied.device_id, set()).update(applied.entity_ids)
+            approved += 1
+        else:
+            pending += 1
+    for device_id, entity_ids in touched.items():
+        await recompute_current_state(session, device_id, entity_ids)
+    await record_audit(
+        session,
+        user=context.user,
+        action="outliers.approved_all",
+        object_type="device" if body.device_id else "project",
+        object_id=str(body.device_id or context.project.id),
+        project_id=context.project.id,
+        details={"approved": approved, "pending": pending, "comment": body.comment},
+    )
+    await session.commit()
+    return OutlierApproveAllResult(approved=approved, pending=pending)
 
 
 @router.get("/history", response_model=RecordHistory)

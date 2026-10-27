@@ -18901,6 +18901,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/curation/outliers/approve-all": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Approve All Outliers",
+    "description": "Every flagged fix waiting for review, of one device or of the project, approved in one\ngo (decision D362; Tim, 2026-10-27: 51 buttons for one drive from the airport): one\nset-valid correction each, as the row's button writes it, applied at once or left pending\nunder the project's approval rule (decision D81); at most `MAX_APPROVE_ALL` per call.",
+    "operationId": "approve_all_outliers_api_v1_projects__project_id__curation_outliers_approve_all_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OutlierApproveAll"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OutlierApproveAllResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/curation/history": {
    "get": {
     "tags": [
@@ -42812,6 +42871,57 @@
     },
     "type": "object",
     "title": "OrganizationUpdate"
+   },
+   "OutlierApproveAll": {
+    "properties": {
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "title": "OutlierApproveAll",
+    "description": "Every flagged fix waiting for review, of one device or of the whole project, approved\nin one go (decision D362)."
+   },
+   "OutlierApproveAllResult": {
+    "properties": {
+     "approved": {
+      "type": "integer",
+      "title": "Approved",
+      "description": "Corrections applied at once"
+     },
+     "pending": {
+      "type": "integer",
+      "title": "Pending",
+      "description": "Corrections left for another person's approval (D81)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "approved",
+     "pending"
+    ],
+    "title": "OutlierApproveAllResult"
    },
    "OutlierList": {
     "properties": {

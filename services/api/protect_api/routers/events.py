@@ -60,6 +60,8 @@ ICON_BY_TYPE = {
     "TRAP_CLOSED": "event.trap",
     "TRAP_OPENED": "event.trap",
     "TRAP_SHUT": "event.trap",
+    "position_outlier": "event.unknown",
+    "position_jump_confirmed": "event.migration",
 }
 
 

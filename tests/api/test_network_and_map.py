@@ -480,3 +480,52 @@ async def test_a_project_sees_a_moved_device_s_messages_from_its_own_spans_alone
     assert (await client.get(url(newer), headers=viewer.headers)).status_code == 200
     assert (await client.get(url(older), headers=viewer.headers)).status_code == 404
     assert (await client.get(url(older), headers=h)).status_code == 200
+
+
+async def test_an_entity_without_a_device_today_keeps_its_position_and_no_device_health(
+    client, db, bus
+):
+    """Decision D361 (Tim, 2026-10-27: entity Tim kept showing the fresh status of the device
+    that had left it two days before): the map takes the device from the assignment valid
+    now; once the device is gone the entity keeps its last position and last seen alone."""
+    from sqlalchemy import func, update
+
+    from shared.models import DeviceEntityAssignment
+
+    admin, project, _entity, source, device, external_id = await _setup(client, db)
+    at = datetime(2026, 4, 1, tzinfo=UTC)
+    await _feed(db, bus, source["id"], external_id, at, -24.9, 31.5)
+    url = f"/api/v1/projects/{project.id}/map/current"
+    before = (await client.get(url, headers=admin.headers)).json()["features"][0]["properties"]
+    assert before["device_id"] == device["id"]
+    assert before["assigned_since"] == "2026-01-01T00:00:00+00:00"
+    assert before["device_last_seen_at"] is not None
+
+    # the device leaves the entity the day after the fix
+    await db.execute(
+        update(DeviceEntityAssignment)
+        .where(DeviceEntityAssignment.device_id == uuid.UUID(device["id"]))
+        .values(
+            validity=func.tstzrange(
+                func.lower(DeviceEntityAssignment.validity), at + timedelta(days=1), "[)"
+            )
+        )
+    )
+    await db.commit()
+    body = (await client.get(url, headers=admin.headers)).json()
+    assert body["total"] == 1, "the entity stays on the map where it was last seen"
+    after = body["features"][0]["properties"]
+    assert after["position_time"] == "2026-04-01T00:00:00+00:00"
+    assert after["last_seen_at"] is not None
+    for key in (
+        "device_id",
+        "assigned_since",
+        "health_level",
+        "battery_voltage",
+        "battery_percent",
+        "last_status_at",
+        "device_last_seen_at",
+        "last_movement_at",
+        "uptime",
+    ):
+        assert after[key] is None, key

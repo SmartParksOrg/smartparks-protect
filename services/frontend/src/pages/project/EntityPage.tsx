@@ -554,7 +554,9 @@ export function EntityPage() {
                     <dd title={formatTime(device.data?.data_received_at)}>
                       {device.data?.data_received_at
                         ? formatAgo(device.data.data_received_at, now)
-                        : t("never")}
+                        : current
+                          ? t("never")
+                          : t("no device tracks it today")}
                     </dd>
                     <dt className="text-muted-foreground">
                       {t("Last position")}

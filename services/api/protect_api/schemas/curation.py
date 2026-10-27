@@ -149,6 +149,19 @@ class OutlierList(BaseModel):
     waiting: int
 
 
+class OutlierApproveAll(BaseModel):
+    """Every flagged fix waiting for review, of one device or of the whole project, approved
+    in one go (decision D362)."""
+
+    device_id: uuid.UUID | None = None
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class OutlierApproveAllResult(BaseModel):
+    approved: int = Field(description="Corrections applied at once")
+    pending: int = Field(description="Corrections left for another person's approval (D81)")
+
+
 class RecordHistory(BaseModel):
     """A record's effective and original values with every correction on it."""
 

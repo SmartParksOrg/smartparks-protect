@@ -29,6 +29,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { RecordHistoryDialog } from "@/components/curation/CurationDialogs";
 import { DataTable } from "@/components/data/DataTable";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -164,6 +165,8 @@ export function CurationPage() {
   const [revertComment, setRevertComment] = useState("");
   const [newJob, setNewJob] = useState<false | "any" | "outliers">(false);
   const [job, setJob] = useState<CurationJob | null>(null);
+  // every waiting fix in one go (decision D362): the same correction the row's button writes
+  const [approvingAll, setApprovingAll] = useState(false);
   const invalidateAll = () => {
     void client.invalidateQueries({
       queryKey: ["projects", projectId, "curation"],
@@ -195,6 +198,24 @@ export function CurationPage() {
         ? t("Proposed; the fix returns once another person approves")
         : t("The fix is back in the data"),
     onSuccess: () => {
+      invalidateAll();
+      void outliers.refetch();
+    },
+  });
+  const approveAll = useMutationToast({
+    mutationFn: () =>
+      api.post<{ approved: number; pending: number }>(
+        `${base}/outliers/approve-all`,
+        { body: { device_id: null, comment: null } },
+      ),
+    success: (r: { approved: number; pending: number }) =>
+      r.pending > 0
+        ? t("{{count}} fixes proposed; they return once another person approves", {
+            count: r.pending,
+          })
+        : t("{{count}} fixes are back in the data", { count: r.approved }),
+    onSuccess: () => {
+      setApprovingAll(false);
       invalidateAll();
       void outliers.refetch();
     },
@@ -668,6 +689,24 @@ export function CurationPage() {
                 </>
               )}
             </Callout>
+            {(outliers.data?.waiting ?? 0) > 1 && (
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">
+                  {t(
+                    "A whole run of real fixes can wait here, as after a device travelled by plane; the next fix confirms such a run by itself from now on, and what is still waiting can be approved at once.",
+                  )}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => setApprovingAll(true)}
+                >
+                  <Check className="size-4" />{" "}
+                  {t("Approve all {{count}}", { count: outliers.data?.waiting ?? 0 })}
+                </Button>
+              </div>
+            )}
             <DataTable
               columns={outlierColumns}
               data={outliers.data?.items}
@@ -677,6 +716,19 @@ export function CurationPage() {
                 outliers.data &&
                 t("{{count}} waiting", { count: outliers.data.waiting })
               }
+            />
+            <ConfirmDialog
+              open={approvingAll}
+              onOpenChange={setApprovingAll}
+              title={t("Approve every flagged fix of this project?")}
+              description={t(
+                "{{count}} fixes waiting for review become valid again: each gets a set-valid correction, audited and reversible, under the project's approval rule.",
+                { count: outliers.data?.waiting ?? 0 },
+              )}
+              confirmLabel={t("Approve all")}
+              destructive={false}
+              onConfirm={() => approveAll.mutate()}
+              pending={approveAll.isPending}
             />
           </div>
         )}

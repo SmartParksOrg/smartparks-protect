@@ -4490,6 +4490,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/curation/outliers/approve-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve All Outliers
+         * @description Every flagged fix waiting for review, of one device or of the project, approved in one
+         *     go (decision D362; Tim, 2026-10-27: 51 buttons for one drive from the airport): one
+         *     set-valid correction each, as the row's button writes it, applied at once or left pending
+         *     under the project's approval rule (decision D81); at most `MAX_APPROVE_ALL` per call.
+         */
+        post: operations["approve_all_outliers_api_v1_projects__project_id__curation_outliers_approve_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/curation/history": {
         parameters: {
             query?: never;
@@ -12864,6 +12887,30 @@ export interface components {
             name?: string | null;
             /** Slug */
             slug?: string | null;
+        };
+        /**
+         * OutlierApproveAll
+         * @description Every flagged fix waiting for review, of one device or of the whole project, approved
+         *     in one go (decision D362).
+         */
+        OutlierApproveAll: {
+            /** Device Id */
+            device_id?: string | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** OutlierApproveAllResult */
+        OutlierApproveAllResult: {
+            /**
+             * Approved
+             * @description Corrections applied at once
+             */
+            approved: number;
+            /**
+             * Pending
+             * @description Corrections left for another person's approval (D81)
+             */
+            pending: number;
         };
         /** OutlierList */
         OutlierList: {
@@ -25073,6 +25120,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OutlierList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_all_outliers_api_v1_projects__project_id__curation_outliers_approve_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlierApproveAll"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlierApproveAllResult"];
                 };
             };
             /** @description Validation Error */

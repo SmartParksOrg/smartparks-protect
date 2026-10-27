@@ -204,7 +204,12 @@ async def current_state(
             func.ST_Intersects(EntityCurrentState.latest_position, func.ST_MakeEnvelope(*box, 4326))
         )
     rows = (await session.execute(base.order_by(EntityCurrentState.entity_id).limit(limit))).all()
-    device_ids = {row[0].device_id for row in rows if row[0].device_id}
+    # the device tracking each entity today comes from the assignments, as the Entities page
+    # reads it (D286), never from the state's stored device id, which only says where the
+    # position came from (decision D361; Tim, 2026-10-27: entity Tim kept showing the fresh
+    # status of a device that had left it two days before, from another country)
+    tracked = await _tracked_now(session, [row[0].entity_id for row in rows])
+    device_ids = {device_id for device_id, _ in tracked.values()}
     device_states: dict[uuid.UUID, DeviceCurrentState] = {}
     # the driver key and what the battery type is resolved from, per device (decision D248)
     drivers_by_device: dict[uuid.UUID, tuple[str | None, dict[str, Any], dict[str, Any]]] = {}
@@ -234,24 +239,6 @@ async def current_state(
         }
     contacts = await _contact_counts(session, device_ids)
     readers = await _heard_by(session, device_ids)
-    # when the device tracking the entity today was assigned to it: the start of the "since the
-    # device was assigned" track length in the map's track settings
-    assigned_since: dict[uuid.UUID, datetime] = {}
-    if device_ids:
-        assigned_since = {
-            entity_id: since
-            for entity_id, since in (
-                await session.execute(
-                    select(
-                        DeviceEntityAssignment.entity_id,
-                        func.lower(DeviceEntityAssignment.validity),
-                    ).where(
-                        DeviceEntityAssignment.device_id.in_(device_ids),
-                        DeviceEntityAssignment.validity.op("@>")(utc_now()),
-                    )
-                )
-            ).all()
-        }
     features = []
     for row in rows:
         state, name, entity_status, icon_override, type_key, type_icon, group_key = row[:7]
@@ -259,12 +246,13 @@ async def current_state(
         type_label, parent_label = row[11], row[12]
         import json
 
-        device_state = device_states.get(state.device_id) if state.device_id else None
+        device_id, assigned_since = tracked.get(state.entity_id, (None, None))
+        device_state = device_states.get(device_id) if device_id else None
         health = None
         battery = None
         if device_state is not None:
-            driver_key, attributes, defaults = drivers_by_device.get(
-                state.device_id, (None, {}, {})
+            driver_key, attributes, defaults = (
+                drivers_by_device.get(device_id, (None, {}, {})) if device_id else (None, {}, {})
             )
             driver = DRIVERS.get(driver_key or "")
             battery = resolve_battery(attributes, defaults, driver).profile
@@ -297,10 +285,8 @@ async def current_state(
                     "picture_updated_at": picture_updated_at.isoformat()
                     if picture_updated_at
                     else None,
-                    "device_id": str(state.device_id) if state.device_id else None,
-                    "assigned_since": assigned_since[state.entity_id].isoformat()
-                    if state.entity_id in assigned_since
-                    else None,
+                    "device_id": str(device_id) if device_id else None,
+                    "assigned_since": assigned_since.isoformat() if assigned_since else None,
                     "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
                     "position_time": state.latest_position_time.isoformat()
                     if state.latest_position_time
@@ -308,24 +294,16 @@ async def current_state(
                     "position_kind": state.latest_position_kind,
                     "accuracy_m": state.latest_accuracy_m,
                     # who put it there, when a reader did (decision D258)
-                    "heard_by": readers.get(state.device_id, (None, None))[0]
-                    if state.device_id
-                    else None,
-                    "heard_by_name": readers.get(state.device_id, (None, None))[1]
-                    if state.device_id
-                    else None,
+                    "heard_by": readers.get(device_id, (None, None))[0] if device_id else None,
+                    "heard_by_name": readers.get(device_id, (None, None))[1] if device_id else None,
                     "active_alert_count": state.active_alert_count,
                     "health_level": health.level if health else None,
                     "battery_voltage": device_state.battery_voltage if device_state else None,
                     "battery_percent": _battery_percent(battery, device_state),
                     "battery_type": battery.key if battery else None,
-                    "contacts_24h": contacts.get(state.device_id, (None, None))[0]
-                    if state.device_id
-                    else None,
+                    "contacts_24h": contacts.get(device_id, (None, None))[0] if device_id else None,
                     "last_contact_at": (
-                        contacts[state.device_id][1].isoformat()
-                        if state.device_id in contacts
-                        else None
+                        contacts[device_id][1].isoformat() if device_id in contacts else None
                     ),
                     "last_movement_at": device_state.last_movement_at.isoformat()
                     if device_state and device_state.last_movement_at
@@ -628,6 +606,34 @@ async def _heard_by(
     )
     rows = (await session.execute(newest)).all()
     return {row.device_id: (row.reader_id, row.reader_name) for row in rows if row.reader_id}
+
+
+async def _tracked_now(
+    session: AsyncSession, entity_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[uuid.UUID, datetime]]:
+    """The device tracking each entity today and since when, from the assignments valid now
+    (decision D361); an entity with two devices takes the one assigned last. The "since" is
+    the start of the "since the device was assigned" track length of the map's settings."""
+    tracked: dict[uuid.UUID, tuple[uuid.UUID, datetime]] = {}
+    if not entity_ids:
+        return tracked
+    rows = (
+        await session.execute(
+            select(
+                DeviceEntityAssignment.entity_id,
+                DeviceEntityAssignment.device_id,
+                func.lower(DeviceEntityAssignment.validity),
+            ).where(
+                DeviceEntityAssignment.entity_id.in_(entity_ids),
+                DeviceEntityAssignment.validity.op("@>")(utc_now()),
+            )
+        )
+    ).all()
+    for entity_id, device_id, since in rows:
+        current = tracked.get(entity_id)
+        if current is None or since > current[1]:
+            tracked[entity_id] = (device_id, since)
+    return tracked
 
 
 def _battery_percent(

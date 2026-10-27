@@ -3364,5 +3364,17 @@
   "zone": "zone",
   "Zoom and position": "Zoom en positie",
   "Zoom in": "Inzoomen",
-  "Zoom out": "Uitzoomen"
+  "Zoom out": "Uitzoomen",
+  "{{count}} fixes are back in the data_one": "Eén fix staat weer in de data",
+  "{{count}} fixes are back in the data_other": "{{count}} fixes staan weer in de data",
+  "{{count}} fixes proposed; they return once another person approves_one": "Eén fix voorgesteld; hij keert terug zodra iemand anders goedkeurt",
+  "{{count}} fixes proposed; they return once another person approves_other": "{{count}} fixes voorgesteld; ze keren terug zodra iemand anders goedkeurt",
+  "{{count}} fixes waiting for review become valid again: each gets a set-valid correction, audited and reversible, under the project's approval rule._one": "Eén fix die op beoordeling wacht wordt weer geldig: een correctie op geldigheid, gelogd en omkeerbaar, volgens de goedkeuringsregel van het project.",
+  "{{count}} fixes waiting for review become valid again: each gets a set-valid correction, audited and reversible, under the project's approval rule._other": "{{count}} fixes die op beoordeling wachten worden weer geldig: elk krijgt een correctie op geldigheid, gelogd en omkeerbaar, volgens de goedkeuringsregel van het project.",
+  "A whole run of real fixes can wait here, as after a device travelled by plane; the next fix confirms such a run by itself from now on, and what is still waiting can be approved at once.": "Een hele reeks echte fixes kan hier wachten, zoals na een vliegreis van een apparaat; de volgende fix bevestigt zo'n reeks voortaan vanzelf, en wat nog wacht kan in één keer worden goedgekeurd.",
+  "Approve all": "Alles goedkeuren",
+  "Approve all {{count}}_one": "De ene wachtende goedkeuren",
+  "Approve all {{count}}_other": "Alle {{count}} goedkeuren",
+  "Approve every flagged fix of this project?": "Elke gemarkeerde fix van dit project goedkeuren?",
+  "no device tracks it today": "geen apparaat volgt het vandaag"
 }
