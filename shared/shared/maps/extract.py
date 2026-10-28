@@ -1,19 +1,27 @@
-"""The offline map of a project's area for Protect Go (phase 43 P3; Protect Go's decision D4).
+"""The offline map of a project's places for Protect Go (phase 43 P3; Protect Go's decision D4).
 
 Protomaps publishes a planet build most days at https://build.protomaps.com/YYYYMMDD.pmtiles, one
 PMTiles file of some 140 GB that answers range requests, and its `pmtiles extract` command cuts
-a bounding box out of it by reading only the ranges it needs. The export worker runs that
-command for a project's area, padded by a margin, down to a zoom level, keeps the result in
+a region out of it by reading only the ranges it needs. The export worker runs that command
+for a project's regions, each padded by a margin, down to a zoom level, keeps the result in
 MinIO and the row says where; Protect Go downloads it beside the field bundle and serves it to
 MapLibre offline. The data is OpenStreetMap's under the ODbL; Protect Go's map credits it.
+
+A project's places may lie far apart (decision D365, Tim, 2026-10-28: the offload station in
+the Netherlands, the tracker it serves in Namibia, and one box over both at zoom 14 is most of
+Africa): the places are grouped into regions when they lie farther apart than
+`MAP_EXTRACT_REGION_GAP_KM`, and one file is cut for all the regions at once through the
+command's `--region` option with a multipolygon of boxes.
 """
 
 import asyncio
 import hashlib
+import json
 import math
 import tempfile
 import uuid
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -71,6 +79,71 @@ def pad(bbox: Bbox, km: float) -> Bbox:
     )
 
 
+def gap_km(a: Bbox, b: Bbox) -> float:
+    """How far apart two boxes lie, in kilometres: zero when they touch or overlap."""
+    lat = (a.south + a.north + b.south + b.north) / 4
+    dlon = max(0.0, max(a.west, b.west) - min(a.east, b.east))
+    dlat = max(0.0, max(a.south, b.south) - min(a.north, b.north))
+    return math.hypot(dlon * 111.32 * math.cos(math.radians(lat)), dlat * 111.32)
+
+
+def envelope(boxes: Sequence[Bbox]) -> Bbox:
+    """The one box around them all."""
+    if not boxes:
+        raise ValueError("no boxes")
+    return Bbox(
+        west=min(b.west for b in boxes),
+        south=min(b.south for b in boxes),
+        east=max(b.east for b in boxes),
+        north=max(b.north for b in boxes),
+    )
+
+
+def regions_of(boxes: Sequence[Bbox], gap: float) -> list[Bbox]:
+    """The boxes grouped into regions (decision D365): two boxes closer than `gap` kilometres
+    belong together, and a region is the envelope of its boxes; the largest first."""
+    regions = list(boxes)
+    merged = True
+    while merged and len(regions) > 1:
+        merged = False
+        for i in range(len(regions)):
+            for j in range(i + 1, len(regions)):
+                if gap_km(regions[i], regions[j]) <= gap:
+                    joined = envelope([regions[i], regions[j]])
+                    regions = [r for k, r in enumerate(regions) if k not in (i, j)] + [joined]
+                    merged = True
+                    break
+            if merged:
+                break
+    return sorted(
+        regions, key=lambda r: ((r.east - r.west) * (r.north - r.south), r.west), reverse=True
+    )
+
+
+def covers(regions: Sequence[Bbox], areas: Sequence[Bbox]) -> bool:
+    """Whether every area lies within one of the regions."""
+    return all(any(region.contains(area) for region in regions) for area in areas)
+
+
+def region_geojson(regions: Sequence[Bbox]) -> dict[str, Any]:
+    """The regions as the GeoJSON multipolygon `pmtiles extract --region` reads."""
+    return {
+        "type": "MultiPolygon",
+        "coordinates": [
+            [
+                [
+                    [r.west, r.south],
+                    [r.east, r.south],
+                    [r.east, r.north],
+                    [r.west, r.north],
+                    [r.west, r.south],
+                ]
+            ]
+            for r in regions
+        ],
+    }
+
+
 def object_key(project_id: uuid.UUID, build: str) -> str:
     return f"{project_id}/{build}.pmtiles"
 
@@ -105,16 +178,21 @@ async def resolve_source() -> tuple[str, str]:
         return await latest_planet_build(client)
 
 
-async def extract(source: str, bbox: Bbox, max_zoom: int, out: Path) -> None:
-    """`pmtiles extract` for the box, down to the zoom; the command's last line on failure
-    (its progress and errors go to stderr, so it is not run quiet)."""
+async def extract(source: str, regions: Sequence[Bbox], max_zoom: int, out: Path) -> None:
+    """`pmtiles extract` for the regions, down to the zoom; the command's last line on failure
+    (its progress and errors go to stderr, so it is not run quiet). The regions go in as a
+    GeoJSON file beside the output, one rectangle each (decision D365)."""
+    if not regions:
+        raise MapExtractError("No region to cut")
     settings = get_settings()
+    region_file = out.with_suffix(".region.json")
+    region_file.write_text(json.dumps(region_geojson(regions)))
     command = [
         settings.pmtiles_bin,
         "extract",
         source,
         str(out),
-        f"--bbox={bbox.west},{bbox.south},{bbox.east},{bbox.north}",
+        f"--region={region_file}",
         f"--maxzoom={max_zoom}",
     ]
     try:
@@ -149,39 +227,55 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def row_regions(row: MapExtract) -> list[Bbox]:
+    """The boxes a map row was cut for; a row from before decision D365 is its one box."""
+    regions = [
+        Bbox(float(r["west"]), float(r["south"]), float(r["east"]), float(r["north"]))
+        for r in (row.regions or [])
+        if isinstance(r, dict)
+    ]
+    return regions or [Bbox(row.west, row.south, row.east, row.north)]
+
+
 async def queue_map_extract(
     session: AsyncSession,
     bus: RedisStreamsBus,
     project_id: uuid.UUID,
-    area: Bbox,
+    areas: Sequence[Bbox],
     *,
     requested_by: uuid.UUID | None,
     force: bool = False,
 ) -> tuple[MapExtract, bool]:
     """Ask for the project's offline map. One at a time per project; an extract younger than
-    `FRESH_FOR` that covers the area is kept unless `force`. Returns the row and whether a job
-    was queued."""
+    `FRESH_FOR` whose regions cover every area is kept unless `force`. Returns the row and
+    whether a job was queued."""
+    if not areas:
+        raise ValueError("no area to cut")
     settings = get_settings()
-    wanted = pad(area, settings.map_extract_margin_km)
+    wanted = regions_of(
+        [pad(area, settings.map_extract_margin_km) for area in areas],
+        settings.map_extract_region_gap_km,
+    )
     row = await session.get(MapExtract, project_id)
     if row is not None:
         if row.status in (MapExtractStatus.QUEUED, MapExtractStatus.RUNNING):
             return row, False
-        have = Bbox(row.west, row.south, row.east, row.north)
         fresh = row.ready_at is not None and utc_now() - row.ready_at < FRESH_FOR
         if (
             row.status == MapExtractStatus.READY
             and not force
             and fresh
-            and have.contains(area)
+            and covers(row_regions(row), areas)
             and row.max_zoom >= settings.map_extract_max_zoom
         ):
             return row, False
     else:
         row = MapExtract(project_id=project_id, west=0, south=0, east=0, north=0, max_zoom=0)
         session.add(row)
+    whole = envelope(wanted)
     row.status = MapExtractStatus.QUEUED
-    row.west, row.south, row.east, row.north = wanted.west, wanted.south, wanted.east, wanted.north
+    row.west, row.south, row.east, row.north = whole.west, whole.south, whole.east, whole.north
+    row.regions = [asdict(region) for region in wanted]
     row.max_zoom = settings.map_extract_max_zoom
     row.error = None
     row.requested_by = requested_by
@@ -203,13 +297,13 @@ async def run_map_extract_job(payload: dict[str, Any]) -> None:
         row.status = MapExtractStatus.RUNNING
         row.error = None
         await session.commit()
-        bbox = Bbox(row.west, row.south, row.east, row.north)
+        regions = row_regions(row)
         old_key = row.object_key
         try:
             source, build = await resolve_source()
             with tempfile.TemporaryDirectory(prefix="map-extract-") as folder:
                 out = Path(folder) / f"{build}.pmtiles"
-                await extract(source, bbox, row.max_zoom, out)
+                await extract(source, regions, row.max_zoom, out)
                 size = out.stat().st_size
                 if size > settings.map_extract_max_bytes:
                     raise MapExtractError(

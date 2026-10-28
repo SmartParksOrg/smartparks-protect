@@ -7,7 +7,6 @@ caller's visibility applied, the keys only for a caller who may set them (the ru
 import hashlib
 import json
 import os
-import re
 import uuid
 from typing import Any
 
@@ -46,12 +45,14 @@ from shared.config import get_settings
 from shared.database import get_session
 from shared.domain.lp0 import credentials_for, device_eui, lp0_source
 from shared.enums import MapExtractStatus
-from shared.maps.extract import Bbox, queue_map_extract
+from shared.maps.extract import Bbox, covers, queue_map_extract, regions_of, row_regions
 from shared.models import (
     Device,
+    DeviceCurrentState,
     DeviceLp0Credentials,
     DeviceType,
     Entity,
+    EntityCurrentState,
     EntityType,
     Feature,
     Gateway,
@@ -65,15 +66,8 @@ from shared.version import __version__
 
 router = APIRouter(tags=["offload"])
 
-BOX = re.compile(r"BOX\(([-\d.eE+]+) ([-\d.eE+]+),([-\d.eE+]+) ([-\d.eE+]+)\)")
-
-
-def _box(text: str | None) -> FieldArea | None:
-    match = BOX.match(text or "")
-    if match is None:
-        return None
-    west, south, east, north = (float(value) for value in match.groups())
-    return FieldArea(west=west, south=south, east=east, north=north)
+#: Places of one kind read for the regions; a project with more is cut for the first of them.
+MAX_PLACES = 5000
 
 
 def _merge(boxes: list[FieldArea | None]) -> FieldArea | None:
@@ -95,37 +89,63 @@ def _geojson(text: str | None) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-async def _area(
+async def _areas(
     session: AsyncSession, project_id: uuid.UUID, device_ids: list[uuid.UUID]
-) -> FieldArea | None:
-    """The extent of the project's features, its entities' places and its devices' places."""
-    boxes = [
-        _box(
-            await session.scalar(
-                select(func.ST_Extent(cast(Feature.geom, Geometry))).where(
-                    Feature.project_id == project_id
-                )
-            )
-        ),
-        _box(
-            await session.scalar(
-                select(func.ST_Extent(cast(Entity.geom, Geometry))).where(
-                    Entity.project_id == project_id, Entity.geom.is_not(None)
-                )
-            )
-        ),
+) -> list[FieldArea]:
+    """The project's places as regions (decision D365): the boxes of its features, its
+    entities' and devices' places set by hand, and the current positions of its devices and of
+    the entities they track, grouped where they lie within `MAP_EXTRACT_REGION_GAP_KM` of one
+    another; the largest region first. A station in the Netherlands and the tracker it served
+    in Namibia are two regions, not one box over the gap."""
+    boxes: list[Bbox] = []
+
+    def envelope(column: Any) -> tuple[Any, Any, Any, Any]:
+        geometry = cast(column, Geometry)
+        return (
+            func.ST_XMin(geometry),
+            func.ST_YMin(geometry),
+            func.ST_XMax(geometry),
+            func.ST_YMax(geometry),
+        )
+
+    statements = [
+        select(*envelope(Feature.geom))
+        .where(Feature.project_id == project_id, Feature.geom.is_not(None))
+        .limit(MAX_PLACES),
+        select(*envelope(Entity.geom))
+        .where(Entity.project_id == project_id, Entity.geom.is_not(None))
+        .limit(MAX_PLACES),
     ]
     if device_ids:
-        boxes.append(
-            _box(
-                await session.scalar(
-                    select(func.ST_Extent(cast(Device.static_geom, Geometry))).where(
-                        Device.id.in_(device_ids), Device.static_geom.is_not(None)
-                    )
-                )
+        statements += [
+            select(*envelope(Device.static_geom))
+            .where(Device.id.in_(device_ids), Device.static_geom.is_not(None))
+            .limit(MAX_PLACES),
+            select(*envelope(DeviceCurrentState.latest_position))
+            .where(
+                DeviceCurrentState.device_id.in_(device_ids),
+                DeviceCurrentState.latest_position.is_not(None),
             )
-        )
-    return _merge(boxes)
+            .limit(MAX_PLACES),
+            select(*envelope(EntityCurrentState.latest_position))
+            .where(
+                EntityCurrentState.project_id == project_id,
+                EntityCurrentState.device_id.in_(device_ids),
+                EntityCurrentState.latest_position.is_not(None),
+            )
+            .limit(MAX_PLACES),
+        ]
+    for statement in statements:
+        for west, south, east, north in (await session.execute(statement)).all():
+            if None in (west, south, east, north):
+                continue
+            boxes.append(Bbox(float(west), float(south), float(east), float(north)))
+    regions = regions_of(boxes, get_settings().map_extract_region_gap_km)
+    return [FieldArea(west=r.west, south=r.south, east=r.east, north=r.north) for r in regions]
+
+
+def _boxes(areas: list[FieldArea]) -> list[Bbox]:
+    return [Bbox(a.west, a.south, a.east, a.north) for a in areas]
 
 
 async def _build_bundle(
@@ -243,6 +263,7 @@ async def _build_bundle(
     )
 
     map_row = await session.get(MapExtract, context.project.id)
+    areas = await _areas(session, context.project.id, device_ids)
     # the metric registry is shared by every project and small; the app names and units the
     # values it decodes with it (decision D334)
     metric_rows = (await session.scalars(select(Metric).order_by(Metric.key))).all()
@@ -268,8 +289,9 @@ async def _build_bundle(
             slug=context.project.slug,
             timezone=context.project.timezone,
         ),
-        area=await _area(session, context.project.id, device_ids),
-        map=_map_read(map_row) if map_row else None,
+        area=_merge(list(areas)),
+        areas=areas,
+        map=_map_read(map_row, areas) if map_row else None,
         credentials_included=reveal,
         devices=devices,
         entities=[
@@ -353,13 +375,18 @@ async def field_bundle_revision(
     return FieldBundleRevision(revision=bundle.revision, checked_at=utc_now())
 
 
-def _map_read(row: MapExtract) -> FieldMapRead:
+def _map_read(row: MapExtract, areas: list[FieldArea]) -> FieldMapRead:
+    regions = row_regions(row)
     return FieldMapRead(
         status=row.status,
         west=row.west,
         south=row.south,
         east=row.east,
         north=row.north,
+        regions=[
+            FieldArea(west=r.west, south=r.south, east=r.east, north=r.north) for r in regions
+        ],
+        covers_areas=covers(regions, _boxes(areas)),
         max_zoom=row.max_zoom,
         build=row.build,
         size_bytes=row.size_bytes,
@@ -381,15 +408,16 @@ async def request_field_map(
     session: AsyncSession = Depends(get_session),
     bus: RedisStreamsBus = Depends(get_bus),
 ) -> FieldMapRead:
-    """Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with
-    a margin, from the newest Protomaps planet build. A file made for a member, so the
-    permission is the exports' (`exports:create`: analysts and admins); every member downloads
-    it. One job per project at a time; a map younger than a month that covers the area is kept
-    unless `force`. The area is the extent of the project's features, entity places and device
-    places, so a project with none yet has no map to cut."""
+    """Ask for the project's offline map (phase 43 P3): the export worker cuts the project's
+    regions, each with a margin, from the newest Protomaps planet build into one file. A file
+    made for a member, so the permission is the exports' (`exports:create`: analysts and
+    admins); every member downloads it. One job per project at a time; a map younger than a
+    month whose regions cover every area is kept unless `force`. The regions are the project's
+    features, entity and device places and current positions grouped by distance (decision
+    D365), so a project with none yet has no map to cut."""
     device_ids = await _project_device_ids(session, context)
-    area = await _area(session, context.project.id, device_ids)
-    if area is None:
+    areas = await _areas(session, context.project.id, device_ids)
+    if not areas:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "The project has no area yet: place an offload station, an entity or a feature first",
@@ -398,7 +426,7 @@ async def request_field_map(
         session,
         bus,
         context.project.id,
-        Bbox(area.west, area.south, area.east, area.north),
+        _boxes(areas),
         requested_by=context.user.id,
         force=body.force,
     )
@@ -410,10 +438,10 @@ async def request_field_map(
             object_type="project",
             object_id=str(context.project.id),
             project_id=context.project.id,
-            details={"max_zoom": row.max_zoom, "force": body.force},
+            details={"max_zoom": row.max_zoom, "force": body.force, "regions": len(row.regions)},
         )
     await session.commit()
-    return _map_read(row)
+    return _map_read(row, areas)
 
 
 @router.get(
@@ -438,8 +466,11 @@ async def download_field_map(
     if row.status == MapExtractStatus.FAILED:
         raise HTTPException(status.HTTP_409_CONFLICT, f"The last map failed: {row.error}")
     if row.status != MapExtractStatus.READY or row.object_key is None:
+        areas = await _areas(
+            session, context.project.id, await _project_device_ids(session, context)
+        )
         return JSONResponse(
-            _map_read(row).model_dump(mode="json"), status_code=status.HTTP_202_ACCEPTED
+            _map_read(row, areas).model_dump(mode="json"), status_code=status.HTTP_202_ACCEPTED
         )
     return StreamingResponse(
         stream_object(get_settings().minio_bucket_map_extracts, row.object_key),

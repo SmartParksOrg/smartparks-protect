@@ -5082,12 +5082,13 @@ export interface paths {
         put?: never;
         /**
          * Request Field Map
-         * @description Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with
-         *     a margin, from the newest Protomaps planet build. A file made for a member, so the
-         *     permission is the exports' (`exports:create`: analysts and admins); every member downloads
-         *     it. One job per project at a time; a map younger than a month that covers the area is kept
-         *     unless `force`. The area is the extent of the project's features, entity places and device
-         *     places, so a project with none yet has no map to cut.
+         * @description Ask for the project's offline map (phase 43 P3): the export worker cuts the project's
+         *     regions, each with a margin, from the newest Protomaps planet build into one file. A file
+         *     made for a member, so the permission is the exports' (`exports:create`: analysts and
+         *     admins); every member downloads it. One job per project at a time; a map younger than a
+         *     month whose regions cover every area is kept unless `force`. The regions are the project's
+         *     features, entity and device places and current positions grouped by distance (decision
+         *     D365), so a project with none yet has no map to cut.
          */
         post: operations["request_field_map_api_v1_projects__project_id__field_bundle_map_post"];
         delete?: never;
@@ -10329,8 +10330,9 @@ export interface components {
         };
         /**
          * FieldArea
-         * @description The project's bounding box in degrees, from its features, its entities' places and its
-         *     devices' places; what the offline map is cut for.
+         * @description A box in degrees: one of the project's regions, from its features, its entities' and
+         *     devices' places and their current positions (decision D365), or the envelope of them all;
+         *     what the offline map is cut for.
          */
         FieldArea: {
             /** West */
@@ -10377,7 +10379,13 @@ export interface components {
              */
             server_url: string;
             project: components["schemas"]["FieldProject"];
+            /** @description The envelope of `areas` */
             area?: components["schemas"]["FieldArea"] | null;
+            /**
+             * Areas
+             * @description The project's regions, the largest first (decision D365): places farther apart than the server's region gap are regions of their own
+             */
+            areas?: components["schemas"]["FieldArea"][];
             /** @description The offline map's state, once one was asked for */
             map?: components["schemas"]["FieldMapRead"] | null;
             /**
@@ -10500,9 +10508,9 @@ export interface components {
         };
         /**
          * FieldMapRead
-         * @description The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,
-         *     cut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`
-         *     streams it.
+         * @description The project's offline map (phase 43 P3): one PMTiles extract of the project's regions,
+         *     each with a margin, cut from a Protomaps planet build; `ready` means
+         *     `GET /projects/{id}/field-bundle/map` streams it.
          */
         FieldMapRead: {
             /**
@@ -10518,6 +10526,17 @@ export interface components {
             east: number;
             /** North */
             north: number;
+            /**
+             * Regions
+             * @description The boxes the map was or is being cut for, with their margin (D365)
+             */
+            regions?: components["schemas"]["FieldArea"][];
+            /**
+             * Covers Areas
+             * @description Whether those boxes cover every region the project has now; when not, a new map should be asked for
+             * @default true
+             */
+            covers_areas: boolean;
             /** Max Zoom */
             max_zoom: number;
             /**

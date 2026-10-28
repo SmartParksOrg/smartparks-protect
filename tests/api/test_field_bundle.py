@@ -4,6 +4,7 @@ the area, and the download in the audit log."""
 
 import hashlib
 import shutil
+import uuid
 
 import pytest
 import pytest_asyncio
@@ -19,7 +20,7 @@ from tests.api.test_network_and_map import _setup
 from tests.api.test_offload_stations import _device, _opencollar_type
 from tests.conftest import unique_name
 from tests.shared.test_lp0_lorawan import APP_S_KEY, NWK_S_KEY
-from tests.shared.test_map_extract import make_planet
+from tests.shared.test_map_extract import make_planet, tiles_of
 
 pytestmark = pytest.mark.asyncio
 
@@ -104,6 +105,7 @@ async def test_bundle_carries_the_project_with_keys_for_those_who_may_set_them(c
         and area["west"] <= -11.3 <= area["east"]
         and area["south"] <= -7.75 <= area["north"]
     )
+    assert bundle["areas"] == [area]
 
     # a viewer: the same project, the address, never a key
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
@@ -204,17 +206,51 @@ async def test_the_offline_map_is_cut_for_the_area_and_streamed(
 
     # a fresh map that covers the area is kept; force cuts again
     kept = await client.post(f"/api/v1/projects/{project_id}/field-bundle/map", json={}, headers=h)
-    assert kept.json()["status"] == "ready"
+    assert kept.json()["status"] == "ready" and kept.json()["covers_areas"] is True
+    assert len(kept.json()["regions"]) == 1
     forced = await client.post(
         f"/api/v1/projects/{project_id}/field-bundle/map", json={"force": True}, headers=h
     )
     assert forced.json()["status"] == "queued"
+    await extract_module.run_map_extract_job({"project_id": str(project_id)})
+
+    # a tracker far from the station (decision D365: SP051307 in Namibia, the station in the
+    # Netherlands): its current position is a region of its own, the map no longer covers
+    # the project, and the next map holds both regions in one file
+    tracker = await _device(client, h, oc["id"], project_id)
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import Point
+
+    from shared.models import DeviceCurrentState
+
+    db.add(
+        DeviceCurrentState(
+            device_id=uuid.UUID(tracker["id"]),
+            latest_state={},
+            latest_position=from_shape(Point(14.54, -22.68), srid=4326),
+        )
+    )
+    await db.commit()
+    bundle = (await client.get(f"/api/v1/projects/{project_id}/field-bundle", headers=h)).json()
+    assert len(bundle["areas"]) == 2 and bundle["map"]["covers_areas"] is False
+    assert bundle["area"]["west"] == -10.9 and bundle["area"]["east"] == 14.54
+    asked = await client.post(f"/api/v1/projects/{project_id}/field-bundle/map", json={}, headers=h)
+    assert asked.status_code == 202, asked.text
+    assert asked.json()["status"] == "queued"
+    assert len(asked.json()["regions"]) == 2 and asked.json()["covers_areas"] is True
+    await extract_module.run_map_extract_job({"project_id": str(project_id)})
+    ready = await client.get(f"/api/v1/projects/{project_id}/field-bundle/map", headers=h)
+    assert ready.status_code == 200
+    both = tmp_path / "both.pmtiles"
+    both.write_bytes(ready.content)
+    deepest = {(x, y) for z, x, y in tiles_of(both) if z == 3}
+    assert (3, 3) in deepest and (4, 4) in deepest and len(deepest) == 2
 
     # a viewer downloads the map but does not ask for one (a file made for members, as an
     # export is); an analyst asks; a stranger gets nothing
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
     path = f"/api/v1/projects/{project_id}/field-bundle/map"
-    assert (await client.get(path, headers=viewer.headers)).status_code == 202
+    assert (await client.get(path, headers=viewer.headers)).status_code == 200
     assert (await client.post(path, json={}, headers=viewer.headers)).status_code == 403
     analyst = await project_actor(client, db, project, Role.PROJECT_ANALYST)
     assert (await client.post(path, json={}, headers=analyst.headers)).status_code == 202

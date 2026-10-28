@@ -665,6 +665,142 @@ async def test_status_accelerometer_samples_become_activity_and_the_last_movemen
     assert current.latest_measurements["activity"]["value"] == 5.0
 
 
+async def test_a_cards_files_decoded_out_of_order_still_give_every_sample_its_activity(
+    db, bus, world
+):
+    """Decision D364 (Tim, 2026-10-28): SP051307's card files were decoded with the evening's
+    file before the day's, so the day's samples got no activity and the evening's first sample
+    was judged against a sample twelve hours older, a phantom movement of 13.9 while the car
+    stood. Each sample is judged against its neighbours in time whatever the order it arrives
+    in, the sample after a late frame is derived anew, and the last movement follows."""
+    from shared.models import Measurement
+
+    still = {"acceleration_x": 0.0, "acceleration_y": 0.0, "acceleration_z": 9.8}
+    turned = {"acceleration_x": 3.0, "acceleration_y": 4.0, "acceleration_z": 9.8}
+    await _ingest_and_process(
+        db, bus, world, {"time": "2026-05-04T08:00:00+00:00", "measurements": still}
+    )
+    # the 10:00 sample arrives before the 09:00 one: judged against 08:00 it reads as a move
+    await _ingest_and_process(
+        db, bus, world, {"time": "2026-05-04T10:00:00+00:00", "measurements": turned}
+    )
+    await db.rollback()
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_movement_at == datetime(2026, 5, 4, 10, tzinfo=UTC)
+    # the 09:00 sample arrives: the move was at 09:00, and 10:00 kept the same posture
+    await _ingest_and_process(
+        db, bus, world, {"time": "2026-05-04T09:00:00+00:00", "measurements": turned}
+    )
+    await db.rollback()
+    rows = (
+        await db.execute(
+            select(Measurement.time, Measurement.value_num)
+            .where(Measurement.device_id == world.device.id, Measurement.metric_key == "activity")
+            .order_by(Measurement.time)
+        )
+    ).all()
+    assert [(r.time.hour, r.value_num) for r in rows] == [(9, 5.0), (10, 0.0)]
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_movement_at == datetime(2026, 5, 4, 9, tzinfo=UTC)
+    # a sample that never had an activity row (decoded first of all) gets one from the frame
+    # before it, and a frame decoded again writes the right value over a wrong one
+    await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {"time": "2026-05-04T07:00:00+00:00", "measurements": {**still, "acceleration_z": 9.8}},
+    )
+    await db.rollback()
+    rows = (
+        await db.execute(
+            select(Measurement.time, Measurement.value_num)
+            .where(Measurement.device_id == world.device.id, Measurement.metric_key == "activity")
+            .order_by(Measurement.time)
+        )
+    ).all()
+    assert [(r.time.hour, r.value_num) for r in rows] == [(8, 0.0), (9, 5.0), (10, 0.0)]
+
+
+async def test_fixes_beyond_the_jitter_are_movement_whatever_the_accelerometer_saw(db, bus, world):
+    """Decision D363 (Tim, 2026-10-28): SP051307 drove 70 km with the device flat in the car
+    and the hourly accelerometer samples stayed under the bar, so the line read "still for
+    20 h" beside fixes 40 km apart. A valid fix beyond the jitter bar from the valid fix before
+    it is movement; a parked receiver's wander is not."""
+    still = {"acceleration_x": 0.0, "acceleration_y": 0.0, "acceleration_z": 9.8}
+    first = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-05T08:00:00+00:00",
+            "lat": -22.6772,
+            "lon": 14.5410,
+            "measurements": still,
+        },
+    )
+    assert first[1].fix_movement_times == set()
+    # 20 m away five minutes later: a parked receiver's wander
+    parked = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-05T08:05:00+00:00",
+            "lat": -22.67738,
+            "lon": 14.5410,
+            "measurements": still,
+        },
+    )
+    assert parked[1].fix_movement_times == set()
+    await db.rollback()
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_fix_movement_at is None
+    # 2 km away: the car moved, the accelerometer still reads the same posture
+    drove = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-05T08:10:00+00:00",
+            "lat": -22.6950,
+            "lon": 14.5410,
+            "measurements": still,
+        },
+    )
+    assert drove[1].fix_movement_times == {datetime(2026, 5, 5, 8, 10, tzinfo=UTC)}
+    # a fix whose own accuracy is worse than its step does not count
+    vague = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {"time": "2026-05-05T08:15:00+00:00", "lat": -22.6955, "lon": 14.5410, "accuracy": 300},
+    )
+    assert vague[1].fix_movement_times == set()
+    await db.rollback()
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_fix_movement_at == datetime(2026, 5, 5, 8, 10, tzinfo=UTC)
+    assert current.last_movement_at is None  # the accelerometer never saw it
+    from shared.domain.health import device_health
+    from shared.device_drivers.base import HealthField
+
+    health = device_health(
+        [HealthField(key="battery_voltage", label="Battery", kind="number", unit="V")],
+        latest_measurements=current.latest_measurements,
+        latest_state=current.latest_state,
+        latest_state_time=current.latest_state_time,
+        last_seen_at=current.last_seen_at,
+        last_movement_at=current.last_movement_at,
+        last_fix_movement_at=current.last_fix_movement_at,
+        now=datetime(2026, 5, 5, 9, tzinfo=UTC),
+    )
+    movement = next(f for f in health.fields if f.key == "movement")
+    assert movement.text == "moving (positions)" and movement.level == "ok"
+
+
 async def test_an_uptime_drop_is_a_reboot_event_and_the_last_reset(db, bus, world):
     """Tim (2026-09-14): a status whose uptime is lower than the one before it means the
     device started again; a device_reset event with the reason, and last_reset_at moves."""

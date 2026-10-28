@@ -1,6 +1,7 @@
-"""The offline map of a project's area (phase 43 P3): the box padded, the newest planet build
-found by probing backwards, and `pmtiles extract` cutting a box out of a planet, run on a small
-world of our own making so the test needs no network and no 140 GB."""
+"""The offline map of a project's places (phase 43 P3): the box padded, the places grouped into
+regions (decision D365), the newest planet build found by probing backwards, and `pmtiles
+extract` cutting the regions out of a planet, run on a small world of our own making so the
+test needs no network and no 140 GB."""
 
 import shutil
 from datetime import date
@@ -12,7 +13,18 @@ from pmtiles.reader import MmapSource, Reader, all_tiles
 from pmtiles.tile import Compression, TileType, zxy_to_tileid
 from pmtiles.writer import Writer
 
-from shared.maps.extract import Bbox, MapExtractError, extract, latest_planet_build, pad
+from shared.maps.extract import (
+    Bbox,
+    MapExtractError,
+    covers,
+    envelope,
+    extract,
+    gap_km,
+    latest_planet_build,
+    pad,
+    region_geojson,
+    regions_of,
+)
 
 WORLD = Bbox(-180.0, -85.0511, 180.0, 85.0511)
 
@@ -70,6 +82,31 @@ def test_a_box_within_another():
     assert not Bbox(0, 0, 10, 10).contains(Bbox(1, 1, 11, 9))
 
 
+def test_places_far_apart_become_regions_of_their_own():
+    """Decision D365: the offload station in the Netherlands and the tracker it served in
+    Namibia are two regions; the station and a tracker in the next village are one."""
+    utrecht = Bbox(5.1, 52.08, 5.13, 52.1)
+    amersfoort = Bbox(5.38, 52.15, 5.4, 52.17)  # 20 km east
+    swakopmund = Bbox(14.52, -22.69, 14.55, -22.67)
+    assert 15 < gap_km(utrecht, amersfoort) < 25
+    assert gap_km(utrecht, swakopmund) > 8000
+    assert gap_km(utrecht, utrecht) == 0
+    regions = regions_of([swakopmund, utrecht, amersfoort], 100)
+    assert len(regions) == 2
+    # the largest first: the Dutch pair's envelope, then Namibia
+    assert regions[0] == envelope([utrecht, amersfoort]) and regions[1] == swakopmund
+    assert regions_of([amersfoort, utrecht], 10) == [utrecht, amersfoort]  # the larger first
+    assert regions_of([], 100) == []
+    # a chain merges through its links: three boxes 60 km apart are one region at 100 km
+    chain = [Bbox(0, 0, 0.1, 0.1), Bbox(0.6, 0, 0.7, 0.1), Bbox(1.2, 0, 1.3, 0.1)]
+    assert regions_of(chain, 100) == [envelope(chain)]
+    assert covers(regions, [utrecht, swakopmund]) and not covers(regions, [Bbox(0, 0, 1, 1)])
+    shape = region_geojson(regions)
+    assert shape["type"] == "MultiPolygon" and len(shape["coordinates"]) == 2
+    assert shape["coordinates"][1][0][0] == [14.52, -22.69]
+    assert shape["coordinates"][1][0][-1] == shape["coordinates"][1][0][0]
+
+
 @pytest.mark.asyncio
 async def test_the_newest_build_is_found_by_probing_backwards():
     def planet(request: httpx.Request) -> httpx.Response:
@@ -93,7 +130,7 @@ async def test_extract_cuts_the_box_and_the_zoom_out_of_the_planet(tmp_path):
     assert total == sum(4**z for z in range(5))
     out = tmp_path / "area.pmtiles"
     # Gola Rainforest, roughly: the east of Sierra Leone, west of Liberia
-    await extract(str(planet), Bbox(-11.0, 7.6, -10.8, 7.9), 3, out)
+    await extract(str(planet), [Bbox(-11.0, 7.6, -10.8, 7.9)], 3, out)
     tiles = tiles_of(out)
     assert tiles, "the extract holds no tile"
     assert max(z for z, _, _ in tiles) == 3
@@ -101,7 +138,18 @@ async def test_extract_cuts_the_box_and_the_zoom_out_of_the_planet(tmp_path):
     # every zoom level down to 3 has exactly the tile the box falls in
     assert sorted({z for z, _, _ in tiles}) == [0, 1, 2, 3]
     assert (3, 3, 3) in tiles  # x=floor((-10.9+180)/360*8)=3, y for lat 7.7 at z3 = 3
+    # two regions far apart in one file (decision D365): Gola and the Namibian coast, and
+    # nothing of the Atlantic between them at the deepest zoom
+    both = tmp_path / "both.pmtiles"
+    await extract(
+        str(planet), [Bbox(-11.0, 7.6, -10.8, 7.9), Bbox(14.4, -22.8, 14.6, -22.6)], 3, both
+    )
+    deepest = {(x, y) for z, x, y in tiles_of(both) if z == 3}
+    assert (3, 3) in deepest and (4, 4) in deepest  # x for lon 14.5 at z3 = 4, y for -22.7 = 4
+    assert len(deepest) == 2
     with pytest.raises(MapExtractError, match="pmtiles extract failed"):
         await extract(
-            str(tmp_path / "missing.pmtiles"), Bbox(0, 0, 1, 1), 2, tmp_path / "x.pmtiles"
+            str(tmp_path / "missing.pmtiles"), [Bbox(0, 0, 1, 1)], 2, tmp_path / "x.pmtiles"
         )
+    with pytest.raises(MapExtractError, match="No region"):
+        await extract(str(planet), [], 2, tmp_path / "none.pmtiles")

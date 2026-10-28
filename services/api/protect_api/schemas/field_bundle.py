@@ -16,8 +16,9 @@ class FieldProject(BaseModel):
 
 
 class FieldArea(BaseModel):
-    """The project's bounding box in degrees, from its features, its entities' places and its
-    devices' places; what the offline map is cut for."""
+    """A box in degrees: one of the project's regions, from its features, its entities' and
+    devices' places and their current positions (decision D365), or the envelope of them all;
+    what the offline map is cut for."""
 
     west: float
     south: float
@@ -88,15 +89,24 @@ class FieldMetric(BaseModel):
 
 
 class FieldMapRead(BaseModel):
-    """The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,
-    cut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`
-    streams it."""
+    """The project's offline map (phase 43 P3): one PMTiles extract of the project's regions,
+    each with a margin, cut from a Protomaps planet build; `ready` means
+    `GET /projects/{id}/field-bundle/map` streams it."""
 
     status: str = Field(description="queued, running, ready or failed")
     west: float
     south: float
     east: float
     north: float
+    regions: list[FieldArea] = Field(
+        default_factory=list,
+        description="The boxes the map was or is being cut for, with their margin (D365)",
+    )
+    covers_areas: bool = Field(
+        default=True,
+        description="Whether those boxes cover every region the project has now; when not, "
+        "a new map should be asked for",
+    )
     max_zoom: int
     build: str | None = Field(default=None, description="The planet build's date, YYYYMMDD")
     size_bytes: int | None = None
@@ -139,7 +149,12 @@ class FieldBundleRead(BaseModel):
     protect_commit: str
     server_url: str = Field(description="Where the bundle came from, for the upload")
     project: FieldProject
-    area: FieldArea | None = None
+    area: FieldArea | None = Field(default=None, description="The envelope of `areas`")
+    areas: list[FieldArea] = Field(
+        default_factory=list,
+        description="The project's regions, the largest first (decision D365): places farther "
+        "apart than the server's region gap are regions of their own",
+    )
     map: FieldMapRead | None = Field(
         default=None, description="The offline map's state, once one was asked for"
     )

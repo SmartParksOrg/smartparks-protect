@@ -358,6 +358,10 @@ class DeviceCurrentState(Base):
         DateTime(timezone=True),
         comment="The last status message whose accelerometer sample changed above the threshold",
     )
+    last_fix_movement_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="The newest valid fix beyond the jitter bar from the valid fix before it (D363)",
+    )
     last_reset_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         comment="The last status message whose uptime was lower than the one before it",

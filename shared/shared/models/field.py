@@ -16,6 +16,7 @@ from sqlalchemy import (
     Uuid,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base
@@ -42,6 +43,11 @@ class MapExtract(Base):
     east: Mapped[float] = mapped_column(Float, nullable=False)
     north: Mapped[float] = mapped_column(Float, nullable=False)
     max_zoom: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    #: The boxes the map was cut for, each `{west, south, east, north}` padded by the margin
+    #: (decision D365); the four columns above hold their envelope.
+    regions: Mapped[list[dict[str, float]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb"), default=list
+    )
     source: Mapped[str | None] = mapped_column(
         Text, comment="The planet build the extract was cut from"
     )

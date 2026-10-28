@@ -36,7 +36,7 @@ import {
   UptimeTrend,
   UptimeValue,
 } from "@/components/map/BatteryTrend";
-import { movementLevel } from "@/lib/movement";
+import { lastMovement, movementLevel } from "@/lib/movement";
 import { imprecise } from "@/lib/accuracy";
 import { formatAgo, formatTime } from "@/lib/format";
 import {
@@ -242,6 +242,7 @@ export function PanelSummary({
   batteryDevice,
   healthLevel,
   lastMovementAt,
+  lastFixMovementAt,
   activity,
   now,
 }: {
@@ -257,8 +258,10 @@ export function PanelSummary({
   batteryProject?: string;
   batteryDevice?: string | null;
   healthLevel: string | null | undefined;
-  /** Movement from the accelerometer (Tim, 2026-09-14): shown when the device reports it. */
+  /** Movement from the accelerometer (Tim, 2026-09-14) and from the fixes (decision D363):
+   * shown when the device reports the one or its fixes showed the other. */
   lastMovementAt?: string | null;
+  lastFixMovementAt?: string | null;
   activity?: number | null;
   now: number;
 }) {
@@ -267,7 +270,9 @@ export function PanelSummary({
   // per object
   const [trendOpen, setTrendOpen] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
-  const hasMovement = activity !== undefined && activity !== null;
+  const hasMovement =
+    (activity !== undefined && activity !== null) || lastFixMovementAt != null;
+  const movedAt = lastMovement(lastMovementAt, lastFixMovementAt).at;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span title={formatTime(lastSeenAt)}>
@@ -328,10 +333,11 @@ export function PanelSummary({
           </div>
         )}
       {hasMovement && (
-        <span className={batteryClass(movementLevel(lastMovementAt, now))}>
+        <span className={batteryClass(movementLevel(movedAt, now))}>
           <MovementValue
             deviceId={batteryProject ? batteryDevice : null}
             lastMovementAt={lastMovementAt}
+            lastFixMovementAt={lastFixMovementAt}
             now={now}
             open={movementOpen}
             onToggle={() => setMovementOpen((o) => !o)}
@@ -365,6 +371,7 @@ function HealthRows({
   healthLevel,
   lastStatusAt,
   lastMovementAt,
+  lastFixMovementAt,
   activity,
   uptime,
   lastResetAt,
@@ -397,8 +404,10 @@ function HealthRows({
   batteryDevice?: string | null;
   healthLevel: string | null | undefined;
   lastStatusAt: string | null | undefined;
-  /** Movement from the accelerometer (Tim, 2026-09-14): shown when the device reports it. */
+  /** Movement from the accelerometer (Tim, 2026-09-14) and from the fixes (decision D363):
+   * shown when the device reports the one or its fixes showed the other. */
   lastMovementAt?: string | null;
+  lastFixMovementAt?: string | null;
   activity?: number | null;
   /** The uptime in seconds and the last reboot, when the device reports an uptime. */
   uptime?: number | null;
@@ -440,7 +449,9 @@ function HealthRows({
   const [heartOpen, setHeartOpen] = useState(false);
   const [trapOpen, setTrapOpen] = useState(false);
   const [speedOpen, setSpeedOpen] = useState(false);
-  const hasMovement = activity !== undefined && activity !== null;
+  const hasMovement =
+    (activity !== undefined && activity !== null) || lastFixMovementAt != null;
+  const movedAt = lastMovement(lastMovementAt, lastFixMovementAt).at;
   const rebooted =
     lastResetAt != null && now - Date.parse(lastResetAt) < 24 * 3_600_000;
   // on a phone the rows stay short (Tim, 2026-09-14): the accuracy as a badge with its
@@ -573,12 +584,13 @@ function HealthRows({
       {hasMovement && (
         <PanelRow
           label={t("Movement")}
-          className={batteryClass(movementLevel(lastMovementAt, now))}
-          title={lastMovementAt ? formatTime(lastMovementAt) : undefined}
+          className={batteryClass(movementLevel(movedAt, now))}
+          title={movedAt ? formatTime(movedAt) : undefined}
         >
           <MovementValue
             deviceId={batteryProject ? batteryDevice : null}
             lastMovementAt={lastMovementAt}
+            lastFixMovementAt={lastFixMovementAt}
             now={now}
             open={movementOpen}
             onToggle={() => setMovementOpen((o) => !o)}
@@ -1038,6 +1050,7 @@ export function EntityPanel({
           batteryDevice={props.device_id}
           healthLevel={props.health_level}
           lastMovementAt={props.last_movement_at}
+          lastFixMovementAt={props.last_fix_movement_at}
           activity={props.activity}
           now={now}
         />
@@ -1074,6 +1087,7 @@ export function EntityPanel({
         batteryDevice={props.device_id}
         healthLevel={props.health_level}
         lastMovementAt={props.last_movement_at}
+        lastFixMovementAt={props.last_fix_movement_at}
         activity={props.activity}
         lastStatusAt={props.last_status_at}
         uptime={station && stationUptime != null ? stationUptime : props.uptime}
@@ -1233,6 +1247,7 @@ export function DevicePanel({
           batteryDevice={props.device_id}
           healthLevel={props.health_level}
           lastMovementAt={props.last_movement_at}
+          lastFixMovementAt={props.last_fix_movement_at}
           activity={props.activity}
           now={now}
         />
@@ -1267,6 +1282,7 @@ export function DevicePanel({
         batteryDevice={props.device_id}
         healthLevel={props.health_level}
         lastMovementAt={props.last_movement_at}
+        lastFixMovementAt={props.last_fix_movement_at}
         activity={props.activity}
         lastStatusAt={props.last_status_at}
         uptime={props.uptime}

@@ -3376,5 +3376,6 @@
   "Approve all {{count}}_one": "De ene wachtende goedkeuren",
   "Approve all {{count}}_other": "Alle {{count}} goedkeuren",
   "Approve every flagged fix of this project?": "Elke gemarkeerde fix van dit project goedkeuren?",
-  "no device tracks it today": "geen apparaat volgt het vandaag"
+  "no device tracks it today": "geen apparaat volgt het vandaag",
+  "accelerometer samples": "versnellingsmetermonsters"
 }

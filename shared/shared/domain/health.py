@@ -107,6 +107,7 @@ def device_health(
     last_reset_at: datetime | None = None,
     battery: BatteryProfile | None = None,
     now: datetime | None = None,
+    last_fix_movement_at: datetime | None = None,
 ) -> DeviceHealth:
     """The health of one device from what its driver declares and the current state holds:
     the device's own status, never the network's (architecture 20, decision D161). A device
@@ -119,9 +120,10 @@ def device_health(
     measurements = latest_measurements or {}
     state = latest_state or {}
     worst = -1
-    if "activity" in measurements:
+    # a device that reports an accelerometer, or whose fixes have shown it moving (D363)
+    if "activity" in measurements or last_fix_movement_at is not None:
         move_text, move_level, move_at = movement_text(
-            last_movement_at, latest_state_time, now or utc_now()
+            last_movement_at, latest_state_time, now or utc_now(), fix_at=last_fix_movement_at
         )
         if move_level in LEVELS:
             worst = max(worst, LEVELS.index(move_level))

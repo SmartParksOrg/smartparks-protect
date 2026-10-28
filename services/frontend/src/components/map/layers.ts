@@ -78,8 +78,10 @@ export interface EntityFeatureProperties {
   contacts_24h?: number | null;
   last_contact_at?: string | null;
   /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
-   * change itself; absent for a device that reports no accelerometer. */
+   * change itself; absent for a device that reports no accelerometer. The newest valid fix
+   * beyond the jitter bar from the one before it is the fixes' word on movement (D363). */
   last_movement_at?: string | null;
+  last_fix_movement_at?: string | null;
   activity?: number | null;
   /** The uptime in seconds and the last reboot the uptime showed (Tim, 2026-09-14). */
   uptime?: number | null;
@@ -132,8 +134,10 @@ export interface DeviceFeatureProperties {
   contacts_24h?: number | null;
   last_contact_at?: string | null;
   /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
-   * change itself; absent for a device that reports no accelerometer. */
+   * change itself; absent for a device that reports no accelerometer. The newest valid fix
+   * beyond the jitter bar from the one before it is the fixes' word on movement (D363). */
   last_movement_at?: string | null;
+  last_fix_movement_at?: string | null;
   activity?: number | null;
   /** The uptime in seconds and the last reboot the uptime showed (Tim, 2026-09-14). */
   uptime?: number | null;

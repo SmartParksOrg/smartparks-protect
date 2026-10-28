@@ -1,9 +1,13 @@
-"""Movement from the accelerometer sample every status message carries (Tim, 2026-09-14): a
-device's `acceleration_x/y/z` is one snapshot of gravity plus motion, so the value says
-little, but the change of the vector between two status messages says whether the device
-moved at all. The decoder stores that change as the `activity` measurement (m/s²), keeps
-the time of the last change above the threshold on the current state, and the health line,
-the panels and the immobility rule read it. Pure: no database access."""
+"""Movement from two sources (Tim, 2026-09-14 and 2026-10-28). The accelerometer sample every
+status message carries is one snapshot of gravity plus motion, so the value says little, but
+the change of the vector between two status messages says whether the device changed its
+posture. The decoder stores that change as the `activity` measurement (m/s²), keeps the time
+of the last change above the threshold on the current state, and the health line, the panels
+and the immobility rule read it. The fixes are the other source (decision D363): a valid fix
+farther from the previous valid fix than the GPS jitter is movement whatever the accelerometer
+saw, since a device lying flat in a car keeps its posture for a whole drive and one sample an
+hour at a steady speed looks like a parked one. The current state keeps the newest of each,
+and the line shows the newer of the two and names it. Pure: no database access."""
 
 from __future__ import annotations
 
@@ -28,12 +32,20 @@ SENSOR_STEP_MPS2 = 0.784
 MOVEMENT_THRESHOLD_MPS2 = 1.4
 #: A change this large is movement on its own, without waiting for a second. A device on a post
 #: crossed it 7 times in eleven days against 540 crossings of the threshold above, and a jump of
-#: this size is a person handling the hardware or an animal getting up — either way something
+#: this size is a person handling the hardware or an animal getting up: either way something
 #: happened. Without it a single clear jump between two quiet messages would be thrown away.
 MOVEMENT_ALONE_MPS2 = 2.0
+#: A valid fix at least this far from the previous valid fix is movement (decision D363). A
+#: parked receiver wanders a few metres between fixes; SP051307 parked in Namibia on
+#: 2026-10-28 summed 31 to 124 m over an hour of fixes five minutes apart, up to 22 m a step.
+#: A fix whose own accuracy is worse than this bar must beat that accuracy instead.
+FIX_MOVEMENT_MIN_M = 50.0
 #: Hours without movement before the health line warns, and before it is critical.
 STILL_WARN_HOURS = 12
 STILL_CRITICAL_HOURS = 24
+#: The words of the two sources on the health line.
+SOURCE_POSITIONS = "positions"
+SOURCE_ACCELEROMETER = "accelerometer"
 
 Sample = tuple[tuple[float, float, float], datetime]
 
@@ -45,43 +57,36 @@ def activity_between(
     return round(math.sqrt(sum((a - b) ** 2 for a, b in zip(sample, previous, strict=True))), 3)
 
 
-def previous_sample(latest_measurements: dict[str, Any] | None) -> Sample | None:
-    """The newest accelerometer sample the current state holds, when it holds all three axes
-    at one time."""
-    if not latest_measurements:
-        return None
-    entries = [latest_measurements.get(axis) for axis in AXES]
-    if not all(isinstance(e, dict) and isinstance(e.get("value"), int | float) for e in entries):
-        return None
-    times = {str(e["time"]) for e in entries if e and e.get("time")}
-    if len(times) != 1:
-        return None
-    return (
-        tuple(float(e["value"]) for e in entries),  # type: ignore[index,return-value]
-        datetime.fromisoformat(times.pop()),
-    )
+def complete_samples(rows: Iterable[tuple[datetime, str, Any]]) -> list[Sample]:
+    """The accelerometer samples among measurement rows of (time, metric key, value), in time
+    order, keeping only the times that carry all three axes as numbers."""
+    by_time: dict[datetime, dict[str, float]] = {}
+    for time, key, value in rows:
+        if key in AXES and isinstance(value, int | float) and not isinstance(value, bool):
+            by_time.setdefault(time, {})[key] = float(value)
+    return [
+        ((values[AXES[0]], values[AXES[1]], values[AXES[2]]), time)
+        for time, values in sorted(by_time.items())
+        if all(axis in values for axis in AXES)
+    ]
 
 
 def derive_activity(
     measurements: Iterable[DecodedMeasurement], previous: Sample | None
 ) -> list[DecodedMeasurement]:
     """The `activity` measurements to add for the accelerometer samples among the decoded
-    measurements: each sample against the one before it (the state's newest, then the
-    earlier samples of the same delivery), in time order; a sample not later than the one
-    before it (a replay) gets none."""
-    by_time: dict[datetime, dict[str, float]] = {}
+    measurements: each sample against the one before it (the newest sample the device has
+    before the frame, then the earlier samples of the same delivery), in time order; a sample
+    not later than the one before it gets none."""
     kinds: dict[datetime, str] = {}
     for m in measurements:
-        if m.metric_key in AXES and isinstance(m.value, int | float):
-            by_time.setdefault(m.time, {})[m.metric_key] = float(m.value)
+        if m.metric_key in AXES:
             kinds[m.time] = m.record_type
     out: list[DecodedMeasurement] = []
     last = previous
-    for time in sorted(by_time):
-        values = by_time[time]
-        if any(axis not in values for axis in AXES):
-            continue
-        sample = (values[AXES[0]], values[AXES[1]], values[AXES[2]])
+    for sample, time in complete_samples(
+        (m.time, m.metric_key, m.value) for m in measurements if m.metric_key in AXES
+    ):
         if last is not None and time > last[1]:
             out.append(
                 DecodedMeasurement(
@@ -102,8 +107,8 @@ def movement_times(
     """The moments a device is taken to have moved, from its activity samples in time order.
 
     One big change, or two moderate ones in a row. A device on a post drifts past any single
-    moderate threshold now and then — the PWN scanners did it 540 times in eleven days, and 33 of
-    the 45 read "moving" because of it — while an animal that moves produces a run. But a single
+    moderate threshold now and then (the PWN scanners did it 540 times in eleven days, and 33 of
+    the 45 read "moving" because of it) while an animal that moves produces a run. But a single
     clear jump is movement too: waiting for a second would throw away the moment a person picks
     the device up, and that is exactly what somebody looking at the record wants to find.
 
@@ -111,8 +116,8 @@ def movement_times(
     single 1.0 threshold become about 25 under this rule, while samples from devices that really
     move are kept in full above the larger bar and in runs below it.
 
-    `previous` is the newest activity the device already had, so a run that begins in one
-    delivery and continues in the next is not missed.
+    `previous` is the activity of the sample before the first one given, so a run that begins
+    before these samples is not missed.
     """
     out: list[datetime] = []
     last = previous
@@ -129,6 +134,24 @@ def movement_times(
     return out
 
 
+def fix_moved(distance_m: float, accuracy_m: float | None) -> bool:
+    """Whether a valid fix this far from the previous valid fix counts as movement: farther
+    than the jitter bar, and farther than its own accuracy when that is worse."""
+    bar = max(FIX_MOVEMENT_MIN_M, accuracy_m or 0.0)
+    return distance_m > bar
+
+
+def last_movement(
+    accelerometer_at: datetime | None, fix_at: datetime | None
+) -> tuple[datetime | None, str | None]:
+    """The newest movement of the two sources and which one saw it."""
+    if fix_at is not None and (accelerometer_at is None or fix_at >= accelerometer_at):
+        return fix_at, SOURCE_POSITIONS
+    if accelerometer_at is not None:
+        return accelerometer_at, SOURCE_ACCELEROMETER
+    return None, None
+
+
 def still_level(hours: float) -> str:
     if hours >= STILL_CRITICAL_HOURS:
         return "critical"
@@ -138,16 +161,22 @@ def still_level(hours: float) -> str:
 
 
 def movement_text(
-    last_movement_at: datetime | None, last_status_at: datetime | None, now: datetime
+    accelerometer_at: datetime | None,
+    last_status_at: datetime | None,
+    now: datetime,
+    fix_at: datetime | None = None,
 ) -> tuple[str, str | None, datetime | None]:
-    """The health line's text, level and time: "moving" while the last change is younger
-    than the warning, "still for N h" after, and no level when no movement was seen yet."""
-    if last_movement_at is None:
+    """The health line's text, level and time: "moving" while the newest movement of either
+    source is younger than the warning, "still for N h" after, each naming the source that saw
+    the movement last, and no level when no movement was seen yet."""
+    at, source = last_movement(accelerometer_at, fix_at)
+    if at is None or source is None:
         return "no movement seen yet", None, last_status_at
-    hours = (now - last_movement_at).total_seconds() / 3600
+    hours = (now - at).total_seconds() / 3600
     level = still_level(hours)
+    words = "positions" if source == SOURCE_POSITIONS else "accelerometer samples"
     if level == "ok":
-        return "moving", level, last_movement_at
+        return f"moving ({words})", level, at
     days, rest = divmod(int(hours), 24)
     text = f"still for {days} d {rest} h" if days else f"still for {rest} h"
-    return text, level, last_movement_at
+    return f"{text} ({words})", level, at

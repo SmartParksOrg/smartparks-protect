@@ -18,7 +18,7 @@ import { chartTheme } from "@/lib/chartStyle";
 import { formatInZone } from "@/lib/analytics";
 import { browserTimezone, type RangePreset, rangeFor } from "@/lib/analytics";
 import { formatAgo, formatDuration, formatTime } from "@/lib/format";
-import { stillHours } from "@/lib/movement";
+import { lastMovement, stillHours } from "@/lib/movement";
 import { decimalsFor, niceStep, type TrendSpec } from "@/lib/trend";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, CanvasRenderer]);
@@ -114,11 +114,13 @@ export function BatteryTrend({
   );
 }
 
-/** The movement value of a panel: moving, or still for so long, as the button that unfolds
- * the movement trend (Tim, 2026-09-14), the same way as the battery. */
+/** The movement value of a panel: moving, or still for so long, from the newer of the
+ * accelerometer and the fixes with the source named (decision D363), as the button that
+ * unfolds the movement trend (Tim, 2026-09-14), the same way as the battery. */
 export function MovementValue({
   deviceId,
   lastMovementAt,
+  lastFixMovementAt,
   now,
   open,
   onToggle,
@@ -126,20 +128,25 @@ export function MovementValue({
 }: {
   deviceId: string | null | undefined;
   lastMovementAt: string | null | undefined;
+  lastFixMovementAt?: string | null;
   now: number;
   open: boolean;
   onToggle: () => void;
   className?: string;
 }) {
   const { t } = useTranslation();
-  const still = stillHours(lastMovementAt, now);
-  const label = !lastMovementAt
+  const { at, source } = lastMovement(lastMovementAt, lastFixMovementAt);
+  const still = stillHours(at, now);
+  const sourceWord =
+    source === "positions" ? t("positions") : t("accelerometer samples");
+  const words = !at
     ? t("no movement seen yet")
     : still === null
-      ? t("moving, {{ago}}", { ago: formatAgo(lastMovementAt, now) })
+      ? t("moving, {{ago}}", { ago: formatAgo(at, now) })
       : still >= 48
         ? t("still for {{days}} d", { days: Math.floor(still / 24) })
         : t("still for {{hours}} h", { hours: still });
+  const label = at ? `${words} (${sourceWord})` : words;
   if (!deviceId) return <span className={className}>{label}</span>;
   return (
     <button

@@ -192,7 +192,13 @@ class Settings(BaseSettings):
         default=14, ge=8, le=15, description="Zoom level the offline map goes down to"
     )
     map_extract_margin_km: float = Field(
-        default=5.0, ge=0, description="Margin around the project's area in the offline map"
+        default=5.0, ge=0, description="Margin around each region of the offline map"
+    )
+    map_extract_region_gap_km: float = Field(
+        default=100.0,
+        ge=0,
+        description="Places of a project farther apart than this are cut as regions of their "
+        "own in the offline map (decision D365), rather than as one box over the gap",
     )
     map_extract_max_bytes: int = Field(
         default=300 * 1024 * 1024, description="Largest offline map kept for a project"

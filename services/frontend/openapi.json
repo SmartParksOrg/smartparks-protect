@@ -20763,7 +20763,7 @@
      "offload"
     ],
     "summary": "Request Field Map",
-    "description": "Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with\na margin, from the newest Protomaps planet build. A file made for a member, so the\npermission is the exports' (`exports:create`: analysts and admins); every member downloads\nit. One job per project at a time; a map younger than a month that covers the area is kept\nunless `force`. The area is the extent of the project's features, entity places and device\nplaces, so a project with none yet has no map to cut.",
+    "description": "Ask for the project's offline map (phase 43 P3): the export worker cuts the project's\nregions, each with a margin, from the newest Protomaps planet build into one file. A file\nmade for a member, so the permission is the exports' (`exports:create`: analysts and\nadmins); every member downloads it. One job per project at a time; a map younger than a\nmonth whose regions cover every area is kept unless `force`. The regions are the project's\nfeatures, entity and device places and current positions grouped by distance (decision\nD365), so a project with none yet has no map to cut.",
     "operationId": "request_field_map_api_v1_projects__project_id__field_bundle_map_post",
     "security": [
      {
@@ -36320,7 +36320,7 @@
      "north"
     ],
     "title": "FieldArea",
-    "description": "The project's bounding box in degrees, from its features, its entities' places and its\ndevices' places; what the offline map is cut for."
+    "description": "A box in degrees: one of the project's regions, from its features, its entities' and\ndevices' places and their current positions (decision D365), or the envelope of them all;\nwhat the offline map is cut for."
    },
    "FieldBundleRead": {
     "properties": {
@@ -36365,7 +36365,16 @@
        {
         "type": "null"
        }
-      ]
+      ],
+      "description": "The envelope of `areas`"
+     },
+     "areas": {
+      "items": {
+       "$ref": "#/components/schemas/FieldArea"
+      },
+      "type": "array",
+      "title": "Areas",
+      "description": "The project's regions, the largest first (decision D365): places farther apart than the server's region gap are regions of their own"
      },
      "map": {
       "anyOf": [
@@ -36709,6 +36718,20 @@
       "type": "number",
       "title": "North"
      },
+     "regions": {
+      "items": {
+       "$ref": "#/components/schemas/FieldArea"
+      },
+      "type": "array",
+      "title": "Regions",
+      "description": "The boxes the map was or is being cut for, with their margin (D365)"
+     },
+     "covers_areas": {
+      "type": "boolean",
+      "title": "Covers Areas",
+      "description": "Whether those boxes cover every region the project has now; when not, a new map should be asked for",
+      "default": true
+     },
      "max_zoom": {
       "type": "integer",
       "title": "Max Zoom"
@@ -36787,7 +36810,7 @@
      "requested_at"
     ],
     "title": "FieldMapRead",
-    "description": "The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,\ncut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`\nstreams it."
+    "description": "The project's offline map (phase 43 P3): one PMTiles extract of the project's regions,\neach with a margin, cut from a Protomaps planet build; `ready` means\n`GET /projects/{id}/field-bundle/map` streams it."
    },
    "FieldMapRequest": {
     "properties": {

@@ -18,7 +18,7 @@ from typing import Any
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import func, insert, select
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
@@ -69,7 +69,15 @@ from shared.domain.fence import (
     status_title,
 )
 from shared.domain.lp0 import credentials_for, last_counter, remember_counter
-from shared.domain.movement import derive_activity, movement_times, previous_sample
+from shared.domain.movement import (
+    AXES,
+    Sample,
+    activity_between,
+    complete_samples,
+    derive_activity,
+    fix_moved,
+    movement_times,
+)
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.outliers import CONFIRMED_EVENT_TYPE as JUMP_CONFIRMED_EVENT_TYPE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
@@ -94,6 +102,7 @@ from shared.enums import (
     TraceStatus,
     ValueType,
 )
+from shared.geodesy import haversine_m
 from shared.logger import get_logger
 from shared.models import (
     ConnectivityState,
@@ -153,6 +162,9 @@ class Outcome:
     # the current state skips them
     outliers: int = 0
     outlier_times: set[datetime] = field(default_factory=set)
+    #: The times of the frame's valid fixes that lay beyond the jitter bar from the valid fix
+    #: before them (decision D363): the fixes' word on movement.
+    fix_movement_times: set[datetime] = field(default_factory=set)
     # flagged fixes the next fix confirmed (decision D360): the device moved, the run is valid
     confirmed_jumps: int = 0
     # settings the device reported that changed what Protect knew (decision D229)
@@ -620,13 +632,13 @@ async def process_source_event(
             # the deliveries this event already has, read once (a re-decode links no row twice)
             delivered = await _existing_deliveries(session, event)
 
-            # movement from the accelerometer sample of a status message: the change against
-            # the sample before it, stored as `activity` (shared/domain/movement.py)
             before = await session.get(DeviceCurrentState, device.id)
-            records.measurements += derive_activity(
-                records.measurements,
-                previous_sample(before.latest_measurements if before else None),
-            )
+            # movement from the accelerometer sample of a status message: the change against
+            # the sample before it in time, read from the table rather than from the current
+            # state, so a card's files decoded out of order still give every sample its own
+            # activity (shared/domain/movement.py, decision D364)
+            movement = await _movement_context(session, device.id, records.measurements)
+            records.measurements += derive_activity(records.measurements, movement.predecessor)
             # the speed and course a fix carries, as measurements too (shared/domain/speed.py)
             records.measurements += speed_measurements(records.positions)
             # a reboot from an uptime lower than the one before it (shared/domain/reboot.py)
@@ -655,6 +667,9 @@ async def process_source_event(
             await _write_measurements(
                 session, event, device, records, outcome, attribution_at, delivered
             )
+            # the sample after the frame's last, when one was decoded before this frame, was
+            # judged against an older sample or none: its activity is derived anew (D364)
+            await _settle_successor(session, device, records, movement)
             await _write_states(session, event, device, records, outcome, attribution_at)
             await _write_events(session, event, device, records, outcome, attribution_at)
             await _write_contacts(session, event, device, records, outcome, attribution_at)
@@ -693,7 +708,9 @@ async def process_source_event(
             if unassigned:
                 step.metadata["unassigned_times"] = [t.isoformat() for t in unassigned]
 
-        await _update_current_state(session, event, device, records, attributions, outcome)
+        await _update_current_state(
+            session, event, device, records, attributions, outcome, movement
+        )
         outcome.messages += await interpret_device_records(session, device, driver, event, records)
         satellite = SatelliteSession.from_dict(
             (event.provider_metadata or {}).get("satellite_session")
@@ -926,6 +943,13 @@ async def _write_positions(
                     if flagged is not None and agrees(flagged.point, point, **bounds):
                         confirmed = flagged
                         outlier = None
+                # a valid fix beyond the jitter bar from the valid fix before it is movement
+                # (decision D363); a confirmed jump is one too, a flagged fix is not
+                if outlier is None and fix_moved(
+                    haversine_m(previous[0], previous[1], record.latitude, record.longitude),
+                    record.accuracy_m,
+                ):
+                    outcome.fix_movement_times.add(record.time)
         if confirmed is not None:
             # the device moved: the flagged fix becomes valid, one jump event stands for the
             # run (in this frame it replaces the outlier event; a fix flagged by an earlier
@@ -1069,11 +1093,157 @@ async def _write_positions(
     await _insert_deliveries(session, deliveries)
 
 
-def _stored_number(state: DeviceCurrentState, metric: str) -> float | None:
-    """The newest value a current state holds for a metric, when it is a number."""
-    entry = (state.latest_measurements or {}).get(metric)
-    value = entry.get("value") if isinstance(entry, dict) else None
-    return float(value) if isinstance(value, int | float) else None
+@dataclass(slots=True)
+class _Movement:
+    """What the activity derivation of one frame needs around it (decision D364): the newest
+    complete accelerometer sample before the frame's first and the activity that sample already
+    had, and, once the frame is written, the sample after the frame's last with its activity
+    derived anew against the frame."""
+
+    predecessor: Sample | None = None
+    predecessor_activity: float | None = None
+    successor: tuple[datetime, float] | None = None
+
+
+#: Measurements the decoder derives from the ones around them, whose stored value is written
+#: anew when a frame decoded again derives another (decision D364).
+REDERIVED = frozenset({"activity"})
+#: How many of the device's newest activity rows decide the last movement when the sample that
+#: set it turns out to have been derived against the wrong neighbour.
+LAST_MOVEMENT_ROWS = 200
+
+
+async def _sample_beside(
+    session: AsyncSession, device_id: uuid.UUID, at: datetime, *, before: bool
+) -> Sample | None:
+    """The device's complete accelerometer sample nearest to `at` on one side of it, from the
+    valid measurement rows (a clock-ahead sample is invalid and does not count)."""
+    statement = select(Measurement.time, Measurement.metric_key, Measurement.value_num).where(
+        Measurement.device_id == device_id,
+        Measurement.metric_key.in_(AXES),
+        Measurement.valid.is_(True),
+        Measurement.value_num.is_not(None),
+    )
+    if before:
+        statement = statement.where(Measurement.time < at).order_by(Measurement.time.desc())
+    else:
+        statement = statement.where(Measurement.time > at).order_by(Measurement.time.asc())
+    rows = (await session.execute(statement.limit(5 * len(AXES)))).all()
+    samples = complete_samples((time, key, value) for time, key, value in rows)
+    if not samples:
+        return None
+    return samples[-1] if before else samples[0]
+
+
+async def _activity_at(session: AsyncSession, device_id: uuid.UUID, at: datetime) -> float | None:
+    value = await session.scalar(
+        select(Measurement.value_num).where(
+            Measurement.device_id == device_id,
+            Measurement.time == at,
+            Measurement.metric_key == "activity",
+            Measurement.valid.is_(True),
+        )
+    )
+    return float(value) if value is not None else None
+
+
+async def _movement_context(
+    session: AsyncSession, device_id: uuid.UUID, measurements: list[DecodedMeasurement]
+) -> _Movement:
+    samples = complete_samples((m.time, m.metric_key, m.value) for m in measurements)
+    if not samples:
+        return _Movement()
+    predecessor = await _sample_beside(session, device_id, samples[0][1], before=True)
+    if predecessor is None:
+        return _Movement()
+    return _Movement(predecessor, await _activity_at(session, device_id, predecessor[1]))
+
+
+async def _settle_successor(
+    session: AsyncSession, device: Device, records: DecodedRecords, movement: _Movement
+) -> None:
+    """The activity of the sample after the frame's last, derived against the frame's last
+    sample: a card's file decoded before the file of the hours before it compared its first
+    sample with whatever the device had then, twelve hours earlier on SP051307 (an activity
+    of 13.9 while the car stood), or with nothing. The row is written anew when its value
+    differs, made when it is missing, and the current state's last movement is judged with it."""
+    samples = complete_samples((m.time, m.metric_key, m.value) for m in records.measurements)
+    if not samples:
+        return
+    last = samples[-1]
+    successor = await _sample_beside(session, device.id, last[1], before=False)
+    if successor is None:
+        return
+    value = activity_between(last[0], successor[0])
+    await _write_activity_at(session, device, successor[1], value)
+    movement.successor = (successor[1], value)
+
+
+async def _write_activity_at(
+    session: AsyncSession, device: Device, at: datetime, value: float
+) -> None:
+    row = await session.scalar(
+        select(Measurement).where(
+            Measurement.device_id == device.id,
+            Measurement.time == at,
+            Measurement.metric_key == "activity",
+        )
+    )
+    if row is not None:
+        if row.value_num != value:
+            row.value_num = value
+            await session.flush()
+        return
+    axis = await session.scalar(
+        select(Measurement).where(
+            Measurement.device_id == device.id,
+            Measurement.time == at,
+            Measurement.metric_key == AXES[0],
+        )
+    )
+    if axis is None:
+        return
+    # the key carries the record type the sample was filed under; the time holds colons, so
+    # the type is read from the right
+    record_type = axis.canonical_key.rsplit(":", 2)[1]
+    await _ensure_metric(session, "activity", ValueType.NUMERIC)
+    session.add(
+        Measurement(
+            time=at,
+            device_id=device.id,
+            project_id=axis.project_id,
+            entity_id=axis.entity_id,
+            data_source_id=axis.data_source_id,
+            source_event_id=axis.source_event_id,
+            source_event_ingested_at=axis.source_event_ingested_at,
+            metric_key="activity",
+            canonical_key=canonical_key(device.id, at, record_type, "activity"),
+            value_num=value,
+            valid=axis.valid,
+            trace_id=axis.trace_id,
+            curated_fields=[],
+        )
+    )
+    await session.flush()
+
+
+async def _last_movement_in_table(session: AsyncSession, device_id: uuid.UUID) -> datetime | None:
+    """The newest movement the device's stored activity rows show, under the same rule."""
+    rows = (
+        await session.execute(
+            select(Measurement.time, Measurement.value_num)
+            .where(
+                Measurement.device_id == device_id,
+                Measurement.metric_key == "activity",
+                Measurement.valid.is_(True),
+                Measurement.value_num.is_not(None),
+            )
+            .order_by(Measurement.time.desc())
+            .limit(LAST_MOVEMENT_ROWS)
+        )
+    ).all()
+    moved = movement_times([(t, float(v)) for t, v in reversed(rows)], None)
+    return max(moved) if moved else None
 
 
 def _value_columns(value: Any) -> tuple[dict[str, Any], ValueType]:
@@ -1385,10 +1555,15 @@ async def _write_measurements(
         )
         keyed.append((record, canonical_key(device.id, filed, record.record_type, extra), filed))
     existing = {
-        (key, time): (identifier, time)
-        for identifier, time, key in (
+        (key, time): (identifier, time, value)
+        for identifier, time, key, value in (
             await session.execute(
-                select(Measurement.id, Measurement.time, Measurement.canonical_key).where(
+                select(
+                    Measurement.id,
+                    Measurement.time,
+                    Measurement.canonical_key,
+                    Measurement.value_num,
+                ).where(
                     Measurement.canonical_key.in_([key for _, key, _ in keyed]),
                     Measurement.time.in_(sorted({filed for _, _, filed in keyed})),
                 )
@@ -1405,6 +1580,19 @@ async def _write_measurements(
             if found is not None and ("measurement", found[0]) not in delivered:
                 deliveries.append(_delivery_row(event, "measurement", found[0], found[1], False))
                 delivered.add(("measurement", found[0]))
+            if (
+                found is not None
+                and record.metric_key in REDERIVED
+                and isinstance(record.value, int | float)
+                and found[2] != float(record.value)
+            ):
+                # a derived value whose neighbour arrived since it was written: a frame decoded
+                # again carries the right one now (decision D364)
+                await session.execute(
+                    update(Measurement)
+                    .where(Measurement.id == found[0], Measurement.time == found[1])
+                    .values(value_num=float(record.value))
+                )
             continue
         seen.add((key, filed))
         columns, value_type = _value_columns(record.value)
@@ -1711,6 +1899,7 @@ async def _update_current_state(
     records: DecodedRecords,
     attributions: dict[datetime, Attribution],
     outcome: Outcome,
+    movement: _Movement,
 ) -> None:
     now = utc_now()
     # a record from the future (decision D119) must not become the newest position, state or
@@ -1746,9 +1935,6 @@ async def _update_current_state(
     if current is None:
         current = DeviceCurrentState(device_id=device.id, latest_state={})
         session.add(current)
-    # read before this delivery's values overwrite it below: the movement rule needs the
-    # activity the device had *before* now, to see two above the threshold in a row
-    previous_activity = _stored_number(current, "activity")
     if current.last_seen_at is None or seen_at > current.last_seen_at:
         current.last_seen_at = seen_at
     latest_position = _apply_position(
@@ -1785,15 +1971,33 @@ async def _update_current_state(
     ):
         current.battery_voltage = float(latest_measurements["battery_voltage"].value)
     # a device moved when two activity samples in a row cross the threshold, not one: a device
-    # on a post drifts past any single threshold as its temperature changes
+    # on a post drifts past any single threshold as its temperature changes. The run is judged
+    # in time order: the activity of the sample before the frame, the frame's own, and the one
+    # after it derived anew (decision D364)
     activities = sorted(
         (m.time, float(m.value))
         for m in timely_measurements
         if m.metric_key == "activity" and isinstance(m.value, int | float)
     )
-    moved_at = movement_times(activities, previous_activity)
+    if movement.successor is not None:
+        activities.append(movement.successor)
+    moved_at = movement_times(activities, movement.predecessor_activity)
+    if (
+        current.last_movement_at is not None
+        and current.last_movement_at not in moved_at
+        and any(t == current.last_movement_at for t, _ in activities)
+    ):
+        # the sample that set the last movement was derived anew and no longer qualifies: it
+        # was judged against the wrong neighbour; the table's newest movement stands instead
+        current.last_movement_at = await _last_movement_in_table(session, device.id)
     if moved_at and (current.last_movement_at is None or max(moved_at) > current.last_movement_at):
         current.last_movement_at = max(moved_at)
+    # movement the fixes showed (decision D363): a valid fix beyond the jitter bar from the one
+    # before it, whatever the accelerometer saw between two status messages
+    if outcome.fix_movement_times:
+        newest_moved = max(outcome.fix_movement_times)
+        if current.last_fix_movement_at is None or newest_moved > current.last_fix_movement_at:
+            current.last_fix_movement_at = newest_moved
     reboots = [e.time for e in timely_events if e.event_type == "device_reset"]
     if reboots and (current.last_reset_at is None or max(reboots) > current.last_reset_at):
         current.last_reset_at = max(reboots)

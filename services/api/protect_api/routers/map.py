@@ -263,6 +263,7 @@ async def current_state(
                 latest_state_time=device_state.latest_state_time,
                 last_seen_at=device_state.last_seen_at,
                 last_movement_at=device_state.last_movement_at,
+                last_fix_movement_at=device_state.last_fix_movement_at,
                 last_reset_at=device_state.last_reset_at,
                 battery=battery,
             )
@@ -307,6 +308,9 @@ async def current_state(
                     ),
                     "last_movement_at": device_state.last_movement_at.isoformat()
                     if device_state and device_state.last_movement_at
+                    else None,
+                    "last_fix_movement_at": device_state.last_fix_movement_at.isoformat()
+                    if device_state and device_state.last_fix_movement_at
                     else None,
                     "activity": _latest_value(device_state, "activity"),
                     "uptime": _latest_value(device_state, "uptime"),
@@ -434,6 +438,7 @@ async def devices_state(
                 latest_state_time=state.latest_state_time,
                 last_seen_at=state.last_seen_at,
                 last_movement_at=state.last_movement_at,
+                last_fix_movement_at=state.last_fix_movement_at,
                 last_reset_at=state.last_reset_at,
                 battery=battery,
             )
@@ -476,6 +481,9 @@ async def devices_state(
                     ),
                     "last_movement_at": state.last_movement_at.isoformat()
                     if state and state.last_movement_at
+                    else None,
+                    "last_fix_movement_at": state.last_fix_movement_at.isoformat()
+                    if state and state.last_fix_movement_at
                     else None,
                     "activity": _latest_value(state, "activity"),
                     "uptime": _latest_value(state, "uptime"),
@@ -805,6 +813,7 @@ async def device_state(
         latest_state_time=current.latest_state_time,
         last_seen_at=current.last_seen_at,
         last_movement_at=current.last_movement_at,
+        last_fix_movement_at=current.last_fix_movement_at,
         last_reset_at=current.last_reset_at,
         battery=resolve_battery(
             device.attributes,

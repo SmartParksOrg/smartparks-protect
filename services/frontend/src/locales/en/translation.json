@@ -428,6 +428,7 @@
   "Above {{bound}} records: the tracks are decimated to 5,000 points each.": "Above {{bound}} records: the tracks are decimated to 5,000 points each.",
   "Above the canvas bound the chart reads buckets of the chosen metrics.": "Above the canvas bound the chart reads buckets of the chosen metrics.",
   "absent or faulted": "absent or faulted",
+  "accelerometer samples": "accelerometer samples",
   "Access": "Access",
   "Account": "Account",
   "Account deleted": "Account deleted",

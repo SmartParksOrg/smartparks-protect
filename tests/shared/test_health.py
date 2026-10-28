@@ -89,7 +89,8 @@ def test_a_device_reporting_activity_gets_a_movement_line():
         now=now,
     )
     movement = next(f for f in still.fields if f.key == "movement")
-    assert movement.text == "still for 1 d 6 h" and movement.level == "critical"
+    assert movement.text == "still for 1 d 6 h (accelerometer samples)"
+    assert movement.level == "critical"
     assert still.level == "critical"
     moving = device_health(
         fields,
@@ -100,7 +101,10 @@ def test_a_device_reporting_activity_gets_a_movement_line():
         last_movement_at=now - timedelta(hours=1),
         now=now,
     )
-    assert next(f for f in moving.fields if f.key == "movement").text == "moving"
+    assert (
+        next(f for f in moving.fields if f.key == "movement").text
+        == "moving (accelerometer samples)"
+    )
     assert moving.level == "ok"
     # a device without the activity metric has no movement line
     without = device_health(
