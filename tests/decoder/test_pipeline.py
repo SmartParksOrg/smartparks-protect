@@ -784,8 +784,8 @@ async def test_fixes_beyond_the_jitter_are_movement_whatever_the_accelerometer_s
     await db.refresh(current)
     assert current.last_fix_movement_at == datetime(2026, 5, 5, 8, 10, tzinfo=UTC)
     assert current.last_movement_at is None  # the accelerometer never saw it
-    from shared.domain.health import device_health
     from shared.device_drivers.base import HealthField
+    from shared.domain.health import device_health
 
     health = device_health(
         [HealthField(key="battery_voltage", label="Battery", kind="number", unit="V")],
