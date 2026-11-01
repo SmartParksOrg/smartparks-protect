@@ -1,7 +1,7 @@
 """Canonical metrics with their unit, value type and category.
 
 A driver converts to the canonical unit before emitting a measurement. Keys are lowercase
-snake_case. Adding a metric here needs a migration that calls `seed_metrics`; the decoder also
+snake_case. Adding a metric here needs a migration that calls `seed_sql`; the decoder also
 registers unknown keys automatically with category `uncategorized`, which administrators then
 curate.
 """
@@ -325,6 +325,39 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
     MetricSeed(
         "free_memory", "Free memory", "B", N, "device_health", "Free memory reported by the device"
     ),
+    # the OpenCollar status, flash status and timestamp messages (ports 4, 14 and 18)
+    MetricSeed(
+        "charging_voltage",
+        "Charging voltage",
+        "V",
+        N,
+        "device_health",
+        "Voltage on the charging input, sent while the device charges",
+    ),
+    MetricSeed(
+        "clock_offset",
+        "Clock offset",
+        "s",
+        N,
+        "device_health",
+        "Device clock minus the network receive time; positive when the device clock is ahead",
+    ),
+    MetricSeed(
+        "flash_used_percent",
+        "Flash used",
+        "%",
+        N,
+        "device_health",
+        "Part of the flash memory that holds stored messages",
+    ),
+    MetricSeed(
+        "flash_messages",
+        "Messages in flash",
+        None,
+        N,
+        "device_health",
+        "Messages stored in the flash memory",
+    ),
     # environment
     MetricSeed("temperature", "Temperature", "°C", N, "environment", "Ambient temperature"),
     MetricSeed("humidity", "Relative humidity", "%", N, "environment", "Relative humidity"),
@@ -411,6 +444,22 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
         "gnss_hdop", "GNSS HDOP", None, N, "positioning", "Horizontal dilution of precision"
     ),
     MetricSeed(
+        "gnss_pdop",
+        "GNSS PDOP",
+        None,
+        N,
+        "positioning",
+        "Position dilution of precision of the u-blox fix, rounded down to a whole number",
+    ),
+    MetricSeed(
+        "lr_satellites",
+        "LoRa satellites",
+        None,
+        N,
+        "positioning",
+        "Satellites seen in the last LR11xx GNSS scan, 0 to 15",
+    ),
+    MetricSeed(
         "gnss_accuracy", "GNSS accuracy", "m", N, "positioning", "Estimated horizontal accuracy"
     ),
     MetricSeed(
@@ -480,6 +529,23 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
         "Average pulse energy of a fence measurement, in the device's own units",
     ),
     MetricSeed("trap_triggered", "Trap triggered", None, B, "infrastructure", "Trap trigger state"),
+    # the external switch input (OpenCollar ports 19 and 20); a TrapEdge reads its trap from it
+    MetricSeed(
+        "switch_active",
+        "Switch active",
+        None,
+        B,
+        "infrastructure",
+        "External switch input is active",
+    ),
+    MetricSeed(
+        "switch_count",
+        "Switch count",
+        None,
+        N,
+        "infrastructure",
+        "Changes of the external switch to active since its previous status report, or its impulses over the same interval in counter mode",
+    ),
     MetricSeed("tank_level", "Tank level", "%", N, "infrastructure", "Fill level of a tank"),
     MetricSeed("flow_rate", "Flow rate", "L/min", N, "infrastructure", "Water flow"),
     # the cardiac tag an OpenCollar Edge follows (port 15, phase 34, decisions D282 and D283).
