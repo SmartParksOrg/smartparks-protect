@@ -107,14 +107,14 @@ async def test_coverage_points_hexagons_and_shares(client, db, bus):  # noqa: F8
         )
     ).json()
     points = [f for f in with_lines["features"] if f["geometry"]["type"] == "Point"]
-    lines = [f for f in with_lines["features"] if f["geometry"]["type"] == "LineString"]
+    paths = [f for f in with_lines["features"] if f["geometry"]["type"] == "MultiLineString"]
     assert len(points) == 3 and with_lines["total"] == 3
-    assert len(lines) == 2
-    assert all(
-        f["properties"]["kind"] == "path" and f["properties"]["gateway"] == "gw-a" for f in lines
-    )
-    assert all(f["geometry"]["coordinates"][1] == [31.55, -24.95] for f in lines)
-    assert sorted(f["properties"]["rssi"] for f in lines) == [-100.0, -95.0]
+    # one path feature per gateway (D371), its lines ending at the gateway
+    assert len(paths) == 1
+    path = paths[0]
+    assert path["properties"] == {"kind": "path", "gateway": "gw-a", "receptions": 2}
+    assert len(path["geometry"]["coordinates"]) == 2
+    assert all(line[1] == [31.55, -24.95] for line in path["geometry"]["coordinates"])
     # without the flag the points come alone
     plain = (
         await client.get(f"{base}/coverage", params={"zoom": 14, "hours": 24}, headers=h)

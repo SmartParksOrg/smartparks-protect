@@ -13,6 +13,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- **The coverage layer answers in seconds instead of a minute** (Tim, 2026-11-06, decision D371: Okonjima's heard positions over 30 days took 47 s, 94 s with the lines). An index on the receptions by device and uplink (migration 0060) answers the join with one lookup per position; the shares, the points and the paths come from one statement; the paths are one feature per gateway instead of one per reception (8 MB to about 3 MB for 30 days); and the live map asks for a box a little larger than the view, so a small pan reuses the answer.
 - **The audit's advisories of 2026-11-06**: pyasn1 0.6.5 in both locks (CVE-2026-119194 to CVE-2026-119197) and tornado 6.6 in the analysis image's lock (CVE-2026-115927, CVE-2026-116577, CVE-2026-116578).
 - **A gateway that fell silent reads "silent", not "online"** (Tim, 2026-11-06, decision D370: gateway ac1f09fffe1e9c83 of Okonjima relayed its last uplink on 29 October and read "online" a week later). The status shown is derived when read: the platform's own word stands while fresh (`GATEWAY_PLATFORM_WORD_HOURS`, 36), otherwise a gateway is online while seen within `GATEWAY_SILENT_HOURS` (24) and silent after that, in the sand tint on the list, the page and the map; offline stays the platform's word until the gateway is heard again. The registry records who set the status and when (migration 0059), and a gateway's last seen from a reception is the network's receive time, as the reception itself.
 

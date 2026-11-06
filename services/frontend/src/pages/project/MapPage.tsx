@@ -173,6 +173,7 @@ import {
 import { imprecise } from "@/lib/accuracy";
 import { circleRing } from "@/lib/geodesy";
 import { isAllProjects } from "@/lib/scope";
+import { coverageBbox } from "@/lib/bbox";
 import {
   useAnalysisModules,
   usePermissions,
@@ -531,6 +532,7 @@ export function MapPage() {
   });
   const [viewport, setViewport] = useState<{
     bbox: string;
+    coverageBbox: string;
     zoom: number;
   } | null>(null);
   const gateways = useQuery({
@@ -568,7 +570,7 @@ export function MapPage() {
   );
   const coverageParams = useMemo(
     () => ({
-      bbox: viewport?.bbox,
+      bbox: viewport?.coverageBbox,
       zoom: viewport?.zoom ?? 8,
       hours: layers.coverage_hours,
       gateway_id: coverageGateways,
@@ -1375,6 +1377,8 @@ export function MapPage() {
           bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
             .map((v) => v.toFixed(5))
             .join(","),
+          // the coverage read's box: padded and snapped, so a small pan asks nothing (D371)
+          coverageBbox: coverageBbox(b.getWest(), b.getSouth(), b.getEast(), b.getNorth()),
           zoom: Math.round(map.getZoom()),
         });
         if (!projectId) return;

@@ -1,8 +1,9 @@
 """Coverage (decision D107): where the project's devices were heard, and by which gateway.
 
 Positions joined to the receptions of the same source event: a heard position carries the
-best RSSI of its receptions. Zoomed out the viewport is tiled into hexagons aggregated in the
-database (PostGIS `ST_HexagonGrid`); zoomed in the positions themselves come back, capped.
+best RSSI of its receptions, and on request the paths to the gateways that heard it (D368).
+Points at every zoom, capped; hexagons aggregated in the database (PostGIS `ST_HexagonGrid`)
+on request.
 It shows only where devices were, never where nobody walked."""
 
 import json
@@ -116,137 +117,157 @@ async def coverage(
             params[f"gs{i}"] = source_id
             params[f"gx{i}"] = external_id
         gateway_filter = " AND (" + " OR ".join(clauses) + ")"
-    # Receptions first: the devices heard in the window are few, and a positions scan per
-    # device uses the compressed chunks' device index, where a bounding-box scan over every
-    # chunk of the window decompresses them all (seconds per 90 days in the all scope).
+    # The devices heard in the window first (few), then their positions in the window and the
+    # view, each joined to the receptions of its uplink on device and source event, which
+    # `ix_gateway_receptions_device_event` answers with one lookup per position (D371, Tim,
+    # 2026-11-06: 47 s over Okonjima's 30 days before it, every position walking the device's
+    # receptions of the window).
     heard = f"""
         heard AS (
             SELECT p.id, p.time, p.geom, r.rssi, r.gateway_id, r.data_source_id
-            FROM (
-                SELECT DISTINCT r.device_id FROM gateway_receptions r
-                WHERE r.time >= :since AND r.device_id IS NOT NULL {gateway_filter}{device_filter}
-            ) d
-            JOIN LATERAL (
-                SELECT p.id, p.time, p.geom, p.device_id, p.source_event_id
-                FROM positions p
-                WHERE p.device_id = d.device_id AND p.record_type <> 'network'
-                  AND (CAST(:project_id AS uuid) IS NULL
-                       OR p.project_id = CAST(:project_id AS uuid))
-                  AND p.time >= :since AND p.time < :until
-                  AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
-            ) p ON true
+            FROM positions p
             JOIN gateway_receptions r
               ON r.device_id = p.device_id AND r.source_event_id = p.source_event_id
              AND r.time >= :since
               {gateway_filter}
+            WHERE p.record_type <> 'network'
+              AND (CAST(:project_id AS uuid) IS NULL
+                   OR p.project_id = CAST(:project_id AS uuid))
+              AND p.time >= :since AND p.time < :until
+              AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
+              AND p.device_id IN (
+                  SELECT DISTINCT r.device_id FROM gateway_receptions r
+                  WHERE r.time >= :since AND r.device_id IS NOT NULL
+                  {gateway_filter}{device_filter}
+              )
         ),
         best AS (
             SELECT id, time, geom, MAX(rssi) AS rssi, COUNT(*) AS gateways
             FROM heard GROUP BY id, time, geom
         )
     """
-    per_gateway = (
-        await session.execute(
-            text(
-                f"""
-                WITH {heard}
-                SELECT data_source_id, gateway_id, COUNT(DISTINCT id) AS heard,
-                       MAX(rssi) AS best_rssi, AVG(rssi) AS mean_rssi,
-                       (SELECT COUNT(*) FROM best) AS total
-                FROM heard
-                GROUP BY data_source_id, gateway_id
-                ORDER BY heard DESC
-                """
-            ),
-            params,
+    if mode == "hexagons":
+        return await _hexagons(session, heard, params, hours, zoom)
+    # One statement for the shares, the total, the drawn points and their paths, so the heard
+    # positions are computed once (D371); the paths are one MultiLineString per gateway, the
+    # lines from the drawn points to the gateway's location, 29,640 features of 8 MB on
+    # Okonjima's 30 days as one LineString each, 14 of 3 MB this way.
+    statement = f"""
+        WITH {heard},
+        shown AS (
+            SELECT id, time, geom, rssi, gateways FROM best ORDER BY time DESC LIMIT :limit
+        ),
+        per_gateway AS (
+            SELECT data_source_id, gateway_id, COUNT(DISTINCT id) AS n,
+                   MAX(rssi) AS best_rssi, AVG(rssi) AS mean_rssi
+            FROM heard GROUP BY data_source_id, gateway_id
         )
-    ).all()
-    total = int(per_gateway[0].total) if per_gateway else 0
-    registry = {
-        (g.data_source_id, g.external_id): g
-        for g in (
-            await session.scalars(
-                select(Gateway).where(
-                    Gateway.data_source_id.in_({r.data_source_id for r in per_gateway}),
-                    Gateway.external_id.in_({r.gateway_id for r in per_gateway}),
+        SELECT 'gateway' AS kind, data_source_id, gateway_id, CAST(NULL AS text) AS name,
+               n, best_rssi, mean_rssi, CAST(NULL AS text) AS geom,
+               CAST(NULL AS bigint) AS gateways, CAST(NULL AS timestamptz) AS time
+        FROM per_gateway
+        UNION ALL
+        SELECT 'total', NULL, NULL, NULL, (SELECT COUNT(*) FROM best), NULL, NULL, NULL, NULL,
+               NULL
+        UNION ALL
+        SELECT 'point', NULL, NULL, NULL, NULL, rssi, NULL, ST_AsGeoJSON(geom), gateways, time
+        FROM shown
+    """
+    if lines:
+        statement += """
+        UNION ALL
+        SELECT 'path', h.data_source_id, h.gateway_id,
+               COALESCE(g.name_override, g.name, g.external_id), COUNT(*), NULL, NULL,
+               ST_AsGeoJSON(ST_Collect(ST_MakeLine(s.geom, g.geom))), NULL, NULL
+        FROM shown s
+        JOIN heard h ON h.id = s.id
+        JOIN gateways g ON g.data_source_id = h.data_source_id AND g.external_id = h.gateway_id
+        WHERE g.geom IS NOT NULL
+        GROUP BY h.data_source_id, h.gateway_id, g.name_override, g.name, g.external_id
+        """
+    rows = (await session.execute(text(statement), {**params, "limit": MAX_POINTS})).all()
+    total = next((int(row.n) for row in rows if row.kind == "total"), 0)
+    gateways = await _shares(session, [row for row in rows if row.kind == "gateway"], total)
+    if total == 0:
+        return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
+    features = []
+    for row in rows:
+        if row.kind == "point":
+            properties: dict[str, Any] = {
+                "best_rssi": row.best_rssi,
+                "gateways": int(row.gateways),
+                "time": row.time.isoformat(),
+            }
+        elif row.kind == "path":
+            properties = {"kind": "path", "gateway": row.name, "receptions": int(row.n)}
+        else:
+            continue
+        features.append(
+            {"type": "Feature", "geometry": json.loads(row.geom), "properties": properties}
+        )
+    return CoverageResponse(
+        hours=hours, mode="points", total=total, features=features, gateways=gateways
+    )
+
+
+async def _shares(session: AsyncSession, rows: list[Any], total: int) -> list[CoverageGateway]:
+    """The share per gateway, named from the registry where the gateway is known."""
+    registry = (
+        {
+            (g.data_source_id, g.external_id): g
+            for g in (
+                await session.scalars(
+                    select(Gateway).where(
+                        Gateway.data_source_id.in_({r.data_source_id for r in rows}),
+                        Gateway.external_id.in_({r.gateway_id for r in rows}),
+                    )
                 )
-            )
-        ).all()
-    }
-    gateways = []
-    for r in per_gateway:
+            ).all()
+        }
+        if rows
+        else {}
+    )
+    shares = []
+    for r in sorted(rows, key=lambda r: int(r.n), reverse=True):
         g = registry.get((r.data_source_id, r.gateway_id))
-        gateways.append(
+        shares.append(
             CoverageGateway(
                 gateway_id=g.id if g else None,
                 external_id=r.gateway_id,
                 name=(g.name_override or g.name or r.gateway_id) if g else r.gateway_id,
                 data_source_id=r.data_source_id,
-                heard=int(r.heard),
-                share=round(int(r.heard) / total, 3) if total else 0.0,
+                heard=int(r.n),
+                share=round(int(r.n) / total, 3) if total else 0.0,
                 best_rssi=float(r.best_rssi) if r.best_rssi is not None else None,
                 mean_rssi=round(float(r.mean_rssi), 1) if r.mean_rssi is not None else None,
             )
         )
+    return shares
+
+
+async def _hexagons(
+    session: AsyncSession, heard: str, params: dict[str, Any], hours: int, zoom: int
+) -> CoverageResponse:
+    """The hexagon aggregation (API users, decision D123): the shares and the total first,
+    then the cells of the viewport sized by zoom."""
+    shares_rows = (
+        await session.execute(
+            text(
+                f"""
+                WITH {heard}
+                SELECT data_source_id, gateway_id, COUNT(DISTINCT id) AS n,
+                       MAX(rssi) AS best_rssi, AVG(rssi) AS mean_rssi,
+                       (SELECT COUNT(*) FROM best) AS total
+                FROM heard GROUP BY data_source_id, gateway_id
+                """
+            ),
+            params,
+        )
+    ).all()
+    total = int(shares_rows[0].total) if shares_rows else 0
+    gateways = await _shares(session, list(shares_rows), total)
     if total == 0:
         return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
-
-    as_points = mode != "hexagons"
-    if as_points:
-        rows = (
-            await session.execute(
-                text(
-                    f"""
-                    WITH {heard},
-                    shown AS (
-                        SELECT id, time, geom, rssi, gateways
-                        FROM best ORDER BY time DESC LIMIT :limit
-                    )
-                    SELECT ST_AsGeoJSON(geom) AS geom, rssi, gateways, time,
-                           NULL AS gateway_name
-                    FROM shown
-                    """
-                    + (
-                        """
-                    UNION ALL
-                    SELECT ST_AsGeoJSON(ST_MakeLine(s.geom, g.geom)) AS geom, h.rssi,
-                           NULL AS gateways, s.time,
-                           COALESCE(g.name_override, g.name, g.external_id) AS gateway_name
-                    FROM shown s
-                    JOIN heard h ON h.id = s.id
-                    JOIN gateways g ON g.data_source_id = h.data_source_id
-                                   AND g.external_id = h.gateway_id
-                    WHERE g.geom IS NOT NULL
-                    """
-                        if lines
-                        else ""
-                    )
-                ),
-                {**params, "limit": MAX_POINTS},
-            )
-        ).all()
-        features = []
-        for row in rows:
-            if row.gateway_name is None:
-                properties: dict[str, Any] = {
-                    "best_rssi": row.rssi,
-                    "gateways": int(row.gateways),
-                    "time": row.time.isoformat(),
-                }
-            else:
-                properties = {
-                    "kind": "path",
-                    "rssi": row.rssi,
-                    "gateway": row.gateway_name,
-                    "time": row.time.isoformat(),
-                }
-            features.append(
-                {"type": "Feature", "geometry": json.loads(row.geom), "properties": properties}
-            )
-        return CoverageResponse(
-            hours=hours, mode="points", total=total, features=features, gateways=gateways
-        )
-
     size = hexagon_size(zoom)
     rows = (
         await session.execute(

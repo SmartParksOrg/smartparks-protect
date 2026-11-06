@@ -278,6 +278,8 @@ class GatewayReception(Base):
     __table_args__ = (
         Index("ix_gateway_receptions_gateway_time", "gateway_id", "time"),
         Index("ix_gateway_receptions_device_time", "device_id", "time"),
+        # the coverage read's join from a position to the receptions of its uplink (D371)
+        Index("ix_gateway_receptions_device_event", "device_id", "source_event_id", "time"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
