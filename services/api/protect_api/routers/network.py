@@ -25,6 +25,7 @@ from protect_api.deps import (
 from protect_api.health_areas import AreaHealth, area_health
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.config import get_settings
+from shared.connectivity.instances import instance_groups, siblings_of
 from shared.connectivity.satellite import SatelliteSession
 from shared.database import get_session
 from shared.device_drivers.base import lorawan_frame, raw_frame
@@ -263,9 +264,10 @@ async def _relayed_by(
     """The source events a registry gateway relayed in the window (decision D369, the gateway
     page's Traffic tab): the receptions of its source and id, read by their own index."""
     gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
+    sources = siblings_of(await instance_groups(session), gateway.data_source_id)
     return SourceEvent.id.in_(
         select(GatewayReception.source_event_id).where(
-            GatewayReception.data_source_id == gateway.data_source_id,
+            GatewayReception.data_source_id.in_(sources),
             GatewayReception.gateway_id == gateway.external_id,
             GatewayReception.time >= time_from - timedelta(hours=1),
             GatewayReception.time < time_to + timedelta(hours=1),

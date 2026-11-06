@@ -11,14 +11,14 @@ sibling holds yet.
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, cast
-from urllib.parse import urlparse
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.connectivity.base import GatewayUpdate
 from shared.connectivity.channels import api_channel_key, channel_enabled
+from shared.connectivity.instances import instance_groups, siblings_of
 from shared.connectivity.registry import ADAPTERS
 from shared.ingest import apply_gateway_update, data_source_context
 from shared.logger import get_logger
@@ -45,30 +45,11 @@ def gateway_lister(source: DataSource, *, require_channel: bool = False) -> List
     return None if lister is None else cast(Lister, lister)
 
 
-def instance_host(config: dict[str, Any] | None) -> str | None:
-    """The host of the platform instance a source talks to, from its `api_url`, whatever the
-    scheme (grpc-web over https, native gRPC); None for a source without one."""
-    url = str((config or {}).get("api_url") or "").strip()
-    if not url:
-        return None
-    parsed = urlparse(url if "://" in url else f"//{url}")
-    return (parsed.hostname or "").lower() or None
-
-
 async def instance_source_ids(session: AsyncSession, source: DataSource) -> list[uuid.UUID]:
     """The source and its siblings: every source of the same adapter on the same platform
     instance (decision D375), the source itself first."""
-    host = instance_host(source.config)
-    if host is None:
-        return [source.id]
-    rows = (
-        await session.scalars(
-            select(DataSource).where(DataSource.adapter_key == source.adapter_key)
-        )
-    ).all()
-    return [source.id] + [
-        s.id for s in rows if s.id != source.id and instance_host(s.config) == host
-    ]
+    others = siblings_of(await instance_groups(session), source.id)
+    return [source.id] + [s for s in others if s != source.id]
 
 
 async def sync_source_gateways(

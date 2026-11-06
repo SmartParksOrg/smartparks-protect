@@ -21,6 +21,12 @@ from protect_api.deps import (
     require_scope_permission,
 )
 from protect_api.routers.map import _bbox
+from shared.connectivity.instances import (
+    Groups,
+    canonical_source,
+    instance_groups,
+    siblings_of,
+)
 from shared.database import get_session
 from shared.models import Gateway
 from shared.permissions import Permission
@@ -103,6 +109,7 @@ async def coverage(
         "east": box[2],
         "north": box[3],
     }
+    groups = await instance_groups(session)
     device_filter = ""
     if context.visibility.limited:
         params["scope_devices"] = list(context.visibility.device_ids or ())
@@ -122,8 +129,11 @@ async def coverage(
             return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
         clauses = []
         for i, (source_id, external_id) in enumerate(pairs):
-            clauses.append(f"(r.data_source_id = :gs{i} AND r.gateway_id = :gx{i})")
-            params[f"gs{i}"] = source_id
+            # the receptions of every sibling source of the gateway's instance (D376)
+            clauses.append(
+                f"(r.data_source_id = ANY(CAST(:gs{i} AS uuid[])) AND r.gateway_id = :gx{i})"
+            )
+            params[f"gs{i}"] = list(siblings_of(groups, source_id))
             params[f"gx{i}"] = external_id
         if clauses:
             selection.append("(" + " OR ".join(clauses) + ")")
@@ -158,7 +168,7 @@ async def coverage(
         )
     """
     if mode == "hexagons":
-        return await _hexagons(session, heard, params, hours, zoom)
+        return await _hexagons(session, heard, params, hours, zoom, groups)
     # One statement for the shares, the total, the drawn points and their paths, so the heard
     # positions are computed once (D371); the paths are one MultiLineString per gateway, the
     # lines from the drawn points to the gateway's location, 29,640 features of 8 MB on
@@ -190,19 +200,30 @@ async def coverage(
         FROM ranked WHERE rank <= :limit GROUP BY id, time, geom
     """
     if lines:
-        statement += """
+        # a reception's source and the gateway's row may be sibling sources of one instance
+        # (D376): both map to the instance's first source id and meet there
+        mapping = ", ".join(
+            f"(CAST(:ms{i} AS uuid), CAST(:mc{i} AS uuid))" for i in range(len(groups))
+        )
+        for i, (source_id, members) in enumerate(groups.items()):
+            params[f"ms{i}"] = source_id
+            params[f"mc{i}"] = members[0]
+        statement += f"""
         UNION ALL
-        SELECT 'path', h.data_source_id, h.gateway_id,
+        SELECT 'path', mg.canonical, h.gateway_id,
                COALESCE(g.name_override, g.name, g.external_id), COUNT(*), NULL, NULL,
                ST_AsGeoJSON(ST_Collect(ST_MakeLine(h.geom, g.geom))), NULL, NULL, NULL
         FROM ranked h
-        JOIN gateways g ON g.data_source_id = h.data_source_id AND g.external_id = h.gateway_id
+        JOIN (VALUES {mapping}) AS mh(source_id, canonical) ON mh.source_id = h.data_source_id
+        JOIN gateways g ON g.external_id = h.gateway_id
+        JOIN (VALUES {mapping}) AS mg(source_id, canonical)
+          ON mg.source_id = g.data_source_id AND mg.canonical = mh.canonical
         WHERE h.rank <= :limit AND g.geom IS NOT NULL
-        GROUP BY h.data_source_id, h.gateway_id, g.name_override, g.name, g.external_id
+        GROUP BY mg.canonical, h.gateway_id, g.name_override, g.name, g.external_id
         """
     rows = (await session.execute(text(statement), {**params, "limit": MAX_POINTS})).all()
     total = next((int(row.n) for row in rows if row.kind == "total"), 0)
-    gateways = await _shares(session, [row for row in rows if row.kind == "gateway"], total)
+    gateways = await _shares(session, [row for row in rows if row.kind == "gateway"], total, groups)
     if total == 0:
         return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
     features = []
@@ -226,43 +247,63 @@ async def coverage(
     )
 
 
-async def _shares(session: AsyncSession, rows: list[Any], total: int) -> list[CoverageGateway]:
-    """The share per gateway, named from the registry where the gateway is known."""
-    registry = (
-        {
-            (g.data_source_id, g.external_id): g
+async def _shares(
+    session: AsyncSession, rows: list[Any], total: int, groups: Groups
+) -> list[CoverageGateway]:
+    """The share per gateway, named from the registry where the gateway is known; the
+    receptions of sibling sources on one instance count together (D376)."""
+    folded: dict[tuple[uuid.UUID, str], dict[str, Any]] = {}
+    for r in rows:
+        key = (canonical_source(groups, r.data_source_id), r.gateway_id)
+        entry = folded.setdefault(key, {"n": 0, "best": None, "rssi": 0.0, "rssi_n": 0})
+        n = int(r.n)
+        entry["n"] += n
+        if r.best_rssi is not None:
+            best = float(r.best_rssi)
+            entry["best"] = best if entry["best"] is None else max(entry["best"], best)
+        if r.mean_rssi is not None:
+            entry["rssi"] += float(r.mean_rssi) * n
+            entry["rssi_n"] += n
+    registry: dict[tuple[uuid.UUID, str], Gateway] = {}
+    if folded:
+        registry = {
+            (canonical_source(groups, g.data_source_id), g.external_id): g
             for g in (
                 await session.scalars(
                     select(Gateway).where(
-                        Gateway.data_source_id.in_({r.data_source_id for r in rows}),
-                        Gateway.external_id.in_({r.gateway_id for r in rows}),
+                        Gateway.data_source_id.in_(
+                            {s for key in folded for s in siblings_of(groups, key[0])}
+                        ),
+                        Gateway.external_id.in_({key[1] for key in folded}),
                     )
                 )
             ).all()
         }
-        if rows
-        else {}
-    )
     shares = []
-    for r in sorted(rows, key=lambda r: int(r.n), reverse=True):
-        g = registry.get((r.data_source_id, r.gateway_id))
+    for key, e in sorted(folded.items(), key=lambda item: int(item[1]["n"]), reverse=True):
+        g = registry.get(key)
         shares.append(
             CoverageGateway(
                 gateway_id=g.id if g else None,
-                external_id=r.gateway_id,
-                name=(g.name_override or g.name or r.gateway_id) if g else r.gateway_id,
-                data_source_id=r.data_source_id,
-                heard=int(r.n),
-                share=round(int(r.n) / total, 3) if total else 0.0,
-                best_rssi=float(r.best_rssi) if r.best_rssi is not None else None,
-                mean_rssi=round(float(r.mean_rssi), 1) if r.mean_rssi is not None else None,
+                external_id=key[1],
+                name=(g.name_override or g.name or key[1]) if g else key[1],
+                data_source_id=g.data_source_id if g else key[0],
+                heard=e["n"],
+                share=round(e["n"] / total, 3) if total else 0.0,
+                best_rssi=e["best"],
+                mean_rssi=round(e["rssi"] / e["rssi_n"], 1) if e["rssi_n"] else None,
             )
         )
     return shares
 
 
 async def _hexagons(
-    session: AsyncSession, heard: str, params: dict[str, Any], hours: int, zoom: int
+    session: AsyncSession,
+    heard: str,
+    params: dict[str, Any],
+    hours: int,
+    zoom: int,
+    groups: Groups,
 ) -> CoverageResponse:
     """The hexagon aggregation (API users, decision D123): the shares and the total first,
     then the cells of the viewport sized by zoom."""
@@ -281,7 +322,7 @@ async def _hexagons(
         )
     ).all()
     total = int(shares_rows[0].total) if shares_rows else 0
-    gateways = await _shares(session, list(shares_rows), total)
+    gateways = await _shares(session, list(shares_rows), total, groups)
     if total == 0:
         return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
     size = hexagon_size(zoom)

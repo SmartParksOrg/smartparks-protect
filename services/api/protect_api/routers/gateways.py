@@ -34,6 +34,12 @@ from protect_api.schemas.integrations import (
     GatewayUpdateRequest,
 )
 from shared.config import get_settings
+from shared.connectivity.instances import (
+    Groups,
+    canonical_source,
+    instance_groups,
+    siblings_of,
+)
 from shared.database import get_session
 from shared.domain.gateways import effective_status
 from shared.domain.links import resolve_links
@@ -110,9 +116,12 @@ async def _reception_stats(
     since: datetime,
     until: datetime,
 ) -> dict[tuple[uuid.UUID, str], dict[str, Any]]:
-    """Per (data source, gateway id): receptions, devices, mean RSSI and SNR, last time."""
+    """Per (instance, gateway id): receptions, devices, mean RSSI and SNR, last time. The
+    receptions of sibling sources on one platform instance (decision D376) count together
+    under the instance's first source id, the key `canonical_source` gives a gateway row."""
     if not device_ids:
         return {}
+    groups = await instance_groups(session)
     rows = (
         await session.execute(
             select(
@@ -132,16 +141,47 @@ async def _reception_stats(
             .group_by(GatewayReception.data_source_id, GatewayReception.gateway_id)
         )
     ).all()
+    folded: dict[tuple[uuid.UUID, str], dict[str, Any]] = {}
+    for row in rows:
+        key = (canonical_source(groups, row.data_source_id), row.gateway_id)
+        entry = folded.setdefault(
+            key,
+            {
+                "receptions": 0,
+                "devices": 0,
+                "rssi": 0.0,
+                "rssi_n": 0,
+                "snr": 0.0,
+                "snr_n": 0,
+                "last_reception_at": None,
+            },
+        )
+        n = int(row.receptions)
+        entry["receptions"] += n
+        entry["devices"] += int(row.devices)
+        if row.mean_rssi is not None:
+            entry["rssi"] += float(row.mean_rssi) * n
+            entry["rssi_n"] += n
+        if row.mean_snr is not None:
+            entry["snr"] += float(row.mean_snr) * n
+            entry["snr_n"] += n
+        if entry["last_reception_at"] is None or row.last_reception_at > entry["last_reception_at"]:
+            entry["last_reception_at"] = row.last_reception_at
     return {
-        (row.data_source_id, row.gateway_id): {
-            "receptions": row.receptions,
-            "devices": row.devices,
-            "mean_rssi": round(float(row.mean_rssi), 1) if row.mean_rssi is not None else None,
-            "mean_snr": round(float(row.mean_snr), 1) if row.mean_snr is not None else None,
-            "last_reception_at": row.last_reception_at,
+        key: {
+            "receptions": e["receptions"],
+            "devices": e["devices"],
+            "mean_rssi": round(e["rssi"] / e["rssi_n"], 1) if e["rssi_n"] else None,
+            "mean_snr": round(e["snr"] / e["snr_n"], 1) if e["snr_n"] else None,
+            "last_reception_at": e["last_reception_at"],
         }
-        for row in rows
+        for key, e in folded.items()
     }
+
+
+def _key(groups: Groups, gateway: Gateway) -> tuple[uuid.UUID, str]:
+    """A gateway row's key in the folded statistics."""
+    return (canonical_source(groups, gateway.data_source_id), gateway.external_id)
 
 
 def _window(hours: int) -> tuple[datetime, datetime]:
@@ -215,12 +255,15 @@ async def project_gateways(
     (heartbeats, or any reception)."""
     since, until = _window(hours)
     device_ids = await _scope_device_ids(session, context, since, until)
+    groups = await instance_groups(session)
     stats = await _reception_stats(session, device_ids, since, until)
     newest = await _newest_receptions(session, context, hours, stats)
     statement = select(Gateway)
     if not context.is_all:
         source_ids = await visible_source_ids(session, context.project_id, device_ids)
         source_ids |= {k[0] for k in stats}
+        # a source's siblings on the same platform instance come along (decision D376)
+        source_ids = {s for source_id in source_ids for s in siblings_of(groups, source_id)}
         if not source_ids:
             return []
         statement = statement.where(Gateway.data_source_id.in_(source_ids))
@@ -230,8 +273,8 @@ async def project_gateways(
         gateway_read(
             g,
             sources.get(g.data_source_id),
-            stats.get((g.data_source_id, g.external_id)),
-            newest.get((g.data_source_id, g.external_id)),
+            stats.get(_key(groups, g)),
+            newest.get(_key(groups, g)),
         )
         for g in gateways
     ]
@@ -250,6 +293,8 @@ async def project_gateway(
     gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
     since, until = _window(hours)
     device_ids = await _scope_device_ids(session, context, since, until)
+    groups = await instance_groups(session)
+    siblings = siblings_of(groups, gateway.data_source_id)
     stats = await _reception_stats(session, device_ids, since, until)
     newest = await _newest_receptions(session, context, hours, stats)
     source = await session.get(DataSource, gateway.data_source_id)
@@ -263,7 +308,7 @@ async def project_gateway(
                 func.max(GatewayReception.time).label("last_reception_at"),
             )
             .where(
-                GatewayReception.data_source_id == gateway.data_source_id,
+                GatewayReception.data_source_id.in_(siblings),
                 GatewayReception.gateway_id == gateway.external_id,
                 GatewayReception.device_id.in_(device_ids) if device_ids else false(),
                 GatewayReception.time >= since,
@@ -283,13 +328,10 @@ async def project_gateway(
         ).all()
     }
     read = gateway_read(
-        gateway,
-        source,
-        stats.get((gateway.data_source_id, gateway.external_id)),
-        newest.get((gateway.data_source_id, gateway.external_id)),
+        gateway, source, stats.get(_key(groups, gateway)), newest.get(_key(groups, gateway))
     )
     if gateway.geom is not None and device_ids:
-        await _range(session, gateway, read, device_ids, since, until)
+        await _range(session, gateway, read, device_ids, since, until, siblings)
     return GatewayDetail(
         gateway=read,
         devices=[
@@ -313,6 +355,7 @@ async def _range(
     device_ids: list[uuid.UUID],
     since: datetime,
     until: datetime,
+    sources: tuple[uuid.UUID, ...],
 ) -> None:
     """The gateway's range over the window (decision D374, Tim, 2026-11-06: with the lines
     drawn, the shortest, mean and longest distance a heard position lay from the gateway):
@@ -334,7 +377,8 @@ async def _range(
                     FROM positions p
                     JOIN gateway_receptions r
                       ON r.device_id = p.device_id AND r.source_event_id = p.source_event_id
-                     AND r.time >= :since AND r.data_source_id = :source_id
+                     AND r.time >= :since
+                     AND r.data_source_id = ANY(CAST(:sources AS uuid[]))
                      AND r.gateway_id = :gateway_id
                     WHERE p.record_type <> 'network'
                       AND p.device_id = ANY(CAST(:devices AS uuid[]))
@@ -347,7 +391,7 @@ async def _range(
                 "lat": float(coordinates[1]),
                 "since": since,
                 "until": until,
-                "source_id": gateway.data_source_id,
+                "sources": list(sources),
                 "gateway_id": gateway.external_id,
                 "devices": list(device_ids),
             },
@@ -375,6 +419,7 @@ async def project_gateway_days(
     device_ids = await _scope_device_ids(session, context, since, until)
     if not device_ids:
         return []
+    siblings = siblings_of(await instance_groups(session), gateway.data_source_id)
     day = func.date_trunc("day", GatewayReception.time).label("day")
     rows = (
         await session.execute(
@@ -386,7 +431,7 @@ async def project_gateway_days(
                 func.avg(GatewayReception.snr).label("mean_snr"),
             )
             .where(
-                GatewayReception.data_source_id == gateway.data_source_id,
+                GatewayReception.data_source_id.in_(siblings),
                 GatewayReception.gateway_id == gateway.external_id,
                 GatewayReception.device_id.in_(device_ids),
                 GatewayReception.time >= since,
@@ -406,6 +451,55 @@ async def project_gateway_days(
         )
         for row in rows
     ]
+
+
+class _Folded:
+    """One device's receptions by one gateway, the sibling sources of its instance together
+    (decision D376), in the shape the grouped query answers."""
+
+    def __init__(self, device_id: uuid.UUID, data_source_id: uuid.UUID, gateway_id: str) -> None:
+        self.device_id = device_id
+        self.data_source_id = data_source_id
+        self.gateway_id = gateway_id
+        self.receptions = 0
+        self.uplinks = 0
+        self._rssi = 0.0
+        self._rssi_n = 0
+        self._snr = 0.0
+        self._snr_n = 0
+        self.last_reception_at: datetime | None = None
+
+    def add(self, row: Any) -> None:
+        n = int(row.receptions)
+        self.receptions += n
+        self.uplinks += int(row.uplinks)
+        if row.mean_rssi is not None:
+            self._rssi += float(row.mean_rssi) * n
+            self._rssi_n += n
+        if row.mean_snr is not None:
+            self._snr += float(row.mean_snr) * n
+            self._snr_n += n
+        if self.last_reception_at is None or row.last_reception_at > self.last_reception_at:
+            self.last_reception_at = row.last_reception_at
+
+    @property
+    def mean_rssi(self) -> float | None:
+        return self._rssi / self._rssi_n if self._rssi_n else None
+
+    @property
+    def mean_snr(self) -> float | None:
+        return self._snr / self._snr_n if self._snr_n else None
+
+
+def _fold_per_device(rows: list[Any], groups: Groups) -> list[_Folded]:
+    folded: dict[tuple[uuid.UUID, uuid.UUID, str], _Folded] = {}
+    for row in rows:
+        canonical = canonical_source(groups, row.data_source_id)
+        key = (row.device_id, canonical, row.gateway_id)
+        if key not in folded:
+            folded[key] = _Folded(row.device_id, canonical, row.gateway_id)
+        folded[key].add(row)
+    return list(folded.values())
 
 
 @router.get("/projects/{project_id}/connectivity", response_model=list[DeviceConnectivity])
@@ -447,13 +541,17 @@ async def project_connectivity(
     ).all()
     if not rows:
         return []
+    groups = await instance_groups(session)
+    entries = _fold_per_device(list(rows), groups)
     gateways = {
-        (g.data_source_id, g.external_id): g
+        _key(groups, g): g
         for g in (
             await session.scalars(
                 select(Gateway).where(
-                    Gateway.data_source_id.in_({r.data_source_id for r in rows}),
-                    Gateway.external_id.in_({r.gateway_id for r in rows}),
+                    Gateway.data_source_id.in_(
+                        {s for r in entries for s in siblings_of(groups, r.data_source_id)}
+                    ),
+                    Gateway.external_id.in_({r.gateway_id for r in entries}),
                 )
             )
         ).all()
@@ -480,13 +578,13 @@ async def project_connectivity(
         ).all()
     }
     per_device: dict[uuid.UUID, list[Any]] = {}
-    for row in rows:
+    for row in entries:
         per_device.setdefault(row.device_id, []).append(row)
     result = []
     for device_id, device_rows in per_device.items():
         device_rows.sort(key=lambda r: r.receptions, reverse=True)
         best = device_rows[0]
-        gateway = gateways.get((best.data_source_id, best.gateway_id))
+        gateway = gateways.get((best.data_source_id, best.gateway_id))  # canonical already
         total_receptions = sum(int(r.receptions) for r in device_rows)
         uplinks = uplink_totals.get(device_id, 0)
         rssi = [

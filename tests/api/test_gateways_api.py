@@ -633,3 +633,51 @@ async def test_a_second_tenant_key_names_the_gateways_of_the_same_chirpstack(
     assert under_a["gw-shared"]["geometry"]["coordinates"] == [31.3, -24.7]
     assert "gw-shared" not in under_b
     assert under_b["gw-own"]["name"] == "Valley" and under_b["gw-own"]["status"] == "offline"
+
+    # the receptions path (D376): the project's device has an identity on both tenants'
+    # sources; an uplink through either, heard by gw-shared, lands on the one row, and the
+    # project's list counts the receptions of both sources together; a gateway first heard
+    # through the second source becomes its row
+    from shared.models import ExternalIdentity
+
+    row_b = await db.get(DataSource, uuid.UUID(second["id"]))
+    for source_row in (row_a, row_b):
+        db.add(
+            ExternalIdentity(
+                data_source_id=source_row.id,
+                external_id="00AA00AA00AA00AA",
+                identity_type="dev_eui",
+                device_id=uuid.UUID(_device["id"]),
+                attributes={},
+            )
+        )
+    await db.commit()
+    now = datetime.now(UTC)
+    await _uplink(db, bus, row_a, "00AA00AA00AA00AA", [("gw-shared", -90, 6.0)], now.isoformat())
+    await _uplink(
+        db,
+        bus,
+        row_b,
+        "00AA00AA00AA00AA",
+        [("gw-shared", -95, 4.0), ("gw-heard-b", -100, 2.0)],
+        now.isoformat(),
+    )
+    under_a = await registry(first["id"])
+    under_b = await registry(second["id"])
+    assert "gw-shared" in under_a and "gw-shared" not in under_b
+    assert "gw-heard-b" in under_b and "gw-heard-b" not in under_a
+    listed = {
+        g["external_id"]: g
+        for g in (await client.get(f"/api/v1/projects/{_project.id}/gateways", headers=h)).json()
+    }
+    assert (
+        listed["gw-shared"]["receptions"] == 2 and listed["gw-shared"]["display_name"] == "Hill top"
+    )
+    assert listed["gw-heard-b"]["receptions"] == 1
+    assert listed["gw-own"]["receptions"] == 0
+    detail = (
+        await client.get(
+            f"/api/v1/projects/{_project.id}/gateways/{listed['gw-shared']['id']}", headers=h
+        )
+    ).json()
+    assert detail["gateway"]["receptions"] == 2 and detail["devices"][0]["receptions"] == 2

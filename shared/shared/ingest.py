@@ -29,6 +29,7 @@ from shared.connectivity.base import (
     GatewayUpdate,
     InboundMessage,
 )
+from shared.connectivity.instances import instance_groups, siblings_of
 from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.satellite import DELIVERED_STATUSES, SatelliteSession
 from shared.database import session_scope
@@ -107,7 +108,12 @@ async def upsert_gateways(
 ) -> None:
     """Every gateway that received something exists in the registry (architecture 20, D66).
     A reception's `location` attribute (latitude, longitude, optional altitude; every adapter
-    normalises to this shape) places the gateway unless an administrator placed it."""
+    normalises to this shape) places the gateway unless an administrator placed it. A gateway
+    a sibling source of the same platform instance already holds is updated there, every
+    holder alike, and gets no second row (decision D376)."""
+    siblings: tuple[uuid.UUID, ...] = (data_source_id,)
+    if receptions:
+        siblings = siblings_of(await instance_groups(session), data_source_id)
     for reception in receptions:
         if not reception.gateway_id:
             continue
@@ -117,7 +123,18 @@ async def upsert_gateways(
             update.latitude = location.get("latitude")
             update.longitude = location.get("longitude")
             update.altitude_m = location.get("altitude")
-        await apply_gateway_update(session, data_source_id, update, now, from_reception=True)
+        holders: list[uuid.UUID] = [data_source_id]
+        if len(siblings) > 1:
+            holders = list(
+                await session.scalars(
+                    select(Gateway.data_source_id).where(
+                        Gateway.data_source_id.in_(siblings),
+                        Gateway.external_id == reception.gateway_id.lower(),
+                    )
+                )
+            ) or [data_source_id]
+        for holder in holders:
+            await apply_gateway_update(session, holder, update, now, from_reception=True)
 
 
 async def apply_gateway_update(

@@ -70,8 +70,13 @@ receptions alone, nameless. Add a data source per tenant with that tenant's key 
 address (decision D375): the sync of each applies its list to the rows every source on that
 ChirpStack holds for the same gateway id, so a gateway known from the uplinks gets its name,
 state and location from whichever tenant owns it, and only a gateway no source holds yet
-becomes a row of the new source. A source kept for the gateway sync alone has its API
-channel on and its HTTP channel off, no applications connected and no project assigned.
+becomes a row of the new source. The uplinks posted through any of the sources count for
+the same rows: a gateway heard through a second tenant's source gets no second row, and the
+lists, the panel, the page, the coverage and the range take the receptions of every source
+on that ChirpStack together (decision D376). A source kept for the gateway sync alone has
+its API channel on and its HTTP channel off, no applications connected and no project
+assigned; a source whose applications post to Protect as well brings that tenant's devices
+in the usual way, through Needs attention or the bulk onboarding.
 
 ## Status
 
