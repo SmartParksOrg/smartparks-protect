@@ -130,12 +130,9 @@ export function GatewayPanel({
           {only && (
             <span className="text-xs text-muted-foreground">
               {coverage && heard
-                ? t("{{count}} heard positions, {{share}}% of the view", {
-                    count: heard.heard,
-                    share: Math.round(heard.share * 100),
-                  })
+                ? t("{{count}} heard positions in the period", { count: heard.heard })
                 : coverage
-                  ? t("none in view")
+                  ? t("none in the period")
                   : t("Loading…")}
             </span>
           )}

@@ -100,7 +100,7 @@ async def coverage(
     device_filter = ""
     if context.visibility.limited:
         params["scope_devices"] = list(context.visibility.device_ids or ())
-        device_filter = " AND r.device_id = ANY(CAST(:scope_devices AS uuid[]))"
+        device_filter = " AND p.device_id = ANY(CAST(:scope_devices AS uuid[]))"
     if gateway_id:
         pairs = (
             await session.execute(
@@ -117,11 +117,13 @@ async def coverage(
             params[f"gs{i}"] = source_id
             params[f"gx{i}"] = external_id
         gateway_filter = " AND (" + " OR ".join(clauses) + ")"
-    # The devices heard in the window first (few), then their positions in the window and the
-    # view, each joined to the receptions of its uplink on device and source event, which
+    # Every position of the window and the view joined to the receptions of its uplink, which
     # `ix_gateway_receptions_device_event` answers with one lookup per position (D371, Tim,
     # 2026-11-06: 47 s over Okonjima's 30 days before it, every position walking the device's
-    # receptions of the window).
+    # receptions of the window). Nothing joins the CTEs to one another afterwards: Postgres
+    # estimates a CTE at a handful of rows and nests the loops, and a join of the drawn points
+    # to the heard rows cost 85 s over 30,000 by 8,500 rows; the rank by time inside the heard
+    # rows picks the drawn points and their paths instead.
     heard = f"""
         heard AS (
             SELECT p.id, p.time, p.geom, r.rssi, r.gateway_id, r.data_source_id
@@ -135,11 +137,7 @@ async def coverage(
                    OR p.project_id = CAST(:project_id AS uuid))
               AND p.time >= :since AND p.time < :until
               AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
-              AND p.device_id IN (
-                  SELECT DISTINCT r.device_id FROM gateway_receptions r
-                  WHERE r.time >= :since AND r.device_id IS NOT NULL
-                  {gateway_filter}{device_filter}
-              )
+              {device_filter}
         ),
         best AS (
             SELECT id, time, geom, MAX(rssi) AS rssi, COUNT(*) AS gateways
@@ -154,8 +152,10 @@ async def coverage(
     # Okonjima's 30 days as one LineString each, 14 of 3 MB this way.
     statement = f"""
         WITH {heard},
-        shown AS (
-            SELECT id, time, geom, rssi, gateways FROM best ORDER BY time DESC LIMIT :limit
+        ranked AS (
+            SELECT id, time, geom, rssi, gateway_id, data_source_id,
+                   DENSE_RANK() OVER (ORDER BY time DESC, id DESC) AS rank
+            FROM heard
         ),
         per_gateway AS (
             SELECT data_source_id, gateway_id, COUNT(DISTINCT id) AS n,
@@ -167,22 +167,22 @@ async def coverage(
                CAST(NULL AS bigint) AS gateways, CAST(NULL AS timestamptz) AS time
         FROM per_gateway
         UNION ALL
-        SELECT 'total', NULL, NULL, NULL, (SELECT COUNT(*) FROM best), NULL, NULL, NULL, NULL,
-               NULL
+        SELECT 'total', NULL, NULL, NULL, COUNT(DISTINCT id), NULL, NULL, NULL, NULL, NULL
+        FROM heard
         UNION ALL
-        SELECT 'point', NULL, NULL, NULL, NULL, rssi, NULL, ST_AsGeoJSON(geom), gateways, time
-        FROM shown
+        SELECT 'point', NULL, NULL, NULL, NULL, MAX(rssi), NULL, ST_AsGeoJSON(geom), COUNT(*),
+               time
+        FROM ranked WHERE rank <= :limit GROUP BY id, time, geom
     """
     if lines:
         statement += """
         UNION ALL
         SELECT 'path', h.data_source_id, h.gateway_id,
                COALESCE(g.name_override, g.name, g.external_id), COUNT(*), NULL, NULL,
-               ST_AsGeoJSON(ST_Collect(ST_MakeLine(s.geom, g.geom))), NULL, NULL
-        FROM shown s
-        JOIN heard h ON h.id = s.id
+               ST_AsGeoJSON(ST_Collect(ST_MakeLine(h.geom, g.geom))), NULL, NULL
+        FROM ranked h
         JOIN gateways g ON g.data_source_id = h.data_source_id AND g.external_id = h.gateway_id
-        WHERE g.geom IS NOT NULL
+        WHERE h.rank <= :limit AND g.geom IS NOT NULL
         GROUP BY h.data_source_id, h.gateway_id, g.name_override, g.name, g.external_id
         """
     rows = (await session.execute(text(statement), {**params, "limit": MAX_POINTS})).all()

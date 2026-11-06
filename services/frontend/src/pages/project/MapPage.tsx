@@ -570,14 +570,23 @@ export function MapPage() {
   );
   const coverageParams = useMemo(
     () => ({
-      bbox: viewport?.coverageBbox,
+      // one gateway alone shows everything it heard, wherever the map looks (Tim, 2026-11-06:
+      // the footprint of one gateway is the question, the view is not); every gateway together
+      // stays within the view, padded, so the read stays light
+      bbox: layers.coverage_gateway ? undefined : viewport?.coverageBbox,
       zoom: viewport?.zoom ?? 8,
       hours: layers.coverage_hours,
       gateway_id: coverageGateways,
       // the paths of the uplinks (decision D368), asked for only while the tick is on
       ...(layers.coverage_lines ? { lines: true } : {}),
     }),
-    [viewport, layers.coverage_hours, layers.coverage_lines, coverageGateways],
+    [
+      viewport,
+      layers.coverage_hours,
+      layers.coverage_lines,
+      layers.coverage_gateway,
+      coverageGateways,
+    ],
   );
   const coverage = useQuery({
     queryKey: queryKeys.coverage(projectId, coverageParams),
@@ -2125,6 +2134,7 @@ export function MapPage() {
                 : undefined
             }
             onRetryCoverage={() => void coverage.refetch()}
+            coverageLoading={layers.coverage && coverage.isFetching}
             choices={layers}
             trackedIds={trackedIds}
             trackLabel={trackLengthLabel}

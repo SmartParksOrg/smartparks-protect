@@ -125,8 +125,6 @@
   "{{count}} heard positions in view, as hexagons of about {{size}} m_other": "{{count}} gehoorde posities in beeld, als zeshoeken van ongeveer {{size}} m",
   "{{count}} heard positions in view, the newest {{shown}} drawn_one": "{{count}} gehoorde positie in beeld, de nieuwste {{shown}} getekend",
   "{{count}} heard positions in view, the newest {{shown}} drawn_other": "{{count}} gehoorde posities in beeld, de nieuwste {{shown}} getekend",
-  "{{count}} heard positions, {{share}}% of the view_one": "{{count}} gehoorde positie, {{share}}% van het beeld",
-  "{{count}} heard positions, {{share}}% of the view_other": "{{count}} gehoorde posities, {{share}}% van het beeld",
   "{{count}} heatmaps_one": "{{count}} heatmap",
   "{{count}} heatmaps_other": "{{count}} heatmaps",
   "{{count}} hours_one": "{{count}} uur",
@@ -2107,7 +2105,6 @@
   "none heard": "geen gehoord",
   "none in 30 days": "geen in 30 dagen",
   "none in the period": "geen in de periode",
-  "none in view": "geen in beeld",
   "none known": "geen bekend",
   "None of the stations has a place yet. Set it on the station's device page, under Place, or in the station dialog.": "Geen van de stations heeft al een plaats. Stel die in op de apparaatpagina van het station, onder Plaats, of in het stationsvenster.",
   "None of the trackers has a known position yet.": "Geen van de trackers heeft al een bekende positie.",
@@ -3398,5 +3395,14 @@
   "This gateway relayed none of the project's messages in the window.": "Deze gateway gaf in het venster geen bericht van het project door.",
   "Upload raw log": "Ruwe log uploaden",
   "Where the project's devices were when this gateway heard them, coloured by signal from red (weak) to green (strong), with a line from each position to the gateway.": "Waar de apparaten van het project waren toen deze gateway ze hoorde, gekleurd naar signaal van rood (zwak) tot groen (sterk), met een lijn van elke positie naar de gateway.",
-  "silent": "stil"
+  "silent": "stil",
+  "{{count}} heard positions in the period_one": "{{count}} gehoorde positie in de periode",
+  "{{count}} heard positions in the period_other": "{{count}} gehoorde posities in de periode",
+  "{{count}} positions the gateway heard_one": "{{count}} positie die de gateway hoorde",
+  "{{count}} positions the gateway heard_other": "{{count}} posities die de gateway hoorde",
+  "{{count}} positions the gateway heard, the newest {{shown}} drawn_one": "{{count}} positie die de gateway hoorde, de nieuwste {{shown}} getekend",
+  "{{count}} positions the gateway heard, the newest {{shown}} drawn_other": "{{count}} posities die de gateway hoorde, de nieuwste {{shown}} getekend",
+  "Loading every position the gateway heard…": "Elke positie die de gateway hoorde wordt geladen…",
+  "Loading every position this gateway heard in the last {{period}}…": "Elke positie die deze gateway in de laatste {{period}} hoorde wordt geladen…",
+  "Loading the heard positions in view…": "De gehoorde posities in beeld worden geladen…"
 }

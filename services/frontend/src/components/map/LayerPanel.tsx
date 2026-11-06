@@ -88,6 +88,7 @@ import { useIsPhone } from "@/hooks/useMediaQuery";
 import { usePreference } from "@/hooks/usePreference";
 import { useNow } from "@/hooks/useNow";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
+import { LoadingBar } from "@/components/common/LoadingBar";
 import { formatAgo, formatTime } from "@/lib/format";
 
 type Sort = "name" | "recent";
@@ -198,6 +199,7 @@ export function LayerPanel({
   networkLocations,
   coverageError,
   onRetryCoverage,
+  coverageLoading = false,
   choices,
   trackedIds,
   trackLabel,
@@ -229,6 +231,8 @@ export function LayerPanel({
   /** Why the heard positions did not load, if they did not; the panel offers a retry. */
   coverageError?: string;
   onRetryCoverage?: () => void;
+  /** The coverage read is under way: the bar shows, over the figures of the last answer. */
+  coverageLoading?: boolean;
   choices: LayerChoices;
   trackedIds: string[];
   /** Entities and devices with a heatmap on (decision D138), toggled per row like the track. */
@@ -1514,6 +1518,15 @@ export function LayerPanel({
         )}
         {coverageOpen && choices.coverage && (
           <div className="space-y-1 px-2 py-2 text-xs text-muted-foreground">
+            {coverageLoading && (
+              <LoadingBar
+                label={
+                  choices.coverage_gateway
+                    ? t("Loading every position the gateway heard…")
+                    : t("Loading the heard positions in view…")
+                }
+              />
+            )}
             <div className="flex items-center gap-2">
               <span>{t("-120 dBm")}</span>
               <span
@@ -1546,17 +1559,26 @@ export function LayerPanel({
                     { count: coverage.total, size: coverage.hexagon_m ?? 0 },
                   )
                 ) : coverage.features.length < coverage.total ? (
-                  t(
-                    "{{count}} heard positions in view, the newest {{shown}} drawn",
-                    { count: coverage.total, shown: coverage.features.length },
-                  )
+                  choices.coverage_gateway
+                    ? t(
+                        "{{count}} positions the gateway heard, the newest {{shown}} drawn",
+                        { count: coverage.total, shown: coverage.features.length },
+                      )
+                    : t(
+                        "{{count}} heard positions in view, the newest {{shown}} drawn",
+                        { count: coverage.total, shown: coverage.features.length },
+                      )
+                ) : choices.coverage_gateway ? (
+                  t("{{count}} positions the gateway heard", {
+                    count: coverage.total,
+                  })
                 ) : (
                   t("{{count}} heard positions in view", {
                     count: coverage.total,
                   })
                 )
               ) : (
-                t("Loading…")
+                ""
               )}
             </div>
           </div>

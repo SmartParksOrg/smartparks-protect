@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { CoverageResponse, Gateway } from "@/api/types";
+import { LoadingBar } from "@/components/common/LoadingBar";
+import { periodLabel } from "@/lib/coverage";
 import { basemapStyle, basemapsFor, loadBasemap } from "@/components/map/basemap";
 import { type Bounds, boundsOf } from "@/components/map/fit";
 import {
@@ -101,6 +103,15 @@ export function GatewayCoverageMap({
     <div className="space-y-2">
       <div className="relative h-[60vh] min-h-72 overflow-hidden rounded-lg border">
         <div ref={container} className="absolute! inset-0 z-0" />
+        {coverage.isFetching && (
+          <div className="absolute inset-x-0 top-0 z-10 bg-card/90 px-3 py-2">
+            <LoadingBar
+              label={t("Loading every position this gateway heard in the last {{period}}…", {
+                period: periodLabel(hours, t),
+              })}
+            />
+          </div>
+        )}
       </div>
       <p className="text-xs text-muted-foreground">
         {coverage.isError
@@ -118,7 +129,7 @@ export function GatewayCoverageMap({
                 : t("{{count}} heard positions, each with its line to the gateway", {
                     count: total,
                   })
-            : t("Loading…")}
+            : ""}
       </p>
     </div>
   );
