@@ -155,6 +155,14 @@ async def delete_entity_type(
 # Device types
 
 
+def type_read(row: DeviceType) -> DeviceTypeRead:
+    """A device type with what its driver can do (decision D377)."""
+    read = DeviceTypeRead.model_validate(row)
+    driver = DRIVERS.get(row.driver_key)
+    read.driver_capabilities = sorted(driver.capabilities) if driver else []
+    return read
+
+
 @router.get("/device-types", response_model=PageResponse[DeviceTypeRead])
 async def list_device_types(
     page: Page = Depends(page),
@@ -162,9 +170,7 @@ async def list_device_types(
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[DeviceTypeRead]:
     rows, next_cursor = await paginate(session, DeviceType.id, select(DeviceType), page)
-    return PageResponse(
-        items=[DeviceTypeRead.model_validate(r) for r in rows], next_cursor=next_cursor
-    )
+    return PageResponse(items=[type_read(r) for r in rows], next_cursor=next_cursor)
 
 
 @router.get("/device-types/{device_type_id}/driver-catalog", response_model=DriverCatalog)
@@ -194,7 +200,7 @@ async def create_device_type(
     body: DeviceTypeCreate,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
-) -> DeviceType:
+) -> DeviceTypeRead:
     row = DeviceType(**body.model_dump())
     session.add(row)
     await flush_or_409(session, "Device type")
@@ -207,7 +213,7 @@ async def create_device_type(
         details={"key": row.key},
     )
     await session.commit()
-    return row
+    return type_read(row)
 
 
 @router.get("/device-types/{device_type_id}", response_model=DeviceTypeRead)
@@ -215,8 +221,8 @@ async def get_device_type(
     device_type_id: uuid.UUID,
     _: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
-) -> DeviceType:
-    return await get_or_404(session, DeviceType, device_type_id, "Device type")
+) -> DeviceTypeRead:
+    return type_read(await get_or_404(session, DeviceType, device_type_id, "Device type"))
 
 
 @router.patch("/device-types/{device_type_id}", response_model=DeviceTypeRead)
@@ -225,7 +231,7 @@ async def update_device_type(
     body: DeviceTypeUpdate,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
-) -> DeviceType:
+) -> DeviceTypeRead:
     row = await get_or_404(session, DeviceType, device_type_id, "Device type")
     changed = apply_patch(row, body)
     await record_audit(
@@ -237,7 +243,7 @@ async def update_device_type(
         details=changed,
     )
     await session.commit()
-    return row
+    return type_read(row)
 
 
 @router.delete("/device-types/{device_type_id}", status_code=status.HTTP_204_NO_CONTENT)

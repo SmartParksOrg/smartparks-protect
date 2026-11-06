@@ -42,6 +42,7 @@ import { HealthCard } from "@/components/devices/HealthCard";
 import { ContactsCard } from "@/components/devices/ContactsCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
 import { UploadLogButton } from "@/components/devices/UploadLogButton";
+import { supportsRawLogs } from "@/lib/capabilities";
 import { DeviceTraffic } from "@/components/devices/DeviceTraffic";
 import {
   RecordDeliveriesDialog,
@@ -385,7 +386,9 @@ export function DevicePage() {
                 </Link>
               </Button>
             )}
-            {can("devices:control") && <UploadLogButton deviceId={d.id} />}
+            {can("devices:control") && supportsRawLogs(type) && (
+              <UploadLogButton deviceId={d.id} />
+            )}
             {deviceProjectId &&
               modules.includes("device_performance") &&
               can("analysis:run") && (
@@ -855,7 +858,9 @@ export function DevicePage() {
                 driverKey={type?.driver_key}
                 canWrite={can("devices:control")}
               />
-              <LogFilesCard deviceId={d.id} canWrite={can("devices:control")} />
+              {supportsRawLogs(type) && (
+                <LogFilesCard deviceId={d.id} canWrite={can("devices:control")} />
+              )}
               {(type?.driver_key === "opencollar" ||
                 type?.driver_key === "ble_tag") && (
                 <ContactsCard

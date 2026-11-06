@@ -28,6 +28,7 @@ import { LoadMore } from "@/components/data/LoadMore";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { AddDeviceForm } from "@/components/devices/AddDeviceForm";
 import { UploadLogButton } from "@/components/devices/UploadLogButton";
+import { supportsRawLogs } from "@/lib/capabilities";
 import { BulkAssignDialog } from "@/components/devices/BulkAssignDialog";
 import { CreateEntitiesDialog } from "@/components/devices/CreateEntitiesDialog";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
@@ -217,14 +218,15 @@ export function DevicesPage() {
           {
             id: "upload",
             header: "",
-            cell: ({ row }) => (
-              <UploadLogButton
-                deviceId={row.original.id}
-                size="icon"
-                iconOnly
-                className="size-7"
-              />
-            ),
+            cell: ({ row }) =>
+              supportsRawLogs(typeById.get(row.original.device_type_id)) ? (
+                <UploadLogButton
+                  deviceId={row.original.id}
+                  size="icon"
+                  iconOnly
+                  className="size-7"
+                />
+              ) : null,
           } satisfies ColumnDef<Device, unknown>,
         ]
       : []),

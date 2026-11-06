@@ -414,6 +414,12 @@ class DeviceTypeRead(ORMModel):
     capabilities: dict[str, Any]
     default_settings: dict[str, Any]
     created_at: datetime
+    driver_capabilities: list[str] = Field(
+        default_factory=list,
+        description="What the type's driver can do (`flash_logging`, `remote_settings`, "
+        "`ble_scanner`...), so a page offers a feature only to the devices whose driver "
+        "has it (decision D377)",
+    )
 
 
 class DeviceCreate(BaseModel):

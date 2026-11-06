@@ -19,6 +19,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  DeviceType,
   CurrentState,
   Device,
   DeviceDataSpan,
@@ -69,6 +70,7 @@ import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { useDecoding } from "@/hooks/useDecoding";
 import { DecodingNotice } from "@/components/devices/DecodingNotice";
 import { UploadLogButton } from "@/components/devices/UploadLogButton";
+import { supportsRawLogs } from "@/lib/capabilities";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
@@ -177,6 +179,13 @@ export function EntityPage() {
     queryKey: queryKeys.device(current?.device_id ?? ""),
     queryFn: () => api.get<Device>(`/api/v1/devices/${current?.device_id}`),
     enabled: Boolean(current),
+  });
+  // the device's type, for what its driver can do (decision D377): the raw log upload
+  const deviceType = useQuery({
+    queryKey: queryKeys.deviceType(device.data?.device_type_id ?? ""),
+    queryFn: () => api.get<DeviceType>(`/api/v1/device-types/${device.data?.device_type_id}`),
+    enabled: Boolean(device.data?.device_type_id),
+    staleTime: 10 * 60_000,
   });
   const liveFeature = useMemo(
     () =>
@@ -377,7 +386,7 @@ export function EntityPage() {
                 </Link>
               </Button>
             )}
-            {current && can("devices:control") && (
+            {current && can("devices:control") && supportsRawLogs(deviceType.data) && (
               <UploadLogButton deviceId={current.device_id} />
             )}
             {modules.includes("movement") && can("analysis:run") && (

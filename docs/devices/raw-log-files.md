@@ -19,7 +19,9 @@ malformed frames and do not fail the file; a file without any frame fails with
 
 "Upload raw log" sits in the header of the device page, in the header of the entity page
 for the device it has now, and as an upload icon on every row of the Devices list, for whoever
-may control devices (decision D367); the "Log files" card on the device page's Data tab has
+may control devices (decision D367), and only for devices whose driver has a flash log to read
+out, the `flash_logging` capability (decision D377): OpenCollar today, never an AWT tag, whose
+API refuses an upload with 422; the "Log files" card on the device page's Data tab has
 the same button. Several files can be chosen at once; they go one after another, and a station's
 card (a `.jsonl` file or a zip of its LOG folders) takes its own route. The API stores the
 file in the `device-log-files` bucket (`MINIO_BUCKET_LOG_FILES`), refuses the same bytes for

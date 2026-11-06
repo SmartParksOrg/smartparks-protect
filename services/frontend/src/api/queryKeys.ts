@@ -73,6 +73,7 @@ export const queryKeys = {
   deviceConnectivity: (id: string, hours: number) =>
     ["devices", id, "connectivity", hours] as const,
   deviceTypes: ["device-types"] as const,
+  deviceType: (id: string) => ["device-types", id] as const,
   entityTypes: ["entity-types"] as const,
   metrics: ["metrics"] as const,
   dataSources: ["data-sources"] as const,

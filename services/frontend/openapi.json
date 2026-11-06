@@ -32798,6 +32798,14 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "driver_capabilities": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Driver Capabilities",
+      "description": "What the type's driver can do (`flash_logging`, `remote_settings`, `ble_scanner`...), so a page offers a feature only to the devices whose driver has it (decision D377)"
      }
     },
     "type": "object",

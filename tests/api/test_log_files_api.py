@@ -57,9 +57,12 @@ async def _decode(bus, log_file_id: str, *, reprocess: bool = False) -> None:
 async def test_upload_list_download_and_redecode(client, db, bus):
     admin, project, _entity, _source, device, _ = await _setup(client, db)
     h = admin.headers
-    await _opencollar_device(client, db, device, h)
     content = (LINE + "\n").encode()
     files = {"file": ("raw_logs-all-SP05.txt", content, "text/plain")}
+    # a generic device's driver has no flash log, so it takes no raw log (decision D377)
+    refused = await client.post(f"/api/v1/devices/{device['id']}/log-files", files=files, headers=h)
+    assert refused.status_code == 422 and "flash log" in refused.json()["detail"]
+    await _opencollar_device(client, db, device, h)
     response = await client.post(
         f"/api/v1/devices/{device['id']}/log-files", files=files, headers=h
     )

@@ -30,6 +30,7 @@ from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.control.commands import driver_for
 from shared.database import get_session
+from shared.device_drivers.registry import DRIVERS
 from shared.domain.attribution import recent_jobs
 from shared.domain.lp0 import addresses_of
 from shared.enums import AcquisitionChannel, LogFileStatus
@@ -40,7 +41,7 @@ from shared.logfiles import (
     parse_log_text,
     store_log_file,
 )
-from shared.models import Device, DeviceLogFile, User
+from shared.models import Device, DeviceLogFile, DeviceType, User
 from shared.permissions import Permission
 from shared.storage import stream_object
 from shared.timeutil import utc_now
@@ -53,12 +54,22 @@ TEXT_TYPES = ("text/", "application/octet-stream", "application/x-", "")
 
 async def _writable_device(session: AsyncSession, user: User, device_id: uuid.UUID) -> Device:
     """Uploading or syncing device data needs the control permission in the device's project
-    (a viewer reads, an admin acts), or server admin."""
+    (a viewer reads, an admin acts), or server admin, and a driver with a flash log to read
+    out (decision D377, Tim, 2026-11-06: an AWT tag offered a raw log upload nobody knows a
+    way to make)."""
     device = await _visible_device(session, user, device_id)
     _, permissions = await _control_permissions(session, user, device)
     if Permission.DEVICES_CONTROL not in permissions:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, f"Permission {Permission.DEVICES_CONTROL} required"
+        )
+    device_type = await session.get(DeviceType, device.device_type_id)
+    driver = DRIVERS.get(device_type.driver_key) if device_type else None
+    if driver is None or "flash_logging" not in driver.capabilities:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "This device type's driver has no flash log to read out, so it takes no raw log "
+            "files or Bluetooth syncs",
         )
     return device
 

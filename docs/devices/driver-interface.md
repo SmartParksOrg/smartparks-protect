@@ -8,7 +8,7 @@ A driver turns a source event of one device family into decoded records, and lat
 class DeviceDriver(Protocol):
     key: ClassVar[str]  # "opencollar"
     label: ClassVar[str]
-    capabilities: ClassVar[frozenset[str]]  # {"gnss", "battery", ...}
+    capabilities: ClassVar[frozenset[str]]  # {"gnss", "battery", ...}; "flash_logging" opens the raw log upload and the Bluetooth sync (D377)
     timestamp_semantics: ClassVar[dict[str, TimestampSemantics]]  # per record type
 
     def decode(self, event: SourceEventData) -> DecodedRecords: ...
