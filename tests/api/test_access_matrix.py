@@ -161,6 +161,7 @@ ALL_SCOPE_READS: dict[str, dict[str, str]] = {
     "/api/v1/projects/{project_id}/alerts": {},
     "/api/v1/projects/{project_id}/gateways": {},
     "/api/v1/projects/{project_id}/gateways/{gateway_id}": {},
+    "/api/v1/projects/{project_id}/gateways/{gateway_id}/days": {},
     "/api/v1/projects/{project_id}/connectivity": {},
     "/api/v1/projects/{project_id}/coverage": {},
     "/api/v1/projects/{project_id}/traffic": {},
