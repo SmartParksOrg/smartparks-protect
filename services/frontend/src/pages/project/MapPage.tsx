@@ -140,6 +140,7 @@ import {
   parseHeatSettings,
 } from "@/components/map/heat";
 import { locationFeatures } from "@/components/map/networkLocations";
+import { HeardCard, HeardSettingsPanel } from "@/components/map/HeardSettings";
 import { HeatCard, HeatSettingsPanel } from "@/components/map/HeatSettings";
 import { GatewayPanel } from "@/components/map/GatewayPanel";
 import { LayerPanel } from "@/components/map/LayerPanel";
@@ -174,6 +175,7 @@ import { imprecise } from "@/lib/accuracy";
 import { circleRing } from "@/lib/geodesy";
 import { isAllProjects } from "@/lib/scope";
 import { coverageBbox } from "@/lib/bbox";
+import { listParam, mergeCoverage, toggleId } from "@/lib/heard";
 import {
   useAnalysisModules,
   usePermissions,
@@ -455,6 +457,38 @@ export function MapPage() {
       : DEFAULT_TRACK_HOURS;
   const [heatSettingsOpen, setHeatSettingsOpen] = useState(false);
   const [heatCardHidden, setHeatCardHidden] = useState(false);
+  // heard positions (decision D373): switched on per entity, device and gateway like the tracks
+  // (`?heard=`, `?device_heard=` and `?gateway_heard=` list them); the period and the lines
+  // are the layer preference's
+  const heardIds = useMemo(() => listParam(params, "heard"), [params]);
+  const heardDeviceIds = useMemo(() => listParam(params, "device_heard"), [params]);
+  const heardGatewayIds = useMemo(() => listParam(params, "gateway_heard"), [params]);
+  const heardOn = heardIds.length + heardDeviceIds.length + heardGatewayIds.length > 0;
+  const [heardSettingsOpen, setHeardSettingsOpen] = useState(false);
+  const setHeardLists = useCallback(
+    (entityIds: string[], deviceIds: string[], gatewayIds: string[]) =>
+      setParams(
+        (p) => {
+          for (const [key, ids] of [
+            ["heard", entityIds],
+            ["device_heard", deviceIds],
+            ["gateway_heard", gatewayIds],
+          ] as const) {
+            if (ids.length > 0) p.set(key, ids.join(","));
+            else p.delete(key);
+          }
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const toggleHeard = (entityId: string) =>
+    setHeardLists(toggleId(heardIds, entityId), heardDeviceIds, heardGatewayIds);
+  const toggleDeviceHeard = (deviceId: string) =>
+    setHeardLists(heardIds, toggleId(heardDeviceIds, deviceId), heardGatewayIds);
+  const toggleGatewayHeard = (gatewayId: string) =>
+    setHeardLists(heardIds, heardDeviceIds, toggleId(heardGatewayIds, gatewayId));
   const setHeatLists = useCallback(
     (entityIds: string[], deviceIds: string[]) =>
       setParams(
@@ -570,23 +604,15 @@ export function MapPage() {
   );
   const coverageParams = useMemo(
     () => ({
-      // one gateway alone shows everything it heard, wherever the map looks (Tim, 2026-11-06:
-      // the footprint of one gateway is the question, the view is not); every gateway together
-      // stays within the view, padded, so the read stays light
-      bbox: layers.coverage_gateway ? undefined : viewport?.coverageBbox,
+      // everything heard in the view, padded, so the read stays light (D371)
+      bbox: viewport?.coverageBbox,
       zoom: viewport?.zoom ?? 8,
       hours: layers.coverage_hours,
       gateway_id: coverageGateways,
       // the paths of the uplinks (decision D368), asked for only while the tick is on
       ...(layers.coverage_lines ? { lines: true } : {}),
     }),
-    [
-      viewport,
-      layers.coverage_hours,
-      layers.coverage_lines,
-      layers.coverage_gateway,
-      coverageGateways,
-    ],
+    [viewport, layers.coverage_hours, layers.coverage_lines, coverageGateways],
   );
   const coverage = useQuery({
     queryKey: queryKeys.coverage(projectId, coverageParams),
@@ -600,6 +626,47 @@ export function MapPage() {
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
   });
+  // the selection's read (decision D373): every position of the toggled devices (an entity
+  // through the device it has now) and everything the toggled gateways heard, wherever the
+  // map looks, over the same period, with the same lines
+  const heardSelectionDevices = useMemo(() => {
+    const ofEntities = heardIds.flatMap((id) => {
+      const device = currentFeatures?.find((f) => f.properties.entity_id === id)?.properties
+        .device_id;
+      return device ? [device] : [];
+    });
+    return [...new Set([...ofEntities, ...heardDeviceIds])];
+  }, [heardIds, heardDeviceIds, currentFeatures]);
+  const heardParams = useMemo(
+    () => ({
+      zoom: 14,
+      hours: layers.coverage_hours,
+      ...(heardSelectionDevices.length ? { device_id: heardSelectionDevices } : {}),
+      ...(heardGatewayIds.length ? { gateway_id: heardGatewayIds } : {}),
+      ...(layers.coverage_lines ? { lines: true } : {}),
+    }),
+    [layers.coverage_hours, layers.coverage_lines, heardSelectionDevices, heardGatewayIds],
+  );
+  const heardCoverage = useQuery({
+    queryKey: queryKeys.coverage(projectId, { ...heardParams, selection: true }),
+    queryFn: ({ signal }) =>
+      api.get<CoverageResponse>(`/api/v1/projects/${projectId}/coverage`, {
+        query: heardParams,
+        signal,
+      }),
+    enabled: heardOn && heardSelectionDevices.length + heardGatewayIds.length > 0,
+    retry: false,
+    placeholderData: (previous) => previous,
+    refetchInterval: 120_000,
+  });
+  const heardMerged = useMemo(
+    () =>
+      mergeCoverage(
+        layers.coverage ? coverage.data : undefined,
+        heardOn ? heardCoverage.data : undefined,
+      ),
+    [layers.coverage, coverage.data, heardOn, heardCoverage.data],
+  );
   // network locations (decisions D162 and D163): where the networks placed the devices over the
   // coverage period, circles of their radius; a small preference field switches them on
   const networkLocationParams = useMemo(
@@ -1422,13 +1489,8 @@ export function MapPage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    setCoverage(
-      map,
-      layers.coverage && coverage.data
-        ? (coverage.data.features as unknown as GeoJSON.Feature[])
-        : [],
-    );
-  }, [mapRef, ready, layers.coverage, coverage.data]);
+    setCoverage(map, heardMerged.features);
+  }, [mapRef, ready, heardMerged]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2103,6 +2165,44 @@ export function MapPage() {
             onClose={() => setHeatSettingsOpen(false)}
           />
         )}
+        {(heardOn || layers.coverage) && (
+          <HeardCard
+            count={
+              heardIds.length +
+              heardDeviceIds.length +
+              heardGatewayIds.length +
+              (layers.coverage ? 1 : 0)
+            }
+            total={heardMerged.total}
+            points={heardMerged.points}
+            hours={layers.coverage_hours}
+            loading={
+              (heardOn && heardCoverage.isFetching) ||
+              (layers.coverage && coverage.isFetching)
+            }
+            settingsOpen={heardSettingsOpen}
+            onToggleSettings={() => setHeardSettingsOpen((o) => !o)}
+            onClear={() => {
+              setHeardLists([], [], []);
+              if (layers.coverage) setLayers({ ...layers, coverage: false });
+              setHeardSettingsOpen(false);
+            }}
+          />
+        )}
+        {(heardOn || layers.coverage) && heardSettingsOpen && (
+          <HeardSettingsPanel
+            hours={layers.coverage_hours}
+            lines={Boolean(layers.coverage_lines)}
+            onChange={(next) =>
+              setLayers({
+                ...layers,
+                coverage_hours: next.hours,
+                coverage_lines: next.lines,
+              })
+            }
+            onClose={() => setHeardSettingsOpen(false)}
+          />
+        )}
         {feedOpen && (
           <FeedPanel
             projectId={projectId}
@@ -2142,6 +2242,12 @@ export function MapPage() {
             heatDeviceIds={heatDeviceIds}
             onToggleHeat={toggleHeat}
             onToggleDeviceHeat={toggleDeviceHeat}
+            heardIds={heardIds}
+            heardDeviceIds={heardDeviceIds}
+            heardGatewayIds={heardGatewayIds}
+            onToggleHeard={toggleHeard}
+            onToggleDeviceHeard={toggleDeviceHeard}
+            onToggleGatewayHeard={toggleGatewayHeard}
             devices={(deviceFeatures ?? []).map((f) => f.properties)}
             projects={
               allProjects
@@ -2249,6 +2355,8 @@ export function MapPage() {
             track={selectedTrack}
             heat={heatIds.includes(selected.entity_id)}
             onToggleHeat={() => toggleHeat(selected.entity_id)}
+            heard={heardIds.includes(selected.entity_id)}
+            onToggleHeard={() => toggleHeard(selected.entity_id)}
             following={following}
             onToggleFollow={() =>
               setFollowPausedFor(following ? followKey : null)
@@ -2296,6 +2404,10 @@ export function MapPage() {
             onToggleHeat={() =>
               toggleDeviceHeat(selectedDevice.properties.device_id)
             }
+            heard={heardDeviceIds.includes(selectedDevice.properties.device_id)}
+            onToggleHeard={() =>
+              toggleDeviceHeard(selectedDevice.properties.device_id)
+            }
             following={following}
             onToggleFollow={() =>
               setFollowPausedFor(following ? followKey : null)
@@ -2326,9 +2438,9 @@ export function MapPage() {
             now={now}
             wasHidden={revealNote === `gateway:${selectedGatewayId}`}
             onClose={() => selectGateway(null)}
-            choices={layers}
-            coverage={layers.coverage ? coverage.data : undefined}
-            onChange={setLayers}
+            heard={heardGatewayIds.includes(selectedGatewayId)}
+            onToggleHeard={() => toggleGatewayHeard(selectedGatewayId)}
+            coverage={heardCoverage.data}
           />
         )}
         {!selected &&

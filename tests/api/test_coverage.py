@@ -121,6 +121,42 @@ async def test_coverage_points_hexagons_and_shares(client, db, bus):  # noqa: F8
     ).json()
     assert all(f["geometry"]["type"] == "Point" for f in plain["features"])
 
+    # one device's heard positions, every reception (D373): the three fixes, both gateways;
+    # with a gateway as well, the union
+    mine = (
+        await client.get(
+            f"{base}/coverage",
+            params={"zoom": 14, "hours": 24, "device_id": _device["id"], "bbox": "0,0,1,1"},
+            headers=h,
+        )
+    ).json()
+    assert mine["total"] == 0  # the view still bounds a read that names a device
+    mine = (
+        await client.get(
+            f"{base}/coverage",
+            params={"zoom": 14, "hours": 24, "device_id": _device["id"]},
+            headers=h,
+        )
+    ).json()
+    assert mine["total"] == 3 and sorted(g["external_id"] for g in mine["gateways"]) == [
+        "gw-a",
+        "gw-b",
+    ]
+    assert all("id" in f["properties"] for f in mine["features"])
+    both = (
+        await client.get(
+            f"{base}/coverage",
+            params={
+                "zoom": 14,
+                "hours": 24,
+                "device_id": str(uuid.uuid4()),
+                "gateway_id": gw_a["gateway_id"],
+            },
+            headers=h,
+        )
+    ).json()
+    assert both["total"] == 2 and [g["external_id"] for g in both["gateways"]] == ["gw-a"]
+
     # outside the window or the view: nothing
     empty = (
         await client.get(f"{base}/coverage", params={"zoom": 14, "bbox": "0,0,1,1"}, headers=h)

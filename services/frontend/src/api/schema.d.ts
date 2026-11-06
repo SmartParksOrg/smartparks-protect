@@ -27203,8 +27203,10 @@ export interface operations {
                 bbox?: string | null;
                 zoom?: number;
                 hours?: number;
-                /** @description Only receptions by these registry gateways */
+                /** @description Only receptions by these registry gateways: what each of them heard (decision D373) */
                 gateway_id?: string[] | null;
+                /** @description Only positions of these devices, every reception of them; with `gateway_id` the union of both (decision D373) */
+                device_id?: string[] | null;
                 /** @description Points at every zoom unless hexagons are asked for (decision D123) */
                 mode?: string | null;
                 /** @description With the points, a line from each heard position to every gateway that received it and has a location (decision D368) */

@@ -65,7 +65,14 @@ async def coverage(
     zoom: int = Query(8, ge=0, le=22),
     hours: int = Query(24 * 7, ge=1, le=MAX_HOURS),
     gateway_id: list[uuid.UUID] | None = Query(
-        None, description="Only receptions by these registry gateways"
+        None,
+        description="Only receptions by these registry gateways: what each of them heard "
+        "(decision D373)",
+    ),
+    device_id: list[uuid.UUID] | None = Query(
+        None,
+        description="Only positions of these devices, every reception of them; with "
+        "`gateway_id` the union of both (decision D373)",
     ),
     mode: str | None = Query(
         None,
@@ -96,11 +103,13 @@ async def coverage(
         "east": box[2],
         "north": box[3],
     }
-    gateway_filter = ""
     device_filter = ""
     if context.visibility.limited:
         params["scope_devices"] = list(context.visibility.device_ids or ())
         device_filter = " AND p.device_id = ANY(CAST(:scope_devices AS uuid[]))"
+    # the selection (decision D373): the receptions of the named gateways, the positions of
+    # the named devices with every reception, or the union of both
+    selection: list[str] = []
     if gateway_id:
         pairs = (
             await session.execute(
@@ -109,14 +118,19 @@ async def coverage(
                 )
             )
         ).all()
-        if not pairs:
+        if not pairs and not device_id:
             return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
         clauses = []
         for i, (source_id, external_id) in enumerate(pairs):
             clauses.append(f"(r.data_source_id = :gs{i} AND r.gateway_id = :gx{i})")
             params[f"gs{i}"] = source_id
             params[f"gx{i}"] = external_id
-        gateway_filter = " AND (" + " OR ".join(clauses) + ")"
+        if clauses:
+            selection.append("(" + " OR ".join(clauses) + ")")
+    if device_id:
+        params["selected_devices"] = list(device_id)
+        selection.append("p.device_id = ANY(CAST(:selected_devices AS uuid[]))")
+    selection_filter = " AND (" + " OR ".join(selection) + ")" if selection else ""
     # Every position of the window and the view joined to the receptions of its uplink, which
     # `ix_gateway_receptions_device_event` answers with one lookup per position (D371, Tim,
     # 2026-11-06: 47 s over Okonjima's 30 days before it, every position walking the device's
@@ -131,13 +145,12 @@ async def coverage(
             JOIN gateway_receptions r
               ON r.device_id = p.device_id AND r.source_event_id = p.source_event_id
              AND r.time >= :since
-              {gateway_filter}
             WHERE p.record_type <> 'network'
               AND (CAST(:project_id AS uuid) IS NULL
                    OR p.project_id = CAST(:project_id AS uuid))
               AND p.time >= :since AND p.time < :until
               AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
-              {device_filter}
+              {device_filter}{selection_filter}
         ),
         best AS (
             SELECT id, time, geom, MAX(rssi) AS rssi, COUNT(*) AS gateways
@@ -164,14 +177,16 @@ async def coverage(
         )
         SELECT 'gateway' AS kind, data_source_id, gateway_id, CAST(NULL AS text) AS name,
                n, best_rssi, mean_rssi, CAST(NULL AS text) AS geom,
-               CAST(NULL AS bigint) AS gateways, CAST(NULL AS timestamptz) AS time
+               CAST(NULL AS bigint) AS gateways, CAST(NULL AS timestamptz) AS time,
+               CAST(NULL AS bigint) AS position_id
         FROM per_gateway
         UNION ALL
-        SELECT 'total', NULL, NULL, NULL, COUNT(DISTINCT id), NULL, NULL, NULL, NULL, NULL
+        SELECT 'total', NULL, NULL, NULL, COUNT(DISTINCT id), NULL, NULL, NULL, NULL, NULL,
+               NULL
         FROM heard
         UNION ALL
         SELECT 'point', NULL, NULL, NULL, NULL, MAX(rssi), NULL, ST_AsGeoJSON(geom), COUNT(*),
-               time
+               time, id
         FROM ranked WHERE rank <= :limit GROUP BY id, time, geom
     """
     if lines:
@@ -179,7 +194,7 @@ async def coverage(
         UNION ALL
         SELECT 'path', h.data_source_id, h.gateway_id,
                COALESCE(g.name_override, g.name, g.external_id), COUNT(*), NULL, NULL,
-               ST_AsGeoJSON(ST_Collect(ST_MakeLine(h.geom, g.geom))), NULL, NULL
+               ST_AsGeoJSON(ST_Collect(ST_MakeLine(h.geom, g.geom))), NULL, NULL, NULL
         FROM ranked h
         JOIN gateways g ON g.data_source_id = h.data_source_id AND g.external_id = h.gateway_id
         WHERE h.rank <= :limit AND g.geom IS NOT NULL
@@ -194,6 +209,7 @@ async def coverage(
     for row in rows:
         if row.kind == "point":
             properties: dict[str, Any] = {
+                "id": int(row.position_id),
                 "best_rssi": row.best_rssi,
                 "gateways": int(row.gateways),
                 "time": row.time.isoformat(),

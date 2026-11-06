@@ -7,12 +7,7 @@ import { Link } from "react-router";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { CoverageResponse, GatewayDetail } from "@/api/types";
-import {
-  isOnlyGateway,
-  type LayerChoices,
-  toggleOnlyGateway,
-} from "@/components/map/layerChoices";
-import { MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
+import { HeardButton, MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
 import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -24,8 +19,8 @@ const HOURS = 168;
 
 /**
  * A gateway on the live map (phase 19): the network's side of the picture, with the devices it
- * heard in the last week and "Show heard positions", which narrows the coverage layer to this
- * gateway alone (the Coverage tab reflects it).
+ * heard in the last week and the heard positions toggle (decision D373), which draws every
+ * position this gateway heard over the period, like a track on an entity's panel.
  */
 export function GatewayPanel({
   projectId,
@@ -35,9 +30,9 @@ export function GatewayPanel({
   now,
   wasHidden,
   onClose,
-  choices,
+  heard,
+  onToggleHeard,
   coverage,
-  onChange,
 }: {
   projectId: string;
   gatewayId: string;
@@ -46,9 +41,11 @@ export function GatewayPanel({
   now: number;
   wasHidden: boolean;
   onClose: () => void;
-  choices: LayerChoices;
+  /** The heard positions of this gateway are on (decision D373). */
+  heard: boolean;
+  onToggleHeard: () => void;
+  /** The selection's read, for the count beside the button. */
   coverage: CoverageResponse | undefined;
-  onChange: (next: LayerChoices) => void;
 }) {
   const { t } = useTranslation();
   const { can } = usePermissions(projectId);
@@ -62,8 +59,7 @@ export function GatewayPanel({
       ),
   });
   const g = detail.data?.gateway;
-  const only = isOnlyGateway(choices, gatewayId);
-  const heard = coverage?.gateways.find((c) => c.gateway_id === gatewayId);
+  const share = coverage?.gateways.find((c) => c.gateway_id === gatewayId);
   const coordinates = g?.geometry
     ? ((g.geometry as { coordinates: [number, number] }).coordinates ?? null)
     : null;
@@ -108,15 +104,7 @@ export function GatewayPanel({
       }
       footer={
         <>
-          <Button
-            variant={only ? "default" : "outline"}
-            size="sm"
-            className="h-8"
-            aria-pressed={only}
-            onClick={() => onChange(toggleOnlyGateway(choices, gatewayId))}
-          >
-            {only ? t("All heard positions") : t("Show heard positions")}
-          </Button>
+          <HeardButton on={heard} onToggle={onToggleHeard} gateway />
           {g && can("project:write") && !allProjects && (
             <Button
               variant="outline"
@@ -127,10 +115,10 @@ export function GatewayPanel({
               {coordinates ? t("Change location") : t("Set location")}
             </Button>
           )}
-          {only && (
+          {heard && (
             <span className="text-xs text-muted-foreground">
-              {coverage && heard
-                ? t("{{count}} heard positions in the period", { count: heard.heard })
+              {coverage && share
+                ? t("{{count}} heard positions in the period", { count: share.heard })
                 : coverage
                   ? t("none in the period")
                   : t("Loading…")}

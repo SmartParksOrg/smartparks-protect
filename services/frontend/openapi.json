@@ -22673,10 +22673,32 @@
          "type": "null"
         }
        ],
-       "description": "Only receptions by these registry gateways",
+       "description": "Only receptions by these registry gateways: what each of them heard (decision D373)",
        "title": "Gateway Id"
       },
-      "description": "Only receptions by these registry gateways"
+      "description": "Only receptions by these registry gateways: what each of them heard (decision D373)"
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only positions of these devices, every reception of them; with `gateway_id` the union of both (decision D373)",
+       "title": "Device Id"
+      },
+      "description": "Only positions of these devices, every reception of them; with `gateway_id` the union of both (decision D373)"
      },
      {
       "name": "mode",

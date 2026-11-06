@@ -8,6 +8,7 @@ import {
   LocateFixed,
   RadioTower,
   Route,
+  Signal,
   X,
 } from "lucide-react";
 import {
@@ -207,6 +208,12 @@ export function LayerPanel({
   heatDeviceIds,
   onToggleHeat,
   onToggleDeviceHeat,
+  heardIds,
+  heardDeviceIds,
+  heardGatewayIds,
+  onToggleHeard,
+  onToggleDeviceHeard,
+  onToggleGatewayHeard,
   devices,
   trackedDeviceIds,
   projects,
@@ -240,6 +247,14 @@ export function LayerPanel({
   heatDeviceIds: string[];
   onToggleHeat: (entityId: string) => void;
   onToggleDeviceHeat: (deviceId: string) => void;
+  /** Entities, devices and gateways with their heard positions on (decision D373), toggled
+   * per row like the track and the heatmap. */
+  heardIds: string[];
+  heardDeviceIds: string[];
+  heardGatewayIds: string[];
+  onToggleHeard: (entityId: string) => void;
+  onToggleDeviceHeard: (deviceId: string) => void;
+  onToggleGatewayHeard: (gatewayId: string) => void;
   /** The current track length, for the tooltip of the track button ("21 days"). */
   trackLabel: string;
   /** The device layer (decision D113): every device assigned to the project today. */
@@ -559,6 +574,27 @@ export function LayerPanel({
         >
           <Flame className="size-4" />
         </Button>
+        {m.device_id && (
+          <Button
+            variant={heardIds.includes(m.entity_id) ? "default" : "ghost"}
+            size="icon"
+            className={`size-7 shrink-0 ${heardIds.includes(m.entity_id) ? "" : "text-muted-foreground"}`}
+            aria-pressed={heardIds.includes(m.entity_id)}
+            aria-label={
+              heardIds.includes(m.entity_id)
+                ? t("Hide the heard positions")
+                : t("Show the heard positions")
+            }
+            title={
+              heardIds.includes(m.entity_id)
+                ? t("Hide the heard positions")
+                : t("Show the heard positions")
+            }
+            onClick={() => onToggleHeard(m.entity_id)}
+          >
+            <Signal className="size-4" />
+          </Button>
+        )}
         <Locate
           label={t("Show on map")}
           onClick={() => onPickEntity(m.entity_id)}
@@ -1127,11 +1163,6 @@ export function LayerPanel({
       choices.offline_gateways ?? true,
     ],
   ];
-  const PERIODS = [24, 168, 720, 2160];
-  const periodLabel = (hours: number) =>
-    hours < 48
-      ? t("{{count}} hours", { count: hours })
-      : t("{{count}} days", { count: Math.round(hours / 24) });
   const heardBy = new Map(
     (coverage?.gateways ?? []).map((g) => [g.gateway_id ?? g.external_id, g]),
   );
@@ -1257,6 +1288,25 @@ export function LayerPanel({
           onClick={() => onToggleDeviceHeat(d.device_id)}
         >
           <Flame className="size-4" />
+        </Button>
+        <Button
+          variant={heardDeviceIds.includes(d.device_id) ? "default" : "ghost"}
+          size="icon"
+          className={`size-7 shrink-0 ${heardDeviceIds.includes(d.device_id) ? "" : "text-muted-foreground"}`}
+          aria-pressed={heardDeviceIds.includes(d.device_id)}
+          aria-label={
+            heardDeviceIds.includes(d.device_id)
+              ? t("Hide the heard positions")
+              : t("Show the heard positions")
+          }
+          title={
+            heardDeviceIds.includes(d.device_id)
+              ? t("Hide the heard positions")
+              : t("Show the heard positions")
+          }
+          onClick={() => onToggleDeviceHeard(d.device_id)}
+        >
+          <Signal className="size-4" />
         </Button>
         {d.position_time ? (
           <Locate
@@ -1442,48 +1492,15 @@ export function LayerPanel({
             label={t("Heard positions")}
             onChange={(v) => onChange({ ...choices, coverage: v })}
           />
-          <span className={`${nameClass} font-semibold`}>
-            {t("Heard positions")}
-          </span>
-          <Select
-            value={String(choices.coverage_hours)}
-            onValueChange={(v) =>
-              onChange({ ...choices, coverage_hours: Number(v) })
-            }
+          <span
+            className={`${nameClass} font-semibold`}
+            title={t(
+              "Everything heard in view; the icon on an entity, a device or a gateway shows its own heard positions wherever the map looks",
+            )}
           >
-            <SelectTrigger
-              className="h-7 w-24 text-xs"
-              aria-label={t("Period")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIODS.map((hours) => (
-                <SelectItem key={hours} value={String(hours)}>
-                  {periodLabel(hours)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {t("Heard positions in view")}
+          </span>
         </Row>
-        {choices.coverage && (
-          <Row depth={0}>
-            <span className="size-6 shrink-0" />
-            <Check
-              checked={Boolean(choices.coverage_lines)}
-              label={t("Lines to the gateways")}
-              onChange={(v) => onChange({ ...choices, coverage_lines: v })}
-            />
-            <span
-              className={nameClass}
-              title={t(
-                "The path every uplink took: a thin line from the heard position to each gateway that received it",
-              )}
-            >
-              {t("Lines to the gateways")}
-            </span>
-          </Row>
-        )}
         <Row depth={0}>
           <span className="size-6 shrink-0" />
           <Check
@@ -1500,44 +1517,11 @@ export function LayerPanel({
             </span>
           )}
         </Row>
-        {choices.coverage && choices.coverage_gateway && (
-          <div className="px-2 pt-1 text-xs text-muted-foreground">
-            {t("Only what {{gateway}} heard.", {
-              gateway:
-                gateways.find((g) => g.id === choices.coverage_gateway)
-                  ?.display_name ?? t("one gateway"),
-            })}{" "}
-            <button
-              type="button"
-              className="underline"
-              onClick={() => onChange({ ...choices, coverage_gateway: null })}
-            >
-              {t("Every gateway")}
-            </button>
-          </div>
-        )}
         {coverageOpen && choices.coverage && (
           <div className="space-y-1 px-2 py-2 text-xs text-muted-foreground">
             {coverageLoading && (
-              <LoadingBar
-                label={
-                  choices.coverage_gateway
-                    ? t("Loading every position the gateway heard…")
-                    : t("Loading the heard positions in view…")
-                }
-              />
+              <LoadingBar label={t("Loading the heard positions in view…")} />
             )}
-            <div className="flex items-center gap-2">
-              <span>{t("-120 dBm")}</span>
-              <span
-                className="h-2 flex-1 rounded"
-                style={{
-                  background:
-                    "linear-gradient(90deg, #b91c1c, #f59e0b, #a3c14a, #15803d)",
-                }}
-              />
-              <span>{t("-80 dBm")}</span>
-            </div>
             <div>
               {coverageError ? (
                 <span className="text-destructive">
@@ -1559,19 +1543,10 @@ export function LayerPanel({
                     { count: coverage.total, size: coverage.hexagon_m ?? 0 },
                   )
                 ) : coverage.features.length < coverage.total ? (
-                  choices.coverage_gateway
-                    ? t(
-                        "{{count}} positions the gateway heard, the newest {{shown}} drawn",
-                        { count: coverage.total, shown: coverage.features.length },
-                      )
-                    : t(
-                        "{{count}} heard positions in view, the newest {{shown}} drawn",
-                        { count: coverage.total, shown: coverage.features.length },
-                      )
-                ) : choices.coverage_gateway ? (
-                  t("{{count}} positions the gateway heard", {
-                    count: coverage.total,
-                  })
+                  t(
+                    "{{count}} heard positions in view, the newest {{shown}} drawn",
+                    { count: coverage.total, shown: coverage.features.length },
+                  )
                 ) : (
                   t("{{count}} heard positions in view", {
                     count: coverage.total,
@@ -1698,6 +1673,25 @@ export function LayerPanel({
                       >
                         {g.display_name}
                       </button>
+                      <Button
+                        variant={heardGatewayIds.includes(g.id) ? "default" : "ghost"}
+                        size="icon"
+                        className={`size-7 shrink-0 ${heardGatewayIds.includes(g.id) ? "" : "text-muted-foreground"}`}
+                        aria-pressed={heardGatewayIds.includes(g.id)}
+                        aria-label={
+                          heardGatewayIds.includes(g.id)
+                            ? t("Hide the heard positions")
+                            : t("Show what this gateway heard")
+                        }
+                        title={
+                          heardGatewayIds.includes(g.id)
+                            ? t("Hide the heard positions")
+                            : t("Show what this gateway heard")
+                        }
+                        onClick={() => onToggleGatewayHeard(g.id)}
+                      >
+                        <Signal className="size-4" />
+                      </Button>
                       {choices.coverage && heard ? (
                         <span
                           className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline"

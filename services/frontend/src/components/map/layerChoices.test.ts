@@ -31,8 +31,6 @@ import {
   revealDevice,
   revealGateway,
   revealFeature,
-  isOnlyGateway,
-  toggleOnlyGateway,
   coverageGatewayIds,
 } from "@/components/map/layerChoices";
 import type { EntityFeatureProperties } from "@/components/map/layers";
@@ -354,26 +352,13 @@ describe("a show-on-map link reveals the object (phase 19)", () => {
   });
 });
 
-describe("heard positions of one gateway (phase 19)", () => {
+describe("the gateways the view's coverage read filters on", () => {
   const all = ["g1", "g2", "g3"];
 
-  it("narrows the coverage query to the gateway, shows it, and widens again", () => {
-    const start = {
-      ...DEFAULT_LAYERS,
-      gateways: false,
-      hidden_gateways: ["g2", "g3"],
-    };
-    const only = toggleOnlyGateway(start, "g2");
-    expect(only.coverage).toBe(true);
-    expect(only.gateways).toBe(true);
-    expect(only.hidden_gateways).toEqual(["g3"]);
-    expect(isOnlyGateway(only, "g2")).toBe(true);
-    expect(isOnlyGateway(only, "g1")).toBe(false);
-    expect(coverageGatewayIds(only, all)).toEqual(["g2"]);
-    const back = toggleOnlyGateway(only, "g2");
-    expect(back.coverage).toBe(true);
-    expect(back.coverage_gateway).toBeNull();
-    expect(coverageGatewayIds(back, all)).toEqual(["g1", "g2"]);
+  it("names the ticked gateways only when some are hidden", () => {
     expect(coverageGatewayIds(DEFAULT_LAYERS, all)).toBeUndefined();
+    expect(
+      coverageGatewayIds({ ...DEFAULT_LAYERS, hidden_gateways: ["g2"] }, all),
+    ).toEqual(["g1", "g3"]);
   });
 });

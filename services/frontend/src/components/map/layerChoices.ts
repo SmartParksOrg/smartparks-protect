@@ -30,9 +30,6 @@ export interface LayerChoices {
   /** Network locations (decisions D162 and D163): where the networks placed the devices, as
    * circles of their radius over the coverage period; a small field so the preference stays small. */
   network_locations?: boolean;
-  /** Heard positions of one gateway alone (phase 19); null or absent means every ticked gateway.
-   * A field rather than a hidden list, so the markers stay and the preference stays small. */
-  coverage_gateway?: string | null;
   /** The device layer (decision D113) is a shown set: every device is off until switched on. */
   shown_devices: string[];
 }
@@ -508,37 +505,13 @@ export function revealFeature(
   };
 }
 
-/** Whether the coverage layer shows the heard positions of exactly this gateway (the gateway
- * panel's "Show heard positions"). */
-export function isOnlyGateway(
-  choices: LayerChoices,
-  gatewayId: string,
-): boolean {
-  return choices.coverage && choices.coverage_gateway === gatewayId;
-}
-
-/** Heard positions of one gateway alone: the coverage layer on and narrowed to the gateway,
- * which is shown as well; a second call widens the layer back to every ticked gateway. */
-export function toggleOnlyGateway(
-  choices: LayerChoices,
-  gatewayId: string,
-): LayerChoices {
-  if (isOnlyGateway(choices, gatewayId))
-    return { ...choices, coverage: true, coverage_gateway: null };
-  return {
-    ...revealGateway(choices, gatewayId),
-    coverage: true,
-    coverage_gateway: gatewayId,
-  };
-}
-
-/** The gateway ids the coverage query filters on: the one gateway, else every ticked one, else
- * nothing (every gateway). */
+/** The gateway ids the "everything in view" coverage read filters on: every ticked gateway,
+ * or nothing (every gateway) when none is hidden. One gateway alone is a toggle in the URL
+ * (decision D373), not a layer choice. */
 export function coverageGatewayIds(
   choices: LayerChoices,
   all: string[],
 ): string[] | undefined {
-  if (choices.coverage_gateway) return [choices.coverage_gateway];
   if (choices.hidden_gateways.length === 0) return undefined;
   return all.filter((id) => !choices.hidden_gateways.includes(id));
 }

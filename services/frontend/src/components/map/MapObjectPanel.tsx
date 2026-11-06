@@ -7,6 +7,7 @@ import {
   Crosshair,
   Flame,
   Route,
+  Signal,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -890,6 +891,40 @@ export function HeatButton({
   );
 }
 
+/** The heard positions toggle of a panel (decision D373): where the device was heard over the
+ * period, coloured by signal, with the lines to the gateways when they are on; on a gateway
+ * panel, everything that gateway heard. Like the track and the heatmap. */
+export function HeardButton({
+  on,
+  onToggle,
+  gateway = false,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  /** The gateway's side: the words say what the gateway heard. */
+  gateway?: boolean;
+}) {
+  const { t } = useTranslation();
+  const label = on
+    ? t("Hide the heard positions")
+    : gateway
+      ? t("Show what this gateway heard")
+      : t("Show the heard positions");
+  return (
+    <Button
+      variant={on ? "default" : "outline"}
+      size="icon"
+      className="size-8"
+      aria-pressed={on}
+      aria-label={label}
+      title={label}
+      onClick={onToggle}
+    >
+      <Signal className="size-4" />
+    </Button>
+  );
+}
+
 /** Whether the map follows the object as new positions arrive (decision D210, Tim,
  * 2026-09-15): on while selected, off after a drag by hand, on again with this button. */
 export function FollowButton({
@@ -965,6 +1000,8 @@ export function EntityPanel({
   onToggleTrack,
   heat,
   onToggleHeat,
+  heard,
+  onToggleHeard,
   following,
   onToggleFollow,
 }: {
@@ -982,6 +1019,9 @@ export function EntityPanel({
   onToggleTrack: () => void;
   heat: boolean;
   onToggleHeat: () => void;
+  /** The heard positions of the device it has now (decision D373). */
+  heard: boolean;
+  onToggleHeard: () => void;
   /** The map follows the object as positions arrive (decision D210). */
   following: boolean;
   onToggleFollow: () => void;
@@ -1069,6 +1109,7 @@ export function EntityPanel({
             />
           )}
           {moves && <HeatButton on={heat} onToggle={onToggleHeat} />}
+          {props.device_id && <HeardButton on={heard} onToggle={onToggleHeard} />}
           {moves && <FollowButton on={following} onToggle={onToggleFollow} />}
           {position && <CopyPositionButton position={position} />}
         </>
@@ -1175,6 +1216,8 @@ export function DevicePanel({
   onToggleTrack,
   heat,
   onToggleHeat,
+  heard,
+  onToggleHeard,
   following,
   onToggleFollow,
 }: {
@@ -1191,6 +1234,9 @@ export function DevicePanel({
   onToggleTrack: () => void;
   heat: boolean;
   onToggleHeat: () => void;
+  /** The heard positions of this device (decision D373). */
+  heard: boolean;
+  onToggleHeard: () => void;
   /** The map follows the object as positions arrive (decision D210). */
   following: boolean;
   onToggleFollow: () => void;
@@ -1265,6 +1311,7 @@ export function DevicePanel({
             onToggle={onToggleTrack}
           />
           <HeatButton on={heat} onToggle={onToggleHeat} />
+          <HeardButton on={heard} onToggle={onToggleHeard} />
           <FollowButton on={following} onToggle={onToggleFollow} />
           {position && <CopyPositionButton position={position} />}
         </>
