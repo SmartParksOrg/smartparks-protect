@@ -38,22 +38,23 @@ export function HeardCard({
   onClear: () => void;
 }) {
   const { t } = useTranslation();
+  const period = periodLabel(hours, t);
   return (
-    <div className="flex min-h-9 max-w-full flex-col gap-1 rounded-md border bg-card py-1 pr-1 pl-3 text-sm shadow-sm">
+    // shrink-0: the phone's column clips what it cannot fit, and a card of one line must
+    // stay whole while the panel below it gives way (Tim, 2026-11-06)
+    <div className="flex min-h-9 max-w-full shrink-0 flex-col gap-1 rounded-md border bg-card py-1 pr-1 pl-3 text-sm shadow-sm">
       <div className="flex items-center gap-1">
-        <span className="min-w-0 flex-1 leading-tight">
-          {t("Heard positions of {{count}}", { count })}
-          {", "}
+        <span
+          className="min-w-0 flex-1 leading-tight"
+          title={t("{{count}} switched on", { count })}
+        >
           {points < total
-            ? t("the newest {{points}} of {{total}} over {{period}}", {
+            ? t("the newest {{points}} of {{total}} heard positions, {{period}}", {
                 points,
                 total,
-                period: periodLabel(hours, t),
+                period,
               })
-            : t("{{count}} positions over {{period}}", {
-                count: total,
-                period: periodLabel(hours, t),
-              })}
+            : t("{{count}} heard positions, {{period}}", { count: total, period })}
         </span>
         <Button
           variant={settingsOpen ? "default" : "ghost"}
@@ -66,8 +67,15 @@ export function HeardCard({
         >
           <Settings2 className="size-4" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 shrink-0" onClick={onClear}>
-          {t("Clear heard positions")}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 shrink-0"
+          title={t("Clear heard positions")}
+          onClick={onClear}
+        >
+          <span className="sm:hidden">{t("Clear")}</span>
+          <span className="hidden sm:inline">{t("Clear heard positions")}</span>
         </Button>
       </div>
       {loading && <LoadingBar className="pr-2 pb-1" label={t("Loading the heard positions…")} />}

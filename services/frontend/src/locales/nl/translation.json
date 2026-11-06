@@ -3396,17 +3396,17 @@
   "{{count}} heard positions in the period_other": "{{count}} gehoorde posities in de periode",
   "Loading every position this gateway heard in the last {{period}}…": "Elke positie die deze gateway in de laatste {{period}} hoorde wordt geladen…",
   "Loading the heard positions in view…": "De gehoorde posities in beeld worden geladen…",
-  "{{count}} positions over {{period}}_one": "{{count}} positie over {{period}}",
-  "{{count}} positions over {{period}}_other": "{{count}} posities over {{period}}",
   "Clear heard positions": "Gehoorde posities wissen",
   "Everything heard in view; the icon on an entity, a device or a gateway shows its own heard positions wherever the map looks": "Alles wat in beeld is gehoord; het pictogram bij een entiteit, een apparaat of een gateway toont zijn eigen gehoorde posities, waar de kaart ook kijkt",
   "Heard positions in view": "Gehoorde posities in beeld",
-  "Heard positions of {{count}}_one": "Gehoorde posities van {{count}}",
-  "Heard positions of {{count}}_other": "Gehoorde posities van {{count}}",
   "Heard positions settings": "Instellingen gehoorde posities",
   "Hide the heard positions": "Gehoorde posities verbergen",
   "Loading the heard positions…": "De gehoorde posities worden geladen…",
   "Show the heard positions": "Gehoorde posities tonen",
   "Show what this gateway heard": "Tonen wat deze gateway hoorde",
-  "the newest {{points}} of {{total}} over {{period}}": "de nieuwste {{points}} van {{total}} over {{period}}"
+  "{{count}} heard positions, {{period}}_one": "{{count}} gehoorde positie, {{period}}",
+  "{{count}} heard positions, {{period}}_other": "{{count}} gehoorde posities, {{period}}",
+  "{{count}} switched on_one": "{{count}} ingeschakeld",
+  "{{count}} switched on_other": "{{count}} ingeschakeld",
+  "the newest {{points}} of {{total}} heard positions, {{period}}": "de nieuwste {{points}} van {{total}} gehoorde posities, {{period}}"
 }
