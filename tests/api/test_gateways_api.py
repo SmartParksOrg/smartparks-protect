@@ -553,3 +553,83 @@ async def test_a_project_admin_names_a_gateway(client, db, bus):  # noqa: F811
     cleared = await client.patch(base, json={"name": ""}, headers=h)
     assert cleared.status_code == 200 and cleared.json()["name_override"] is None
     assert cleared.json()["display_name"] == "f1366ff3"
+
+
+async def test_a_second_tenant_key_names_the_gateways_of_the_same_chirpstack(
+    client,
+    db,
+    bus,  # noqa: F811
+    monkeypatch,
+):
+    """Decision D375: two sources on one ChirpStack, a tenant key each. A gateway the first
+    source knows from an uplink gets its name, state and place from the second source's list,
+    and no second row; a gateway only the second tenant has becomes the second source's row."""
+    from datetime import UTC, datetime
+
+    admin, _project, _entity, _source, _device, _ = await _setup(client, db)
+    h = admin.headers
+
+    async def make(name: str) -> dict:
+        response = await client.post(
+            "/api/v1/data-sources",
+            json={
+                "name": unique_name(name),
+                "adapter_key": "chirpstack",
+                "config": {"web_url": f"https://cs.example.org/#/tenants/{uuid.uuid4()}"},
+                "credentials": {"api_token": "x"},
+                "channels": {"api": True, "http": False, "mqtt": False},
+            },
+            headers=h,
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    first = await make("tenant-a")
+    second = await make("tenant-b")
+    row_a = await db.get(DataSource, uuid.UUID(first["id"]))
+    # an uplink through the first tenant's source: a nameless row for gw-shared under it
+    await _uplink(
+        db,
+        bus,
+        row_a,
+        "0000000000000001",
+        [("gw-shared", -100, 5.0)],
+        datetime.now(UTC).isoformat(),
+    )
+
+    class FakeManagement:
+        async def list_gateway_updates(self):
+            return [
+                GatewayUpdate(
+                    gateway_id="gw-shared",
+                    name="Hill top",
+                    status="online",
+                    latitude=-24.7,
+                    longitude=31.3,
+                ),
+                GatewayUpdate(gateway_id="gw-own", name="Valley", status="offline"),
+            ]
+
+    adapter = ADAPTERS["chirpstack"]
+    monkeypatch.setattr(
+        type(adapter), "management_connector", lambda self, ctx: FakeManagement(), raising=False
+    )
+    synced = await client.post(f"/api/v1/data-sources/{second['id']}/sync-gateways", headers=h)
+    assert synced.status_code == 200, synced.text
+    assert synced.json()["synced"] == 2
+
+    async def registry(source_id: str) -> dict[str, dict]:
+        items = (
+            await client.get(
+                "/api/v1/admin/gateways", params={"data_source_id": source_id}, headers=h
+            )
+        ).json()["items"]
+        return {g["external_id"]: g for g in items}
+
+    under_a = await registry(first["id"])
+    under_b = await registry(second["id"])
+    assert under_a["gw-shared"]["name"] == "Hill top"
+    assert under_a["gw-shared"]["status"] == "online"
+    assert under_a["gw-shared"]["geometry"]["coordinates"] == [31.3, -24.7]
+    assert "gw-shared" not in under_b
+    assert under_b["gw-own"]["name"] == "Valley" and under_b["gw-own"]["status"] == "offline"

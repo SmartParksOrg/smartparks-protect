@@ -62,6 +62,17 @@ Gateways, {gateway}; the live map's gateway panel and the search lead there too:
 - Traffic: the receptions it relayed per day over a window as bars, a day it relayed nothing
   left empty, then the messages themselves with the Traffic page's filters and pages.
 
+## Several tenants of one ChirpStack
+
+A tenant API key lists its own tenant's gateways alone, while the uplinks of a project may be
+heard by gateways of other tenants of the same ChirpStack, which Protect then knows from the
+receptions alone, nameless. Add a data source per tenant with that tenant's key and the same
+address (decision D375): the sync of each applies its list to the rows every source on that
+ChirpStack holds for the same gateway id, so a gateway known from the uplinks gets its name,
+state and location from whichever tenant owns it, and only a gateway no source holds yet
+becomes a row of the new source. A source kept for the gateway sync alone has its API
+channel on and its HTTP channel off, no applications connected and no project assigned.
+
 ## Status
 
 A gateway's status is derived when it is read (decision D370). The registry keeps the last
