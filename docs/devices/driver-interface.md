@@ -8,11 +8,15 @@ A driver turns a source event of one device family into decoded records, and lat
 class DeviceDriver(Protocol):
     key: ClassVar[str]  # "opencollar"
     label: ClassVar[str]
-    capabilities: ClassVar[frozenset[str]]  # {"gnss", "battery", ...}; "flash_logging" opens the raw log upload and the Bluetooth sync (D377)
+    capabilities: ClassVar[frozenset[str]]  # {"gnss", "battery", "flash_logging", ...}
     timestamp_semantics: ClassVar[dict[str, TimestampSemantics]]  # per record type
 
     def decode(self, event: SourceEventData) -> DecodedRecords: ...
 ```
+
+A driver's `capabilities` reach the device type (`driver_capabilities` on the type read) and
+decide what the pages offer: `flash_logging` opens the raw log upload and the Bluetooth sync,
+which the API refuses for any other driver (decision D377).
 
 `SourceEventData` carries the payload, provider metadata, the network receive time, the ingest time and the device and device type settings. For a LoRaWAN device the decoder service has already extracted the application payload: `event.frame` holds the bytes and `event.f_port` the port, whatever adapter delivered the uplink (`lorawan_frame` in `shared/device_drivers/base.py` reads ChirpStack's base64 `data` or the `frame_hex` other adapters store). `event.acquisition_channel` says whether the delivery came over LoRaWAN, Web Bluetooth, a log file or satellite. `DecodedRecords` holds lists of `DecodedPosition`, `DecodedMeasurement`, `DecodedState` and `DecodedEvent`, each with its canonical `time`.
 
