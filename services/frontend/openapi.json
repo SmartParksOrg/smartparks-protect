@@ -10671,6 +10671,25 @@
       }
      },
      {
+      "name": "gateway_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only messages this registry gateway relayed (decision D369)",
+       "title": "Gateway Id"
+      },
+      "description": "Only messages this registry gateway relayed (decision D369)"
+     },
+     {
       "name": "event_type",
       "in": "query",
       "required": false,
@@ -10867,6 +10886,23 @@
         }
        ],
        "title": "Device Id"
+      }
+     },
+     {
+      "name": "gateway_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Gateway Id"
       }
      },
      {
@@ -19856,6 +19892,55 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/decoding": {
+   "get": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Device Decoding",
+    "description": "What is being processed for this device right now (decision D366, Tim, 2026-11-06: the\nlive map's panels said nothing while a card was being decoded): its own log files and\nbrowser syncs the decoder holds or works on, the SD card files of offload stations whose\nframes name it (by its device or its LP0 address, as the decoder counts them per batch),\nthe decoder's walks over its retained uplinks and the attribution job rewriting its\nrecords. One read for the map panels and the pages, polled while something runs.",
+    "operationId": "device_decoding_api_v1_devices__device_id__decoding_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DecodingRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/log-files": {
    "get": {
     "tags": [
@@ -22145,6 +22230,80 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/gateways/{gateway_id}/days": {
+   "get": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Project Gateway Days",
+    "description": "The gateway's receptions of the scope's devices per UTC day over the window (decision\nD369, the gateway page's Traffic tab): how many uplinks it relayed, from how many devices,\nwith the mean signal; a day it relayed nothing is left out, the page draws the gap.",
+    "operationId": "project_gateway_days_api_v1_projects__project_id__gateways__gateway_id__days_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "gateway_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Gateway Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 720,
+       "minimum": 24,
+       "default": 720,
+       "title": "Hours"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/GatewayDay"
+         },
+         "title": "Response Project Gateway Days Api V1 Projects  Project Id  Gateways  Gateway Id  Days Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/connectivity": {
    "get": {
     "tags": [
@@ -22438,7 +22597,7 @@
      "gateways"
     ],
     "summary": "Coverage",
-    "description": "Heard positions of the project in the window and viewport as points, the newest first\nup to a cap, or as hexagons with the count and best signal on request, plus the share per\ngateway.",
+    "description": "Heard positions of the project in the window and viewport as points, the newest first\nup to a cap, or as hexagons with the count and best signal on request, plus the share per\ngateway. With `lines`, the points come with the paths the uplinks took: one `LineString`\nfrom the position to each gateway that received it, for the gateways with a location.",
     "operationId": "coverage_api_v1_projects__project_id__coverage_get",
     "security": [
      {
@@ -22537,6 +22696,18 @@
        "title": "Mode"
       },
       "description": "Points at every zoom unless hexagons are asked for (decision D123)"
+     },
+     {
+      "name": "lines",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "With the points, a line from each heard position to every gateway that received it and has a location (decision D368)",
+       "default": false,
+       "title": "Lines"
+      },
+      "description": "With the points, a line from each heard position to every gateway that received it and has a location (decision D368)"
      }
     ],
     "responses": {
@@ -30459,6 +30630,45 @@
     ],
     "title": "DecodedStateRead"
    },
+   "DecodingRead": {
+    "properties": {
+     "files": {
+      "items": {
+       "$ref": "#/components/schemas/DeviceLogFileRead"
+      },
+      "type": "array",
+      "title": "Files",
+      "description": "The device's own log files and browser syncs the decoder holds or works on, and the SD card files of offload stations whose frames name this device, each with the device the file belongs to"
+     },
+     "walks": {
+      "items": {
+       "$ref": "#/components/schemas/WalkRead"
+      },
+      "type": "array",
+      "title": "Walks",
+      "description": "The decoder's walks over the device's retained uplinks (decision D121)"
+     },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The job giving the device's records their project and entity, while it is queued or running (decision D206)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "files",
+     "walks",
+     "attribution_job"
+    ],
+    "title": "DecodingRead",
+    "description": "What is being processed for a device right now (decision D366): the one read behind the\n\"data coming in\" row of the live map's panels and the notice of the device and entity\npages, polled while something runs."
+   },
    "DeliveryDetail": {
     "properties": {
      "source_event_id": {
@@ -36999,6 +37209,55 @@
      "station_eui"
     ],
     "title": "FieldStation"
+   },
+   "GatewayDay": {
+    "properties": {
+     "day": {
+      "type": "string",
+      "format": "date",
+      "title": "Day"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions"
+     },
+     "devices": {
+      "type": "integer",
+      "title": "Devices"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     },
+     "mean_snr": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Snr"
+     }
+    },
+    "type": "object",
+    "required": [
+     "day",
+     "receptions",
+     "devices",
+     "mean_rssi",
+     "mean_snr"
+    ],
+    "title": "GatewayDay",
+    "description": "One UTC day of a gateway's receptions of the scope's devices (decision D369)."
    },
    "GatewayDetail": {
     "properties": {

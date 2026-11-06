@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
+from protect_api.crud import get_or_404
 from protect_api.deps import (
     ProjectContext,
     ScopeContext,
@@ -34,6 +35,7 @@ from shared.models import (
     Device,
     DeviceProjectAssignment,
     ExternalIdentity,
+    Gateway,
     GatewayReception,
     ProcessingTrace,
     SourceEvent,
@@ -255,6 +257,23 @@ def _delivered_at() -> Any:
     return func.coalesce(SourceEvent.network_received_at, SourceEvent.ingested_at)
 
 
+async def _relayed_by(
+    session: AsyncSession, gateway_id: uuid.UUID, time_from: datetime, time_to: datetime
+) -> Any:
+    """The source events a registry gateway relayed in the window (decision D369, the gateway
+    page's Traffic tab): the receptions of its source and id, read by their own index."""
+    gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
+    return SourceEvent.id.in_(
+        select(GatewayReception.source_event_id).where(
+            GatewayReception.data_source_id == gateway.data_source_id,
+            GatewayReception.gateway_id == gateway.external_id,
+            GatewayReception.time >= time_from - timedelta(hours=1),
+            GatewayReception.time < time_to + timedelta(hours=1),
+            GatewayReception.source_event_id.is_not(None),
+        )
+    )
+
+
 def _traffic_statuses(status: list[str] | None) -> list[ProcessingStatus]:
     """The statuses a traffic read narrows to; an unknown one is a 422."""
     out: list[ProcessingStatus] = []
@@ -284,6 +303,9 @@ async def _traffic_scope(
 @router.get("/projects/{project_id}/traffic", response_model=list[TrafficRow])
 async def traffic(
     device_id: uuid.UUID | None = None,
+    gateway_id: uuid.UUID | None = Query(
+        None, description="Only messages this registry gateway relayed (decision D369)"
+    ),
     event_type: str | None = None,
     status: list[str] | None = Query(
         None, description="Only these processing statuses, repeatable (decision D352)"
@@ -321,6 +343,8 @@ async def traffic(
         statement = statement.where(
             _assigned_at(context.project.id, SourceEvent.device_id, _delivered_at())
         )
+    if gateway_id is not None:
+        statement = statement.where(await _relayed_by(session, gateway_id, time_from, time_to))
     if event_type is not None:
         statement = statement.where(SourceEvent.event_type == event_type)
     if statuses:
@@ -343,6 +367,7 @@ async def traffic(
 @router.get("/projects/{project_id}/traffic/count", response_model=TrafficCount)
 async def traffic_count(
     device_id: uuid.UUID | None = None,
+    gateway_id: uuid.UUID | None = Query(None),
     event_type: str | None = None,
     status: list[str] | None = Query(None),
     time_from: datetime | None = Query(None, alias="from"),
@@ -371,6 +396,8 @@ async def traffic_count(
         statement = statement.where(
             _assigned_at(context.project.id, SourceEvent.device_id, _delivered_at())
         )
+    if gateway_id is not None:
+        statement = statement.where(await _relayed_by(session, gateway_id, time_from, time_to))
     if event_type is not None:
         statement = statement.where(SourceEvent.event_type == event_type)
     if statuses:

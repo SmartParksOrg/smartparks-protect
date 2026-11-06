@@ -15,13 +15,23 @@ from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import get_or_404
 from protect_api.deps import ProjectContext, require_permission
+from protect_api.device_reads import walk_reads
 from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
-from protect_api.schemas.log_files import BleSyncRequest, DeviceLogFileRead, DriverCatalog
+from protect_api.schemas.domain import AttributionJobRead
+from protect_api.schemas.log_files import (
+    BleSyncRequest,
+    DecodingRead,
+    DeviceLogFileRead,
+    DriverCatalog,
+)
+from shared import reprocessing
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.control.commands import driver_for
 from shared.database import get_session
+from shared.domain.attribution import recent_jobs
+from shared.domain.lp0 import addresses_of
 from shared.enums import AcquisitionChannel, LogFileStatus
 from shared.logfiles import (
     DuplicateLogFile,
@@ -215,6 +225,66 @@ async def list_log_files(
         .limit(limit)
     )
     return list(rows)
+
+
+@router.get("/devices/{device_id}/decoding", response_model=DecodingRead)
+async def device_decoding(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> DecodingRead:
+    """What is being processed for this device right now (decision D366, Tim, 2026-11-06: the
+    live map's panels said nothing while a card was being decoded): its own log files and
+    browser syncs the decoder holds or works on, the SD card files of offload stations whose
+    frames name it (by its device or its LP0 address, as the decoder counts them per batch),
+    the decoder's walks over its retained uplinks and the attribution job rewriting its
+    records. One read for the map panels and the pages, polled while something runs."""
+    device = await _visible_device(session, user, device_id)
+    active = (LogFileStatus.QUEUED, LogFileStatus.PROCESSING)
+    own = (
+        await session.scalars(
+            select(DeviceLogFile)
+            .where(DeviceLogFile.device_id == device.id, DeviceLogFile.status.in_(active))
+            .order_by(DeviceLogFile.uploaded_at)
+        )
+    ).all()
+    files = [DeviceLogFileRead.model_validate(row) for row in own]
+    for read in files:
+        read.device_name = device.name
+    cards = (
+        await session.execute(
+            select(DeviceLogFile, Device.name)
+            .join(Device, Device.id == DeviceLogFile.device_id)
+            .where(
+                DeviceLogFile.device_id != device.id,
+                DeviceLogFile.acquisition_channel == AcquisitionChannel.LP0,
+                DeviceLogFile.status.in_(active),
+            )
+            .order_by(DeviceLogFile.uploaded_at)
+        )
+    ).all()
+    address = (await addresses_of(session, [device.id])).get(device.id)
+    for row, station_name in cards:
+        trackers = (row.attributes or {}).get("trackers") or {}
+        named = address is not None and address in trackers
+        named = named or any(
+            str(entry.get("device_id")) == str(device.id) for entry in trackers.values()
+        )
+        if named:
+            read = DeviceLogFileRead.model_validate(row)
+            read.device_name = station_name
+            files.append(read)
+    walks = [w for w in await reprocessing.walks(bus.redis) if w.device_id == device.id]
+    job = next(
+        (j for j in await recent_jobs(session, device.id) if j.status in ("queued", "running")),
+        None,
+    )
+    return DecodingRead(
+        files=files,
+        walks=await walk_reads(session, walks),
+        attribution_job=AttributionJobRead.model_validate(job) if job else None,
+    )
 
 
 @router.get("/projects/{project_id}/log-files", response_model=list[DeviceLogFileRead])

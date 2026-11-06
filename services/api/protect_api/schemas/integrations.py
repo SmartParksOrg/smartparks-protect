@@ -1,7 +1,7 @@
 """Integrations, deliveries and gateways (phase 8)."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -168,6 +168,16 @@ class GatewayDeviceStat(BaseModel):
 class GatewayDetail(BaseModel):
     gateway: GatewayRead
     devices: list[GatewayDeviceStat]
+
+
+class GatewayDay(BaseModel):
+    """One UTC day of a gateway's receptions of the scope's devices (decision D369)."""
+
+    day: date
+    receptions: int
+    devices: int
+    mean_rssi: float | None
+    mean_snr: float | None
 
 
 class GatewayUpdateRequest(BaseModel):

@@ -4744,6 +4744,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/decoding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Decoding
+         * @description What is being processed for this device right now (decision D366, Tim, 2026-11-06: the
+         *     live map's panels said nothing while a card was being decoded): its own log files and
+         *     browser syncs the decoder holds or works on, the SD card files of offload stations whose
+         *     frames name it (by its device or its LP0 address, as the decoder counts them per batch),
+         *     the decoder's walks over its retained uplinks and the attribution job rewriting its
+         *     records. One read for the map panels and the pages, polled while something runs.
+         */
+        get: operations["device_decoding_api_v1_devices__device_id__decoding_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/log-files": {
         parameters: {
             query?: never;
@@ -5367,6 +5392,28 @@ export interface paths {
         patch: operations["rename_gateway_api_v1_projects__project_id__gateways__gateway_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/gateways/{gateway_id}/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Gateway Days
+         * @description The gateway's receptions of the scope's devices per UTC day over the window (decision
+         *     D369, the gateway page's Traffic tab): how many uplinks it relayed, from how many devices,
+         *     with the mean signal; a day it relayed nothing is left out, the page draws the gap.
+         */
+        get: operations["project_gateway_days_api_v1_projects__project_id__gateways__gateway_id__days_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/connectivity": {
         parameters: {
             query?: never;
@@ -5457,7 +5504,8 @@ export interface paths {
          * Coverage
          * @description Heard positions of the project in the window and viewport as points, the newest first
          *     up to a cap, or as hexagons with the count and best signal on request, plus the share per
-         *     gateway.
+         *     gateway. With `lines`, the points come with the paths the uplinks took: one `LineString`
+         *     from the position to each gateway that received it, for the gateways with a location.
          */
         get: operations["coverage_api_v1_projects__project_id__coverage_get"];
         put?: never;
@@ -8181,6 +8229,26 @@ export interface components {
             };
         };
         /**
+         * DecodingRead
+         * @description What is being processed for a device right now (decision D366): the one read behind the
+         *     "data coming in" row of the live map's panels and the notice of the device and entity
+         *     pages, polled while something runs.
+         */
+        DecodingRead: {
+            /**
+             * Files
+             * @description The device's own log files and browser syncs the decoder holds or works on, and the SD card files of offload stations whose frames name this device, each with the device the file belongs to
+             */
+            files: components["schemas"]["DeviceLogFileRead"][];
+            /**
+             * Walks
+             * @description The decoder's walks over the device's retained uplinks (decision D121)
+             */
+            walks: components["schemas"]["WalkRead"][];
+            /** @description The job giving the device's records their project and entity, while it is queued or running (decision D206) */
+            attribution_job: components["schemas"]["AttributionJobRead"] | null;
+        };
+        /**
          * DeliveryDetail
          * @description One delivery of a canonical record with the source event that carried it (architecture
          *     25.2 and 25.7): which channel, which platform, when it arrived.
@@ -10641,6 +10709,25 @@ export interface components {
             geometry?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * GatewayDay
+         * @description One UTC day of a gateway's receptions of the scope's devices (decision D369).
+         */
+        GatewayDay: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Receptions */
+            receptions: number;
+            /** Devices */
+            devices: number;
+            /** Mean Rssi */
+            mean_rssi: number | null;
+            /** Mean Snr */
+            mean_snr: number | null;
         };
         /** GatewayDetail */
         GatewayDetail: {
@@ -21533,6 +21620,8 @@ export interface operations {
         parameters: {
             query?: {
                 device_id?: string | null;
+                /** @description Only messages this registry gateway relayed (decision D369) */
+                gateway_id?: string | null;
                 event_type?: string | null;
                 /** @description Only these processing statuses, repeatable (decision D352) */
                 status?: string[] | null;
@@ -21577,6 +21666,7 @@ export interface operations {
         parameters: {
             query?: {
                 device_id?: string | null;
+                gateway_id?: string | null;
                 event_type?: string | null;
                 status?: string[] | null;
                 from?: string | null;
@@ -25660,6 +25750,37 @@ export interface operations {
             };
         };
     };
+    device_decoding_api_v1_devices__device_id__decoding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecodingRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_project_log_files_api_v1_projects__project_id__log_files_get: {
         parameters: {
             query?: {
@@ -26902,6 +27023,40 @@ export interface operations {
             };
         };
     };
+    project_gateway_days_api_v1_projects__project_id__gateways__gateway_id__days_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+            };
+            header?: never;
+            path: {
+                gateway_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayDay"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     project_connectivity_api_v1_projects__project_id__connectivity_get: {
         parameters: {
             query?: {
@@ -27052,6 +27207,8 @@ export interface operations {
                 gateway_id?: string[] | null;
                 /** @description Points at every zoom unless hexagons are asked for (decision D123) */
                 mode?: string | null;
+                /** @description With the points, a line from each heard position to every gateway that received it and has a location (decision D368) */
+                lines?: boolean;
             };
             header?: never;
             path: {

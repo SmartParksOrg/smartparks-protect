@@ -81,9 +81,19 @@ async def test_upload_list_download_and_redecode(client, db, bus):
     )
     assert garbage.status_code == 422
 
+    # what is being processed for the device (decision D366): the queued file, named with the
+    # device; nothing once the decoder is done
+    decoding = (await client.get(f"/api/v1/devices/{device['id']}/decoding", headers=h)).json()
+    assert [(f["id"], f["device_name"], f["status"]) for f in decoding["files"]] == [
+        (row["id"], device["name"], "queued")
+    ]
+    assert decoding["walks"] == [] and decoding["attribution_job"] is None
+
     await _decode(bus, row["id"])
     got = (await client.get(f"/api/v1/log-files/{row['id']}", headers=h)).json()
     assert got["status"] == "complete", got
+    decoding = (await client.get(f"/api/v1/devices/{device['id']}/decoding", headers=h)).json()
+    assert decoding["files"] == []
     frames = (
         await db.scalars(
             select(SourceEvent).where(

@@ -1462,6 +1462,24 @@ export function LayerPanel({
             </SelectContent>
           </Select>
         </Row>
+        {choices.coverage && (
+          <Row depth={0}>
+            <span className="size-6 shrink-0" />
+            <Check
+              checked={Boolean(choices.coverage_lines)}
+              label={t("Lines to the gateways")}
+              onChange={(v) => onChange({ ...choices, coverage_lines: v })}
+            />
+            <span
+              className={nameClass}
+              title={t(
+                "The path every uplink took: a thin line from the heard position to each gateway that received it",
+              )}
+            >
+              {t("Lines to the gateways")}
+            </span>
+          </Row>
+        )}
         <Row depth={0}>
           <span className="size-6 shrink-0" />
           <Check

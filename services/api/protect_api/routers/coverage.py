@@ -71,12 +71,18 @@ async def coverage(
         pattern="^(points|hexagons)$",
         description="Points at every zoom unless hexagons are asked for (decision D123)",
     ),
+    lines: bool = Query(
+        False,
+        description="With the points, a line from each heard position to every gateway that "
+        "received it and has a location (decision D368)",
+    ),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> CoverageResponse:
     """Heard positions of the project in the window and viewport as points, the newest first
     up to a cap, or as hexagons with the count and best signal on request, plus the share per
-    gateway."""
+    gateway. With `lines`, the points come with the paths the uplinks took: one `LineString`
+    from the position to each gateway that received it, for the gateways with a location."""
     until = utc_now()
     since = until - timedelta(hours=hours)
     box = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
@@ -191,26 +197,52 @@ async def coverage(
             await session.execute(
                 text(
                     f"""
-                    WITH {heard}
-                    SELECT ST_AsGeoJSON(geom) AS geom, rssi, gateways, time
-                    FROM best ORDER BY time DESC LIMIT :limit
+                    WITH {heard},
+                    shown AS (
+                        SELECT id, time, geom, rssi, gateways
+                        FROM best ORDER BY time DESC LIMIT :limit
+                    )
+                    SELECT ST_AsGeoJSON(geom) AS geom, rssi, gateways, time,
+                           NULL AS gateway_name
+                    FROM shown
                     """
+                    + (
+                        """
+                    UNION ALL
+                    SELECT ST_AsGeoJSON(ST_MakeLine(s.geom, g.geom)) AS geom, h.rssi,
+                           NULL AS gateways, s.time,
+                           COALESCE(g.name_override, g.name, g.external_id) AS gateway_name
+                    FROM shown s
+                    JOIN heard h ON h.id = s.id
+                    JOIN gateways g ON g.data_source_id = h.data_source_id
+                                   AND g.external_id = h.gateway_id
+                    WHERE g.geom IS NOT NULL
+                    """
+                        if lines
+                        else ""
+                    )
                 ),
                 {**params, "limit": MAX_POINTS},
             )
         ).all()
-        features = [
-            {
-                "type": "Feature",
-                "geometry": json.loads(row.geom),
-                "properties": {
+        features = []
+        for row in rows:
+            if row.gateway_name is None:
+                properties: dict[str, Any] = {
                     "best_rssi": row.rssi,
                     "gateways": int(row.gateways),
                     "time": row.time.isoformat(),
-                },
-            }
-            for row in rows
-        ]
+                }
+            else:
+                properties = {
+                    "kind": "path",
+                    "rssi": row.rssi,
+                    "gateway": row.gateway_name,
+                    "time": row.time.isoformat(),
+                }
+            features.append(
+                {"type": "Feature", "geometry": json.loads(row.geom), "properties": properties}
+            )
         return CoverageResponse(
             hours=hours, mode="points", total=total, features=features, gateways=gateways
         )

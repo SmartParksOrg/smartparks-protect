@@ -8,7 +8,9 @@ import type { Decoding } from "@/hooks/useDecoding";
 
 /** Data coming in: the files and the walks over retained events the decoder is working on for
  * this device, or for the devices of this entity, with what is done and a bar, at the top of
- * the page on every tab (Tim, 2026-09-23: the Data tab showed it, but nobody looked there). */
+ * the page on every tab (Tim, 2026-09-23: the Data tab showed it, but nobody looked there). A
+ * station's card whose frames name the device is among the files, with the station's name
+ * (decision D366). */
 export function DecodingNotice({
   decoding,
   onOpen,
@@ -18,11 +20,13 @@ export function DecodingNotice({
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
-  if (decoding.length === 0) return null;
+  // the attribution job has its own notice above this one (AttributionProgress)
+  const shown = decoding.filter((item) => item.kind !== "attribution");
+  if (shown.length === 0) return null;
   return (
     <Callout kind="info">
       <div className="space-y-2">
-        {decoding.map((item) => {
+        {shown.map((item) => {
           if (item.kind === "walk") {
             const { deviceId, deviceName, walk } = item;
             const percent =

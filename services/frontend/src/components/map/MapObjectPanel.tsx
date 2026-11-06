@@ -19,6 +19,7 @@ import type {
   DeviceFeatureProperties,
   EntityFeatureProperties,
 } from "@/components/map/layers";
+import { DecodingRow } from "@/components/map/DecodingRow";
 import { StationRows } from "@/components/map/StationRows";
 import { Button } from "@/components/ui/button";
 import { useIsPhone } from "@/hooks/useMediaQuery";
@@ -1105,6 +1106,7 @@ export function EntityPanel({
         trapClosed={props.trap_closed}
         now={now}
       />
+      <DecodingRow deviceId={props.device_id} />
       {station && (
         <StationRows
           station={stationCard}
@@ -1300,6 +1302,7 @@ export function DevicePanel({
         trapClosed={props.trap_closed}
         now={now}
       />
+      <DecodingRow deviceId={props.device_id} />
       {allProjects && !props.project_id && (
         <PanelRow label={t("Project")}>
           <Link className="underline" to={`/admin/devices/${props.device_id}`}>

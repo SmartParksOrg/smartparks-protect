@@ -2,29 +2,23 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { FileUp, ScrollText } from "lucide-react";
 import { useRef } from "react";
-import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DeviceLogFile, OffloadUpload } from "@/api/types";
+import type { DeviceLogFile } from "@/api/types";
 import { LogFilesExplorer, LogFilesViewSwitch } from "@/components/devices/LogFilesExplorer";
 import { useLogFilesView } from "@/hooks/useLogFilesView";
+import { LOG_FILE_ACCEPT, useLogFileUpload } from "@/hooks/useLogFileUpload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useMutationToast } from "@/hooks/useMutationToast";
-
-/** A station's card: one JSONL file of the card, or a zip of its LOG folders (phase 42). */
-function isStationUpload(file: File): boolean {
-  const name = file.name.toLowerCase();
-  return name.endsWith(".jsonl") || name.endsWith(".zip");
-}
 
 /**
  * Raw log files and browser syncs of a device as managed assets (architecture 25.6), shown as a
  * file explorer shows files (Tim, 2026-10-16: the rows of a card's 31 files ran to several
  * lines each): a list with one line per file, or tiles, switched at the top and remembered per
  * person; a click opens the file's properties, where the counts, the error, the trace, the
- * original and "decode again" live. Upload stays in the header.
+ * original and "decode again" live. Upload stays in the header, the same upload the page's
+ * header button and the Devices list use (decision D367).
  */
 export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrite: boolean }) {
   const { t } = useTranslation();
@@ -37,50 +31,7 @@ export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrit
         ? 3_000
         : false,
   });
-  const upload = useMutationToast({
-    mutationFn: async (file: File) => {
-      const body = new FormData();
-      body.append("file", file);
-      if (isStationUpload(file)) {
-        // a station's card goes through its own endpoint: a zip becomes one row per file
-        const result = await api.post<OffloadUpload>(`/api/v1/devices/${deviceId}/offload-files`, {
-          body,
-        });
-        const notes = result.skipped ?? [];
-        return {
-          name: file.name,
-          files: result.files.length,
-          // the station holds these bytes already: left out, named, no error (decision D353)
-          duplicates: notes.filter((s) => s.duplicate).length,
-          skipped: notes.filter((s) => !s.duplicate).length,
-        };
-      }
-      const row = await api.post<DeviceLogFile>(`/api/v1/devices/${deviceId}/log-files`, { body });
-      return { name: row.original_filename, files: 1, duplicates: 0, skipped: 0 };
-    },
-    invalidate: [queryKeys.logFiles(deviceId), queryKeys.offloadStation(deviceId)],
-    onSuccess: (r) => {
-      if (r.files === 0 && r.duplicates > 0 && r.skipped === 0)
-        toast.info(
-          t("Nothing new: all {{count}} files of {{name}} were uploaded before", {
-            count: r.duplicates,
-            name: r.name,
-          }),
-        );
-      else if (r.files === 1 && r.duplicates === 0 && r.skipped === 0)
-        toast.success(`${r.name} uploaded, decoding`);
-      else
-        toast.success(t("{{name}}: {{files}} files uploaded, {{skipped}} skipped, decoding", r));
-      if (r.duplicates > 0 && r.files > 0)
-        toast.info(t("{{count}} files were uploaded before and were left out", { count: r.duplicates }));
-    },
-    onError: (error) =>
-      toast.error(
-        error.message.includes("uploaded before")
-          ? t("This file was uploaded before for this device.")
-          : error.message,
-      ),
-  });
+  const { uploadAll, isPending } = useLogFileUpload(deviceId);
   const [view, setView] = useLogFilesView();
 
   return (
@@ -100,21 +51,21 @@ export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrit
                 <input
                   ref={input}
                   type="file"
-                  accept=".txt,.log,.jsonl,.zip,text/plain,application/zip"
+                  multiple
+                  accept={LOG_FILE_ACCEPT}
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) upload.mutate(file);
+                    if (e.target.files?.length) void uploadAll(e.target.files);
                     e.target.value = "";
                   }}
                 />
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={upload.isPending}
+                  disabled={isPending}
                   onClick={() => input.current?.click()}
                 >
-                  <FileUp className="size-4" /> {upload.isPending ? t("Uploading…") : t("Upload")}
+                  <FileUp className="size-4" /> {isPending ? t("Uploading…") : t("Upload")}
                 </Button>
               </>
             )}

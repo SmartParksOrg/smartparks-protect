@@ -50,6 +50,12 @@ class Gateway(UuidPrimaryKeyMixin, TimestampMixin, Base):
         DateTime(timezone=True), comment="When the location was last set"
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="unknown")
+    status_source: Mapped[str | None] = mapped_column(
+        String(16), comment="Who set the status: platform (list or connection event) or reception"
+    )
+    status_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="When the status was set (D370)"
+    )
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="Last reception or gateway event"

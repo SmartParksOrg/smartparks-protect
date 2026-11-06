@@ -572,8 +572,10 @@ export function MapPage() {
       zoom: viewport?.zoom ?? 8,
       hours: layers.coverage_hours,
       gateway_id: coverageGateways,
+      // the paths of the uplinks (decision D368), asked for only while the tick is on
+      ...(layers.coverage_lines ? { lines: true } : {}),
     }),
-    [viewport, layers.coverage_hours, coverageGateways],
+    [viewport, layers.coverage_hours, layers.coverage_lines, coverageGateways],
   );
   const coverage = useQuery({
     queryKey: queryKeys.coverage(projectId, coverageParams),

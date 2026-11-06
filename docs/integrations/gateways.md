@@ -41,10 +41,38 @@ location, then the ones that heard nothing, most recently seen first; a source f
 the list to one network and the footer says how many heard nothing in the last 30 days. There
 is no window to pick: every figure covers the last 30 days, and the gateway's own last seen has
 no window at all, so a gateway that heard nothing in a month still says when the network last
-heard from it. On a phone both tabs show a card per row with the same figures. The detail
-shows when the gateway was seen and its last reception, the platform counters, links to the
-platform (when the data source has a gateway link template), diagnostics and the devices
-heard.
+heard from it. On a phone both tabs show a card per row with the same figures. A row opens
+the gateway's own page (decision D369), as a device or an entity has one, under Network,
+Gateways, {gateway}; the live map's gateway panel and the search lead there too:
+
+- Overview: the status with the reason when it is silent, when the network last heard from
+  the gateway and when it last relayed one of the project's devices, when it was first seen,
+  the source, the gateway id, the location with its origin and a small map, the devices heard
+  in the last 30 days with receptions, mean signal and last reception, the platform's counters
+  and diagnostics, and the platform's own page when the data source has a gateway link. Rename
+  and Set or Change location sit in the header for a project admin. A gateway the network's
+  list does not carry (another tenant's, heard through its uplinks alone) says so: its name
+  and its own status reports never reach Protect, so its status follows its receptions.
+- Coverage: the positions the project's devices were at when this gateway heard them over a
+  period (a day to 90 days), coloured by signal as the live map colours them, each with its
+  line to the gateway, the view fitted to all of it.
+- Traffic: the receptions it relayed per day over a window as bars, a day it relayed nothing
+  left empty, then the messages themselves with the Traffic page's filters and pages.
+
+## Status
+
+A gateway's status is derived when it is read (decision D370). The registry keeps the last
+word about the gateway and who gave it: the platform's gateway list or a connection event
+(`platform`), or an uplink the gateway relayed (`reception`), with the moment. The platform
+hears a gateway's own status reports whether or not a device spoke, so its word stands while
+it is fresh, within `GATEWAY_PLATFORM_WORD_HOURS` (36 hours, longer than the daily sync).
+Otherwise the gateway reads `online` while something was heard from it within
+`GATEWAY_SILENT_HOURS` (24 hours by default) and `silent` after that, in the sand tint on the
+list, the page and the map; `offline` is the platform's word and stands until the gateway is
+heard again; a gateway nothing was ever heard from is `unknown`. A gateway known from its
+receptions alone, such as another tenant's gateway on a shared ChirpStack, therefore reads
+silent a day after its last relayed uplink, which is all Protect can know about it; switching
+on the source's MQTT channel brings the gateway status reports of that network in as well.
 
 Device connectivity lists every device with the number of gateways that heard it, the best
 gateway and its share of the device's uplinks, mean signal and last reception, least covered
@@ -60,9 +88,12 @@ The registry keeps one position per gateway with its source and time. A platform
 
 The live map's Coverage tab (decision D107) shows where the project's collars were heard. Every position is joined to the receptions of the same uplink, so a heard position carries the best RSSI among the gateways that heard it. Switch on "Heard positions", pick a period (a day to 90 days) and, if wanted, untick gateways to see the footprint of the rest. The positions show as dots coloured from red (weak, about -120 dBm) to green (strong, -80 dBm and better) at every zoom, the newest ten thousand in view when there are more (decision D123; the hexagon aggregation stays available to API users). Each gateway row shows how many heard positions it received and its share of all heard positions in view. The layer shows only where trackers were: a blank area may still have coverage. Positions that reached the platform without a LoRaWAN reception, such as a Bluetooth log, are not part of it.
 
+"Lines to the gateways" (decision D368), off until ticked and kept in the layer preference, draws the path every uplink took: one thin grey line from the heard position to each gateway that received it and has a location, so a fix heard by three gateways shows three lines and a gateway's reach reads off the map. The lines follow the drawn points, the newest ten thousand in view. A gateway's own Coverage tab shows the same for that gateway alone.
+
 ## API
 
 `GET /projects/{id}/gateways?hours=`, `GET /projects/{id}/gateways/{gateway_id}`,
+`GET /projects/{id}/gateways/{gateway_id}/days?hours=` (the receptions of the scope's devices per UTC day, with devices and mean signal; 24 hours to 30 days),
 `GET /projects/{id}/connectivity?hours=`, `GET /admin/gateways`, `PATCH /admin/gateways/{id}`,
-`POST /data-sources/{id}/sync-gateways`.
-- `GET /projects/{id}/coverage?bbox=&zoom=&hours=&gateway_id=`: heard positions in the window and viewport as points (the newest 10,000) or, with `mode=hexagons`, as hexagons, with the share per gateway.
+`POST /data-sources/{id}/sync-gateways`. `GET /projects/{id}/traffic` and its `count` take `gateway_id` for the messages one gateway relayed.
+- `GET /projects/{id}/coverage?bbox=&zoom=&hours=&gateway_id=&lines=`: heard positions in the window and viewport as points (the newest 10,000) or, with `mode=hexagons`, as hexagons, with the share per gateway; `lines=true` adds a `LineString` per reception of the drawn points to the receiving gateway's location (`kind: path`, the gateway's name, the RSSI).

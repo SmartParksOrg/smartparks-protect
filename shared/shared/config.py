@@ -160,6 +160,15 @@ class Settings(BaseSettings):
         default=8, ge=1, description="Concurrent lanes per consumer; one device stays in one lane"
     )
     heartbeat_stale_minutes: int = 15
+    gateway_silent_hours: float = Field(
+        default=24,
+        description="A gateway seen no later than this reads silent, not online (decision D370)",
+    )
+    gateway_platform_word_hours: float = Field(
+        default=36,
+        description="How long the platform's own status word for a gateway stands before the "
+        "age of the evidence decides (longer than the daily gateway sync, decision D370)",
+    )
     payload_inline_max_bytes: int = Field(
         default=65_536, description="Bigger raw payloads go to MinIO"
     )

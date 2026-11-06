@@ -196,6 +196,110 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert (await client.get("/api/v1/admin/gateways", headers=viewer.headers)).status_code == 403
 
 
+async def test_a_silent_gateway_its_days_and_the_messages_it_relayed(client, db, bus):  # noqa: F811
+    """Decision D370: a gateway heard from within a day reads online, one that relayed its
+    last uplink days ago reads silent, the platform's fresh word stands and its offline word
+    stays; decision D369: the receptions per day and the traffic a gateway relayed."""
+    from datetime import UTC, datetime, timedelta
+
+    from shared.ingest import apply_gateway_update
+    from shared.models import Gateway
+
+    admin, project, _entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    row = await db.get(DataSource, uuid.UUID(source["id"]))
+    external_id = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()[
+        "external_identities"
+    ][0]["external_id"]
+    now = datetime.now(UTC).replace(microsecond=0)
+    three_days_ago = now - timedelta(days=3)
+    await _uplink(
+        db,
+        bus,
+        row,
+        external_id,
+        [("gw-old", -100, 5.0)],
+        three_days_ago.isoformat(),
+        received_at=three_days_ago,
+    )
+    await _uplink(
+        db,
+        bus,
+        row,
+        external_id,
+        [("gw-now", -90, 7.0)],
+        (now - timedelta(minutes=5)).isoformat(),
+        received_at=now - timedelta(minutes=5),
+    )
+    base = f"/api/v1/projects/{project.id}"
+    by_id = {
+        g["external_id"]: g
+        for g in (await client.get(f"{base}/gateways", params={"hours": 168}, headers=h)).json()
+    }
+    assert by_id["gw-now"]["status"] == "online"
+    assert by_id["gw-old"]["status"] == "silent"
+    assert by_id["gw-old"]["last_seen_at"] is not None
+
+    # the platform's word: fresh, it stands whatever the receptions say (the list's lastSeenAt
+    # is three days old, the word itself is of now); stale, the evidence decides; offline stays
+    await apply_gateway_update(
+        db,
+        row.id,
+        GatewayUpdate(gateway_id="gw-old", status="online", name="Hill", seen_at=three_days_ago),
+        now,
+    )
+    await db.commit()
+    detail = (await client.get(f"{base}/gateways/{by_id['gw-old']['id']}", headers=h)).json()
+    assert detail["gateway"]["status"] == "online" and detail["gateway"]["display_name"] == "Hill"
+    gateway = await db.get(Gateway, uuid.UUID(by_id["gw-old"]["id"]))
+    assert gateway.status_source == "platform" and gateway.status_at is not None
+    gateway.status_at = now - timedelta(hours=48)  # the sync has not run for two days
+    await db.commit()
+    detail = (await client.get(f"{base}/gateways/{by_id['gw-old']['id']}", headers=h)).json()
+    assert detail["gateway"]["status"] == "silent"
+    await apply_gateway_update(
+        db, row.id, GatewayUpdate(gateway_id="gw-old", status="offline"), now
+    )
+    await db.commit()
+    detail = (await client.get(f"{base}/gateways/{by_id['gw-old']['id']}", headers=h)).json()
+    assert detail["gateway"]["status"] == "offline"
+
+    # the receptions per day (D369): gw-old relayed one uplink three days ago, gw-now one today
+    days = (
+        await client.get(
+            f"{base}/gateways/{by_id['gw-old']['id']}/days", params={"hours": 168}, headers=h
+        )
+    ).json()
+    assert [(d["day"], d["receptions"], d["devices"], d["mean_rssi"]) for d in days] == [
+        (three_days_ago.date().isoformat(), 1, 1, -100.0)
+    ]
+    assert (
+        await client.get(
+            f"{base}/gateways/{by_id['gw-now']['id']}/days", params={"hours": 12}, headers=h
+        )
+    ).status_code == 422
+
+    # the messages a gateway relayed (D369): the traffic read and its count cut to the gateway
+    week = {"from": (now - timedelta(days=7)).isoformat()}
+    relayed = (
+        await client.get(
+            f"{base}/traffic", params={**week, "gateway_id": by_id["gw-old"]["id"]}, headers=h
+        )
+    ).json()
+    assert len(relayed) == 1 and relayed[0]["receptions"][0]["gateway_id"] == "gw-old"
+    count = (
+        await client.get(
+            f"{base}/traffic/count", params={**week, "gateway_id": by_id["gw-now"]["id"]}, headers=h
+        )
+    ).json()
+    assert count["count"] == 1
+    assert (
+        await client.get(
+            f"{base}/traffic", params={**week, "gateway_id": str(uuid.uuid4())}, headers=h
+        )
+    ).status_code == 404
+
+
 async def test_all_scope_counts_devices_in_no_project(client, db, bus):  # noqa: F811
     """A device in no project is heard in the all scope, not in a project (decision D120)."""
     from datetime import UTC, datetime

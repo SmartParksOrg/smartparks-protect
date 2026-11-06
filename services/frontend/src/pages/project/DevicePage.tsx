@@ -41,6 +41,7 @@ import {
 import { HealthCard } from "@/components/devices/HealthCard";
 import { ContactsCard } from "@/components/devices/ContactsCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
+import { UploadLogButton } from "@/components/devices/UploadLogButton";
 import { DeviceTraffic } from "@/components/devices/DeviceTraffic";
 import {
   RecordDeliveriesDialog,
@@ -384,6 +385,7 @@ export function DevicePage() {
                 </Link>
               </Button>
             )}
+            {can("devices:control") && <UploadLogButton deviceId={d.id} />}
             {deviceProjectId &&
               modules.includes("device_performance") &&
               can("analysis:run") && (

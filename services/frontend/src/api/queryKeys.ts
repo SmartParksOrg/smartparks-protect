@@ -64,6 +64,7 @@ export const queryKeys = {
   deviceSettings: (id: string) => ["devices", id, "settings"] as const,
   deviceSpan: (id: string) => ["devices", id, "span"] as const,
   attributionJobs: (id: string) => ["devices", id, "attribution-jobs"] as const,
+  decoding: (id: string) => ["devices", id, "decoding"] as const,
   deviceAssignments: (id: string) => ["devices", id, "assignments"] as const,
   deviceLastMessage: (id: string, before: string) =>
     ["devices", id, "last-message", before] as const,
@@ -211,6 +212,8 @@ export const queryKeys = {
     ["projects", projectId, "gateways", hours] as const,
   gateway: (projectId: string, id: string, hours: number) =>
     ["projects", projectId, "gateways", id, hours] as const,
+  gatewayDays: (projectId: string, id: string, hours: number) =>
+    ["projects", projectId, "gateways", id, "days", hours] as const,
   connectivity: (projectId: string, hours: number) =>
     ["projects", projectId, "connectivity", hours] as const,
   dataSourceCursor: (id: string) => ["data-sources", id, "cursor"] as const,

@@ -32,6 +32,7 @@ from shared.connectivity.base import (
 from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.satellite import DELIVERED_STATUSES, SatelliteSession
 from shared.database import session_scope
+from shared.domain import gateways as gateway_status
 from shared.enums import AcquisitionChannel, ConnectivityStatus, ProcessingStatus, TraceClass
 from shared.logger import get_logger
 from shared.models import (
@@ -148,8 +149,12 @@ async def apply_gateway_update(
         gateway.last_seen_at = seen
     if from_reception:
         gateway.status = ConnectivityStatus.ONLINE
+        gateway.status_source = gateway_status.RECEPTION
+        gateway.status_at = seen
     elif update.status is not None:
         gateway.status = _status(update.status) or ConnectivityStatus.UNKNOWN
+        gateway.status_source = gateway_status.PLATFORM
+        gateway.status_at = now
     if (update.name and not gateway.name) or (update.name and not from_reception):
         gateway.name = update.name
     if (
@@ -458,7 +463,11 @@ async def store_inbound(
         )
 
     if message.gateway_receptions:
-        await upsert_gateways(session, source.id, message.gateway_receptions, now)
+        # the gateway was seen when the network received the uplink, as its reception row says
+        # (decision D370: a backfilled or late uplink must not read as a gateway alive now)
+        await upsert_gateways(
+            session, source.id, message.gateway_receptions, message.network_received_at or now
+        )
 
     tracer.trace.root_object_id = str(event.id)
     async with tracer.step(

@@ -70,7 +70,7 @@ export function GatewayPanel({
   return (
     <MapPanel
       title={g?.display_name ?? t("Gateway")}
-      titleTo={`/projects/${projectId}/network/gateways`}
+      titleTo={`/projects/${projectId}/network/gateways/${gatewayId}`}
       subtitle={
         g ? `${g.data_source_name ?? ""} · ${g.external_id}` : undefined
       }
@@ -232,6 +232,13 @@ export function GatewayPanel({
             />
           )}
           <PanelRow label={t("More")}>
+            <Link
+              className="underline"
+              to={`/projects/${projectId}/network/gateways/${gatewayId}`}
+            >
+              {t("gateway page")}
+            </Link>
+            {" · "}
             <Link
               className="underline"
               to={`/projects/${projectId}/network/gateways`}

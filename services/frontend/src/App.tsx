@@ -227,6 +227,11 @@ const GatewaysPage = lazy(() =>
     default: m.GatewaysPage,
   })),
 );
+const GatewayPage = lazy(() =>
+  import("@/pages/project/GatewayPage").then((m) => ({
+    default: m.GatewayPage,
+  })),
+);
 const OffloadPage = lazy(() =>
   import("@/pages/project/OffloadPage").then((m) => ({
     default: m.OffloadPage,
@@ -330,6 +335,10 @@ export default function App() {
               </Route>
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/gateways" element={<GatewaysPage />} />
+              <Route
+                path="network/gateways/:gatewayId"
+                element={<GatewayPage />}
+              />
               <Route path="network/offload" element={<OffloadPage />} />
               <Route
                 path="integrate/integrations"

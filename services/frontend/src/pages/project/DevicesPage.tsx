@@ -27,6 +27,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { LoadMore } from "@/components/data/LoadMore";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { AddDeviceForm } from "@/components/devices/AddDeviceForm";
+import { UploadLogButton } from "@/components/devices/UploadLogButton";
 import { BulkAssignDialog } from "@/components/devices/BulkAssignDialog";
 import { CreateEntitiesDialog } from "@/components/devices/CreateEntitiesDialog";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
@@ -210,6 +211,23 @@ export function DevicesPage() {
           </Link>
         ) : null,
     },
+    // a raw log uploaded from the list (decision D367), for whoever may control devices
+    ...(can("devices:control")
+      ? [
+          {
+            id: "upload",
+            header: "",
+            cell: ({ row }) => (
+              <UploadLogButton
+                deviceId={row.original.id}
+                size="icon"
+                iconOnly
+                className="size-7"
+              />
+            ),
+          } satisfies ColumnDef<Device, unknown>,
+        ]
+      : []),
   ];
   return (
     <>

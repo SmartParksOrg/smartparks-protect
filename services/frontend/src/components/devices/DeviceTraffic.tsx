@@ -42,10 +42,14 @@ const PROBLEM_STATUSES = ["failed", "unassigned"];
 export function DeviceTraffic({
   projectId,
   deviceId,
+  gatewayId,
   onSelect,
 }: {
   projectId: string;
-  deviceId: string;
+  /** One device's messages, or, with `gatewayId` instead, the messages a gateway relayed
+   * (decision D369, the gateway page's Traffic tab). */
+  deviceId?: string;
+  gatewayId?: string;
   onSelect: (row: TrafficRow) => void;
 }) {
   const { t } = useTranslation();
@@ -57,11 +61,12 @@ export function DeviceTraffic({
   const from = new Date(anchor - hours * 3600_000).toISOString();
   const filters = {
     device_id: deviceId,
+    gateway_id: gatewayId,
     from,
     event_type: eventType || undefined,
     status: problems ? PROBLEM_STATUSES : undefined,
   };
-  const keyParams = { deviceId, hours, eventType, problems, anchor };
+  const keyParams = { deviceId, gatewayId, hours, eventType, problems, anchor };
   const pages = useInfiniteQuery({
     queryKey: queryKeys.traffic(projectId, keyParams),
     queryFn: ({ pageParam }) =>

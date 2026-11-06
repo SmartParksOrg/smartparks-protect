@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from protect_api.schemas.common import ORMModel
+from protect_api.schemas.domain import AttributionJobRead
 
 
 class WalkRead(BaseModel):
@@ -55,6 +56,25 @@ class DeviceLogFileRead(ORMModel):
     device_name: str | None = Field(
         default=None,
         description="Filled on the project's listing, where files of many devices meet",
+    )
+
+
+class DecodingRead(BaseModel):
+    """What is being processed for a device right now (decision D366): the one read behind the
+    "data coming in" row of the live map's panels and the notice of the device and entity
+    pages, polled while something runs."""
+
+    files: list[DeviceLogFileRead] = Field(
+        description="The device's own log files and browser syncs the decoder holds or works "
+        "on, and the SD card files of offload stations whose frames name this device, each "
+        "with the device the file belongs to"
+    )
+    walks: list[WalkRead] = Field(
+        description="The decoder's walks over the device's retained uplinks (decision D121)"
+    )
+    attribution_job: AttributionJobRead | None = Field(
+        description="The job giving the device's records their project and entity, while it is "
+        "queued or running (decision D206)"
     )
 
 

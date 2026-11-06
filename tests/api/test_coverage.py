@@ -92,6 +92,35 @@ async def test_coverage_points_hexagons_and_shares(client, db, bus):  # noqa: F8
     ).json()
     assert only_b["total"] == 2 and [g["external_id"] for g in only_b["gateways"]] == ["gw-a"]
 
+    # the paths of the uplinks (decision D368): a line from each heard position to every gateway
+    # that received it and has a location; gw-a is placed, gw-b is not, so the two fixes gw-a
+    # heard give two lines and the fix only gw-b heard gives none
+    placed = await client.patch(
+        f"{base}/gateways/{gw_a['gateway_id']}/location",
+        json={"latitude": -24.95, "longitude": 31.55},
+        headers=h,
+    )
+    assert placed.status_code == 200, placed.text
+    with_lines = (
+        await client.get(
+            f"{base}/coverage", params={"zoom": 14, "hours": 24, "lines": "true"}, headers=h
+        )
+    ).json()
+    points = [f for f in with_lines["features"] if f["geometry"]["type"] == "Point"]
+    lines = [f for f in with_lines["features"] if f["geometry"]["type"] == "LineString"]
+    assert len(points) == 3 and with_lines["total"] == 3
+    assert len(lines) == 2
+    assert all(
+        f["properties"]["kind"] == "path" and f["properties"]["gateway"] == "gw-a" for f in lines
+    )
+    assert all(f["geometry"]["coordinates"][1] == [31.55, -24.95] for f in lines)
+    assert sorted(f["properties"]["rssi"] for f in lines) == [-100.0, -95.0]
+    # without the flag the points come alone
+    plain = (
+        await client.get(f"{base}/coverage", params={"zoom": 14, "hours": 24}, headers=h)
+    ).json()
+    assert all(f["geometry"]["type"] == "Point" for f in plain["features"])
+
     # outside the window or the view: nothing
     empty = (
         await client.get(f"{base}/coverage", params={"zoom": 14, "bbox": "0,0,1,1"}, headers=h)

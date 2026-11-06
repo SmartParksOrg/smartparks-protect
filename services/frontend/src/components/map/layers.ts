@@ -1056,6 +1056,8 @@ export interface GatewayFeatureProperties {
 export const GATEWAY_COLORS: Record<string, string> = {
   online: "#2F4A3A",
   offline: "#A13D2D",
+  // seen, but not for a day (decision D370): the sand of a warning, not the red of offline
+  silent: "#B8923F",
   unknown: "#8A9590",
 };
 
@@ -1064,6 +1066,8 @@ const gatewayColor = [
   ["get", "status"],
   "offline",
   GATEWAY_COLORS.offline,
+  "silent",
+  GATEWAY_COLORS.silent,
   "unknown",
   GATEWAY_COLORS.unknown,
   GATEWAY_COLORS.online,
@@ -1196,6 +1200,22 @@ export function ensureCoverageLayers(map: MapLibreMap): void {
         "line-color": "#ffffff",
         "line-width": 0.5,
         "line-opacity": 0.6,
+      },
+    },
+    before,
+  );
+  // the path an uplink took (decision D368): a thin grey line from the heard position to each
+  // gateway that received it, under the points so the dots stay readable
+  map.addLayer(
+    {
+      id: "coverage-lines",
+      type: "line",
+      source: SOURCES.coverage,
+      filter: ["==", ["geometry-type"], "LineString"],
+      paint: {
+        "line-color": "#6b7280",
+        "line-width": 0.6,
+        "line-opacity": 0.3,
       },
     },
     before,

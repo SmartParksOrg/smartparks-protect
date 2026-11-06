@@ -68,6 +68,7 @@ import {
 import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { useDecoding } from "@/hooks/useDecoding";
 import { DecodingNotice } from "@/components/devices/DecodingNotice";
+import { UploadLogButton } from "@/components/devices/UploadLogButton";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
@@ -375,6 +376,9 @@ export function EntityPage() {
                   <MapPin className="size-4" /> {t("Show on map")}
                 </Link>
               </Button>
+            )}
+            {current && can("devices:control") && (
+              <UploadLogButton deviceId={current.device_id} />
             )}
             {modules.includes("movement") && can("analysis:run") && (
               <Button asChild variant="outline" size="sm">

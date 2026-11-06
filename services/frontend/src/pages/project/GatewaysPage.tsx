@@ -1,31 +1,18 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
-import { MapPin, Pencil } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { MapPin } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DeviceConnectivity, Gateway, GatewayDetail } from "@/api/types";
+import type { DeviceConnectivity, Gateway } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
-import { JsonView } from "@/components/common/JsonView";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
-import { GatewayNameDialog } from "@/components/network/GatewayNameDialog";
 import { Badge } from "@/components/ui/badge";
-import { usePermissions } from "@/hooks/useProjects";
 import { DataTable } from "@/components/data/DataTable";
-import { MiniMap } from "@/components/map/MiniMap";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -34,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatAgo, formatTime } from "@/lib/format";
+import { formatAgo } from "@/lib/format";
 import {
   gatewayCoords,
   isOffloadStation,
@@ -54,10 +41,12 @@ const signal = (
 ) =>
   rssi == null && snr == null ? "" : `${rssi ?? "?"} dBm / ${snr ?? "?"} dB`;
 
-/** Gateways and connectivity health (architecture 20): which gateways hear the project's devices, and how well each device is covered. */
+/** Gateways and connectivity health (architecture 20): which gateways hear the project's
+ * devices, and how well each device is covered. A row opens the gateway's page (D369). */
 export function GatewaysPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const tab =
     params.get("tab") === "connectivity" ? "connectivity" : "gateways";
@@ -93,29 +82,6 @@ export function GatewaysPage() {
       ? gateways.data
       : gateways.data?.filter((g) => g.data_source_id === sourceFilter);
   const silent = shown?.filter((g) => g.receptions === 0).length ?? 0;
-  const [selected, setSelected] = useState<Gateway | null>(null);
-  const [placing, setPlacing] = useState<Gateway | null>(null);
-  const [renaming, setRenaming] = useState<Gateway | null>(null);
-  const { can } = usePermissions(projectId);
-  // where the picking map looks for a gateway without a location: another gateway of the
-  // same source that has one, else nothing
-  const fallbackFor = (g: Gateway): [number, number] | null => {
-    const near = gateways.data?.find(
-      (x) =>
-        x.data_source_id === g.data_source_id && x.geometry && x.id !== g.id,
-    );
-    const c = (near?.geometry as { coordinates?: number[] } | null)
-      ?.coordinates;
-    return c ? [c[0], c[1]] : null;
-  };
-  const detail = useQuery({
-    queryKey: queryKeys.gateway(projectId, selected?.id ?? "", hours),
-    queryFn: () =>
-      api.get<GatewayDetail>(`${base}/gateways/${selected?.id}`, {
-        query: { hours },
-      }),
-    enabled: selected !== null,
-  });
 
   const columns: ColumnDef<Gateway, unknown>[] = [
     {
@@ -413,7 +379,9 @@ export function GatewaysPage() {
             emptyMessage={t(
               "No gateway known for this project's data sources yet. Gateways appear from the receptions a network reports and from the platform's gateway list, read every day and on Sync gateways under Server admin, Data sources.",
             )}
-            onRowClick={(g) => setSelected(g)}
+            onRowClick={(g) =>
+              void navigate(`/projects/${projectId}/network/gateways/${g.id}`)
+            }
             footer={
               shown &&
               (silent > 0
@@ -471,168 +439,6 @@ export function GatewaysPage() {
           />
         )}
       </Page>
-      <Dialog
-        open={selected !== null}
-        onOpenChange={(o) => !o && setSelected(null)}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{selected?.display_name}</DialogTitle>
-            <DialogDescription>
-              {selected &&
-                `${selected.data_source_name ?? ""}, gateway ${selected.external_id}`}
-            </DialogDescription>
-          </DialogHeader>
-          {selected && (
-            // min-w-0: a grid item takes the width of its widest child, and the diagnostics
-            // block pushed the map and its button past the dialog's edge on a phone
-            <div className="min-w-0 space-y-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge value={selected.status} />
-                <span className="text-xs text-muted-foreground">
-                  {t("seen {{ago}}, first {{first}}", {
-                    ago: formatAgo(selected.last_seen_at),
-                    first: formatTime(selected.first_seen_at),
-                  })}
-                  {" · "}
-                  {selected.last_reception_at
-                    ? t("last reception {{ago}}", {
-                        ago: formatAgo(selected.last_reception_at),
-                      })
-                    : t("no reception in 30 days")}
-                </span>
-              </div>
-              {coords(selected) ? (
-                <div className="font-mono text-xs">
-                  {coords(selected)}
-                  {selected.altitude_m != null
-                    ? `, ${selected.altitude_m} m`
-                    : ""}
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground">
-                  {t(
-                    "No location known: the network reported none, so the map cannot place this gateway.",
-                  )}
-                </div>
-              )}
-              {can("project:write") && (
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRenaming(selected)}
-                  >
-                    <Pencil className="size-4" /> {t("Rename")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPlacing(selected)}
-                  >
-                    <MapPin className="size-4" />{" "}
-                    {coords(selected)
-                      ? t("Change location")
-                      : t("Set location")}
-                  </Button>
-                </div>
-              )}
-              {selected.geometry && (
-                <div className="h-56">
-                  <MiniMap
-                    point={
-                      (selected.geometry as { coordinates: [number, number] })
-                        .coordinates
-                    }
-                    to={`/projects/${projectId}/map?gateway=${selected.id}`}
-                  />
-                </div>
-              )}
-              {selected.description && <div>{selected.description}</div>}
-              {(selected.links ?? []).length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {(selected.links ?? []).map((l) => (
-                    <Button key={l.key} asChild variant="outline" size="sm">
-                      <a href={l.url} target="_blank" rel="noreferrer">
-                        {l.label}
-                      </a>
-                    </Button>
-                  ))}
-                </div>
-              )}
-              {Object.keys(selected.stats).length > 0 && (
-                <div>
-                  <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                    {t("Statistics")}{" "}
-                    {selected.last_stats_at
-                      ? formatAgo(selected.last_stats_at)
-                      : ""}
-                  </div>
-                  <JsonView value={selected.stats} />
-                </div>
-              )}
-              <div>
-                <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                  {t("Devices heard in the last 30 days")}
-                </div>
-                {detail.data ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-left text-muted-foreground">
-                        <th className="py-1">{t("Device")}</th>
-                        <th>{t("Receptions")}</th>
-                        <th>{t("Mean signal")}</th>
-                        <th>{t("Last")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.data.devices.map((d) => (
-                        <tr key={d.device_id ?? "none"} className="border-t">
-                          <td className="py-1">
-                            {d.device_name ?? d.device_id ?? "unknown"}
-                          </td>
-                          <td>{d.receptions}</td>
-                          <td>{signal(d.mean_rssi, d.mean_snr)}</td>
-                          <td>{formatAgo(d.last_reception_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <span className="text-muted-foreground">{t("Loading…")}</span>
-                )}
-              </div>
-              {Object.keys(selected.attributes).length > 0 && (
-                <div>
-                  <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                    {t("Provider diagnostics")}
-                  </div>
-                  <JsonView value={selected.attributes} />
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-      <GatewayNameDialog
-        key={`name-${renaming?.id ?? "none"}`}
-        projectId={projectId}
-        gateway={renaming}
-        onClose={() => {
-          setRenaming(null);
-          setSelected(null);
-        }}
-      />
-      <GatewayLocationDialog
-        key={placing?.id ?? "none"}
-        projectId={projectId}
-        gateway={placing}
-        fallback={placing ? fallbackFor(placing) : null}
-        onClose={() => {
-          setPlacing(null);
-          setSelected(null);
-        }}
-      />
     </>
   );
 }

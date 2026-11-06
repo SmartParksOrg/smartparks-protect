@@ -20,6 +20,7 @@ const tones: Record<string, string> = {
   failed: "bg-destructive/15 text-destructive border-transparent",
   dead_letter: "bg-destructive/15 text-destructive border-transparent",
   offline: "bg-destructive/15 text-destructive border-transparent",
+  silent: "bg-brand-sand/50 text-foreground border-transparent",
   ignored: "bg-muted text-muted-foreground border-transparent",
   open: "bg-brand-sand/50 text-foreground border-transparent",
   acknowledged: "bg-brand-blue/50 text-foreground border-transparent",

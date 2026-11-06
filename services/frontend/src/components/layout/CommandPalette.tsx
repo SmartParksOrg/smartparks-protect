@@ -102,7 +102,7 @@ function target(
     case "feature":
       return `/projects/${pid}/map?feature=${hit.id}`;
     case "gateway":
-      return pid ? `/projects/${pid}/network/gateways` : "/admin/gateways";
+      return pid ? `/projects/${pid}/network/gateways/${hit.id}` : "/admin/gateways";
     case "data_source":
       return "/admin/data-sources";
     case "project":

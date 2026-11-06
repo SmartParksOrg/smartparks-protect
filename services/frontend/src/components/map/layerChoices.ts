@@ -24,6 +24,9 @@ export interface LayerChoices {
   offline_gateways?: boolean;
   coverage: boolean;
   coverage_hours: number;
+  /** The paths of the uplinks (decision D368): a thin line from each heard position to every
+   * gateway that received it; absent in an older preference means off. */
+  coverage_lines?: boolean;
   /** Network locations (decisions D162 and D163): where the networks placed the devices, as
    * circles of their radius over the coverage period; a small field so the preference stays small. */
   network_locations?: boolean;
@@ -49,6 +52,7 @@ export const DEFAULT_LAYERS: LayerChoices = {
   offline_gateways: true,
   coverage: false,
   coverage_hours: 168,
+  coverage_lines: false,
   network_locations: false,
   shown_devices: [],
 };

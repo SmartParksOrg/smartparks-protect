@@ -17,9 +17,14 @@ malformed frames and do not fail the file; a file without any frame fails with
 
 ## Upload and decoding
 
-On the device page, card "Log files", "Upload raw log". The API stores the file in the
-`device-log-files` bucket (`MINIO_BUCKET_LOG_FILES`), refuses the same bytes for the same device
-with 409 (SHA-256), records the row with status `queued` and publishes `log_file.uploaded`.
+"Upload raw log" sits in the header of the device page, in the header of the entity page
+for the device it has now, and as an upload icon on every row of the Devices list, for whoever
+may control devices (decision D367); the "Log files" card on the device page's Data tab has
+the same button. Several files can be chosen at once; they go one after another, and a station's
+card (a `.jsonl` file or a zip of its LOG folders) takes its own route. The API stores the
+file in the `device-log-files` bucket (`MINIO_BUCKET_LOG_FILES`), refuses the same bytes for
+the same device with 409 (SHA-256), records the row with status `queued` and publishes
+`log_file.uploaded`.
 The decoder service is the file processing worker: it splits the file, stores every frame as a
 source event on the built-in data source "Log file upload" (channel `log_file`, ingestion
 `file_upload`, the device known up front, `file_uploaded_at` as provenance) and decodes it
@@ -32,7 +37,7 @@ The row shows:
 | Field | Meaning |
 | --- | --- |
 | status | `queued`, `processing`, `complete`, `failed` |
-| progress | while processing, the frames decoded of the frames in the file, as a bar with the percentage; the card refreshes every few seconds |
+| progress | while processing, the frames decoded of the frames in the file, as a bar with the percentage; the card refreshes every few seconds. The same bar sits above the device and entity pages and, as a "Data coming in" row, on the device's and its entity's panel on the live map (decision D366), for a file of the device itself and for a station's card whose frames name it |
 | frames | lines that held a frame, and how many were malformed |
 | records found, new, known | canonical records decoded; new rows created; rows that existed already through another path (linked as repeat deliveries) |
 | period | earliest and latest canonical device time in the file |

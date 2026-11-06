@@ -25,6 +25,7 @@ from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.routers.network import _scope_device_ids
 from protect_api.schemas.integrations import (
     DeviceConnectivity,
+    GatewayDay,
     GatewayDetail,
     GatewayDeviceStat,
     GatewayLocationRequest,
@@ -32,7 +33,9 @@ from protect_api.schemas.integrations import (
     GatewayRead,
     GatewayUpdateRequest,
 )
+from shared.config import get_settings
 from shared.database import get_session
+from shared.domain.gateways import effective_status
 from shared.domain.links import resolve_links
 from shared.models import (
     DataSource,
@@ -63,6 +66,16 @@ def gateway_read(
     devices in the last `MAX_HOURS`, whatever the window (Tim, 2026-09-30: a page opened on
     24 hours read "never" for a gateway that heard thirteen devices the morning before)."""
     data = GatewayRead.model_validate(gateway)
+    settings = get_settings()
+    data.status = effective_status(
+        gateway.status,
+        gateway.status_source,
+        gateway.status_at,
+        gateway.last_seen_at,
+        utc_now(),
+        silent_hours=settings.gateway_silent_hours,
+        platform_hours=settings.gateway_platform_word_hours,
+    )
     data.geometry = geom_to_geojson(gateway.geom)
     data.display_name = gateway.name_override or gateway.name or gateway.external_id
     data.data_source_name = source.name if source else None
@@ -288,6 +301,54 @@ async def project_gateway(
             for row in rows
         ],
     )
+
+
+@router.get("/projects/{project_id}/gateways/{gateway_id}/days", response_model=list[GatewayDay])
+async def project_gateway_days(
+    gateway_id: uuid.UUID,
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    hours: int = Query(24 * 30, ge=24, le=MAX_HOURS),
+    session: AsyncSession = Depends(get_session),
+) -> list[GatewayDay]:
+    """The gateway's receptions of the scope's devices per UTC day over the window (decision
+    D369, the gateway page's Traffic tab): how many uplinks it relayed, from how many devices,
+    with the mean signal; a day it relayed nothing is left out, the page draws the gap."""
+    gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
+    since, until = _window(hours)
+    device_ids = await _scope_device_ids(session, context, since, until)
+    if not device_ids:
+        return []
+    day = func.date_trunc("day", GatewayReception.time).label("day")
+    rows = (
+        await session.execute(
+            select(
+                day,
+                func.count().label("receptions"),
+                func.count(func.distinct(GatewayReception.device_id)).label("devices"),
+                func.avg(GatewayReception.rssi).label("mean_rssi"),
+                func.avg(GatewayReception.snr).label("mean_snr"),
+            )
+            .where(
+                GatewayReception.data_source_id == gateway.data_source_id,
+                GatewayReception.gateway_id == gateway.external_id,
+                GatewayReception.device_id.in_(device_ids),
+                GatewayReception.time >= since,
+                GatewayReception.time < until,
+            )
+            .group_by(day)
+            .order_by(day)
+        )
+    ).all()
+    return [
+        GatewayDay(
+            day=row.day.date(),
+            receptions=int(row.receptions),
+            devices=int(row.devices),
+            mean_rssi=round(float(row.mean_rssi), 1) if row.mean_rssi is not None else None,
+            mean_snr=round(float(row.mean_snr), 1) if row.mean_snr is not None else None,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/projects/{project_id}/connectivity", response_model=list[DeviceConnectivity])
