@@ -4,6 +4,7 @@ and polling cursors."""
 import uuid
 
 import pytest
+from sqlalchemy import select
 
 from shared.connectivity.base import GatewayReceptionData, GatewayUpdate, InboundMessage
 from shared.connectivity.registry import ADAPTERS
@@ -68,6 +69,30 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert detail["gateway"]["id"] == best["id"]
     assert detail["devices"][0]["device_name"] == device["name"]
     assert detail["devices"][0]["receptions"] == 3
+    # no location, no range (D374); placed 0.05 degrees east and south of the fixes, the three
+    # positions it heard lie about 7.5 km away, all alike
+    assert detail["gateway"]["range_positions"] == 0 and detail["gateway"]["range_max_m"] is None
+    placed = await client.patch(
+        f"{base}/gateways/{best['id']}/location",
+        json={"latitude": -24.95, "longitude": 31.55},
+        headers=h,
+    )
+    assert placed.status_code == 200, placed.text
+    # the uplinks were stored, not decoded: the range reads positions, so decode them now
+    from protect_decoder.pipeline import process_source_event
+    from shared.models import SourceEvent
+
+    for event in (
+        await db.scalars(
+            select(SourceEvent).where(SourceEvent.device_id == uuid.UUID(device["id"]))
+        )
+    ).all():
+        await process_source_event(db, event.id, event.ingested_at)
+    await db.commit()
+    ranged = (await client.get(f"{base}/gateways/{best['id']}", headers=h)).json()["gateway"]
+    assert ranged["range_positions"] == 3
+    assert 7000 < ranged["range_min_m"] < 8000
+    assert ranged["range_min_m"] == ranged["range_max_m"] == ranged["range_mean_m"]
 
     # a window the uplinks fall outside keeps the last reception (the newest of the last 30
     # days) beside empty counts, so a quiet day does not read as "never" (Tim, 2026-09-30);

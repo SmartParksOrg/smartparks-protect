@@ -3408,5 +3408,9 @@
   "{{count}} heard positions, {{period}}_other": "{{count}} gehoorde posities, {{period}}",
   "{{count}} switched on_one": "{{count}} ingeschakeld",
   "{{count}} switched on_other": "{{count}} ingeschakeld",
-  "the newest {{points}} of {{total}} heard positions, {{period}}": "de nieuwste {{points}} van {{total}} gehoorde posities, {{period}}"
+  "the newest {{points}} of {{total}} heard positions, {{period}}": "de nieuwste {{points}} van {{total}} gehoorde posities, {{period}}",
+  "{{count}} positions_one": "{{count}} positie",
+  "{{count}} positions_other": "{{count}} posities",
+  "{{min}} to {{max}}, mean {{mean}}": "{{min}} tot {{max}}, gemiddeld {{mean}}",
+  "The shortest, longest and mean distance from the positions it heard in the window to the gateway": "De kortste, langste en gemiddelde afstand van de posities die hij in het venster hoorde tot de gateway"
 }

@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import false, func, select
+from sqlalchemy import false, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
@@ -282,13 +282,16 @@ async def project_gateway(
             )
         ).all()
     }
+    read = gateway_read(
+        gateway,
+        source,
+        stats.get((gateway.data_source_id, gateway.external_id)),
+        newest.get((gateway.data_source_id, gateway.external_id)),
+    )
+    if gateway.geom is not None and device_ids:
+        await _range(session, gateway, read, device_ids, since, until)
     return GatewayDetail(
-        gateway=gateway_read(
-            gateway,
-            source,
-            stats.get((gateway.data_source_id, gateway.external_id)),
-            newest.get((gateway.data_source_id, gateway.external_id)),
-        ),
+        gateway=read,
         devices=[
             GatewayDeviceStat(
                 device_id=row.device_id,
@@ -301,6 +304,60 @@ async def project_gateway(
             for row in rows
         ],
     )
+
+
+async def _range(
+    session: AsyncSession,
+    gateway: Gateway,
+    read: GatewayRead,
+    device_ids: list[uuid.UUID],
+    since: datetime,
+    until: datetime,
+) -> None:
+    """The gateway's range over the window (decision D374, Tim, 2026-11-06: with the lines
+    drawn, the shortest, mean and longest distance a heard position lay from the gateway):
+    the scope's positions of the window joined to the receptions of their uplink by this
+    gateway, the great-circle distance to the gateway's location. The positions come first
+    and the receptions through `ix_gateway_receptions_device_event`, as the coverage read."""
+    coordinates = (geom_to_geojson(gateway.geom) or {}).get("coordinates")
+    if not coordinates:
+        return
+    row = (
+        await session.execute(
+            text(
+                """
+                SELECT MIN(d) AS least, AVG(d) AS mean, MAX(d) AS most, COUNT(*) AS n
+                FROM (
+                    SELECT ST_DistanceSphere(
+                        p.geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)
+                    ) AS d
+                    FROM positions p
+                    JOIN gateway_receptions r
+                      ON r.device_id = p.device_id AND r.source_event_id = p.source_event_id
+                     AND r.time >= :since AND r.data_source_id = :source_id
+                     AND r.gateway_id = :gateway_id
+                    WHERE p.record_type <> 'network'
+                      AND p.device_id = ANY(CAST(:devices AS uuid[]))
+                      AND p.time >= :since AND p.time < :until
+                ) x
+                """
+            ),
+            {
+                "lon": float(coordinates[0]),
+                "lat": float(coordinates[1]),
+                "since": since,
+                "until": until,
+                "source_id": gateway.data_source_id,
+                "gateway_id": gateway.external_id,
+                "devices": list(device_ids),
+            },
+        )
+    ).one()
+    read.range_positions = int(row.n or 0)
+    if row.n:
+        read.range_min_m = round(float(row.least))
+        read.range_mean_m = round(float(row.mean))
+        read.range_max_m = round(float(row.most))
 
 
 @router.get("/projects/{project_id}/gateways/{gateway_id}/days", response_model=list[GatewayDay])

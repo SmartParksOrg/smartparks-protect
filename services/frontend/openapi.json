@@ -37657,6 +37657,44 @@
       ],
       "title": "Last Reception At"
      },
+     "range_min_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Range Min M"
+     },
+     "range_mean_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Range Mean M"
+     },
+     "range_max_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Range Max M"
+     },
+     "range_positions": {
+      "type": "integer",
+      "title": "Range Positions",
+      "default": 0
+     },
      "links": {
       "items": {
        "additionalProperties": {

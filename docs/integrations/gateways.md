@@ -47,7 +47,10 @@ Gateways, {gateway}; the live map's gateway panel and the search lead there too:
 
 - Overview: the status with the reason when it is silent, when the network last heard from
   the gateway and when it last relayed one of the project's devices, when it was first seen,
-  the source, the gateway id, the location with its origin and a small map, the devices heard
+  the gateway's range over the last 30 days (the shortest, longest and mean distance from the
+  positions it heard to its own location, decision D374; the live map's gateway panel shows the
+  same over the last 7 days), the source, the gateway id, the location with its origin and a
+  small map, the devices heard
   in the last 30 days with receptions, mean signal and last reception, the platform's counters
   and diagnostics, and the platform's own page when the data source has a gateway link. Rename
   and Set or Change location sit in the header for a project admin. A gateway the network's

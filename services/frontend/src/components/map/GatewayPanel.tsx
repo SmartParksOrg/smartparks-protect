@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
-import { gatewayCoords, locationSourceLabel } from "@/lib/gateways";
+import { gatewayCoords, locationSourceLabel, rangeLabel } from "@/lib/gateways";
 
 const HOURS = 168;
 
@@ -171,6 +171,14 @@ export function GatewayPanel({
             {t("{{count}} devices", { count: g.devices })}
             {g.mean_rssi != null ? `, ${Math.round(g.mean_rssi)} dBm` : ""}
           </PanelRow>
+          {rangeLabel(g, t) && (
+            <PanelRow
+              label={t("Range")}
+              title={t("The shortest, longest and mean distance from the positions it heard in the window to the gateway")}
+            >
+              {rangeLabel(g, t)}
+            </PanelRow>
+          )}
           {(detail.data?.devices.length ?? 0) > 0 && (
             <PanelRow label={t("Heard")}>
               <ul>

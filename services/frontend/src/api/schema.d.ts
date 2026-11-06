@@ -10845,6 +10845,17 @@ export interface components {
             mean_snr?: number | null;
             /** Last Reception At */
             last_reception_at?: string | null;
+            /** Range Min M */
+            range_min_m?: number | null;
+            /** Range Mean M */
+            range_mean_m?: number | null;
+            /** Range Max M */
+            range_max_m?: number | null;
+            /**
+             * Range Positions
+             * @default 0
+             */
+            range_positions: number;
             /** Links */
             links?: {
                 [key: string]: string;

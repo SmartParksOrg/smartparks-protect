@@ -40,3 +40,28 @@ export function gatewayCoords(
     ? `${c[1].toFixed(decimals)}, ${c[0].toFixed(decimals)}`
     : "";
 }
+
+/** A distance in words: metres under a kilometre, else kilometres with one decimal. */
+export function distanceLabel(metres: number): string {
+  return metres < 1000 ? `${Math.round(metres)} m` : `${(metres / 1000).toFixed(1)} km`;
+}
+
+/** The range of a gateway (decision D374): "120 m to 9.8 km, mean 2.4 km", or empty while
+ * it heard nothing or has no location. */
+export function rangeLabel(
+  gateway: Pick<Gateway, "range_min_m" | "range_mean_m" | "range_max_m" | "range_positions">,
+  t: Translate,
+): string {
+  if (
+    !gateway.range_positions ||
+    gateway.range_min_m == null ||
+    gateway.range_max_m == null ||
+    gateway.range_mean_m == null
+  )
+    return "";
+  return t("{{min}} to {{max}}, mean {{mean}}", {
+    min: distanceLabel(gateway.range_min_m),
+    max: distanceLabel(gateway.range_max_m),
+    mean: distanceLabel(gateway.range_mean_m),
+  });
+}

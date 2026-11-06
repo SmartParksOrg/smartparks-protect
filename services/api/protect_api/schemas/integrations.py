@@ -151,6 +151,13 @@ class GatewayRead(ORMModel):
     #: The newest reception of the scope's devices in the last 30 days, whatever the window,
     #: so a quiet day does not read as "never"; None when there was none in 30 days.
     last_reception_at: datetime | None = None
+    #: The range of the gateway over the window (decision D374): the shortest, mean and
+    #: longest distance in metres from the positions it heard to its own location, and how
+    #: many positions; on the detail read, for a gateway with a location.
+    range_min_m: float | None = None
+    range_mean_m: float | None = None
+    range_max_m: float | None = None
+    range_positions: int = 0
     links: list[dict[str, str]] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

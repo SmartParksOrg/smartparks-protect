@@ -40,6 +40,7 @@ import {
   isOffloadStation,
   isRelay,
   locationSourceLabel,
+  rangeLabel,
 } from "@/lib/gateways";
 import { isAllProjects } from "@/lib/scope";
 
@@ -194,6 +195,20 @@ export function GatewayPage() {
                       {t("{{count}} devices", { count: g.devices })}
                       {signal(g.mean_rssi, g.mean_snr) && `, ${signal(g.mean_rssi, g.mean_snr)}`}
                     </dd>
+                    {rangeLabel(g, t) && (
+                      <>
+                        <dt className="text-muted-foreground">{t("Range")}</dt>
+                        <dd
+                          title={t(
+                            "The shortest, longest and mean distance from the positions it heard in the window to the gateway",
+                          )}
+                        >
+                          {rangeLabel(g, t)}
+                          {", "}
+                          {t("{{count}} positions", { count: g.range_positions })}
+                        </dd>
+                      </>
+                    )}
                     <dt className="text-muted-foreground">{t("Source")}</dt>
                     <dd>{g.data_source_name ?? g.data_source_id}</dd>
                     <dt className="text-muted-foreground">{t("Gateway id")}</dt>
