@@ -7,7 +7,8 @@ import { useEffect, useRef } from "react";
 
 import type { GatewayDay } from "@/api/types";
 import { useTheme } from "@/hooks/useTheme";
-import { PALETTE, chartTheme } from "@/lib/chartStyle";
+import { PALETTE, chartMotion, chartTheme } from "@/lib/chartStyle";
+import { useReducedMotion } from "@/lib/motion";
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -32,6 +33,7 @@ function daysOf(hours: number): string[] {
 export function GatewayDaysChart({ days, hours }: { days: GatewayDay[]; hours: number }) {
   const { t } = useTranslation();
   const { resolved } = useTheme();
+  const reduced = useReducedMotion();
   const element = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
   useEffect(() => {
@@ -54,7 +56,7 @@ export function GatewayDaysChart({ days, hours }: { days: GatewayDay[]; hours: n
     const byDay = new Map(days.map((d) => [d.day, d]));
     instance.setOption(
       {
-        animation: false,
+        ...chartMotion(reduced),
         grid: { left: 44, right: 12, top: 12, bottom: 28 },
         tooltip: {
           trigger: "axis",
@@ -96,7 +98,7 @@ export function GatewayDaysChart({ days, hours }: { days: GatewayDay[]; hours: n
       },
       true,
     );
-  }, [days, hours, resolved, t]);
+  }, [days, hours, resolved, reduced, t]);
   return (
     <div
       ref={element}

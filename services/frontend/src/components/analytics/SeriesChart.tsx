@@ -8,7 +8,8 @@ import { useEffect, useRef } from "react";
 import type { SeriesResponse } from "@/api/types";
 import { type ChartType, formatInZone, histogram } from "@/lib/analytics";
 import { useTheme } from "@/hooks/useTheme";
-import { chartTheme } from "@/lib/chartStyle";
+import { chartMotion, chartTheme } from "@/lib/chartStyle";
+import { useReducedMotion } from "@/lib/motion";
 
 echarts.use([LineChart, BarChart, ScatterChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer]);
 
@@ -29,6 +30,7 @@ interface Props {
 export function SeriesChart({ response, type, aggregate, timezone, labels, unit, className }: Props) {
   const { resolved } = useTheme();
   const dark = resolved === "dark";
+  const reduced = useReducedMotion();
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
@@ -49,19 +51,19 @@ export function SeriesChart({ response, type, aggregate, timezone, labels, unit,
   useEffect(() => {
     const instance = chart.current;
     if (!instance) return;
-    instance.setOption(buildOption(response, type, aggregate, timezone, labels, unit, dark), true);
-  }, [response, type, aggregate, timezone, labels, unit, dark]);
+    instance.setOption(buildOption(response, type, aggregate, timezone, labels, unit, dark, reduced), true);
+  }, [response, type, aggregate, timezone, labels, unit, dark, reduced]);
 
   return <div ref={container} className={className ?? "h-80 w-full"} role="img" aria-label={t("Chart of the selected series")} />;
 }
 
-function buildOption(response: SeriesResponse | undefined, type: ChartType, aggregate: string, timezone: string, labels: (index: number) => string, unit: string | null | undefined, dark: boolean): echarts.EChartsCoreOption {
+function buildOption(response: SeriesResponse | undefined, type: ChartType, aggregate: string, timezone: string, labels: (index: number) => string, unit: string | null | undefined, dark: boolean, reduced: boolean): echarts.EChartsCoreOption {
   const all = response?.series ?? [];
   const th = chartTheme(dark);
   const axis = { axisLabel: { color: th.text }, splitLine: { lineStyle: { color: th.grid } }, nameTextStyle: { color: th.text } };
   const base: echarts.EChartsCoreOption = {
     color: PALETTE,
-    animation: false,
+    ...chartMotion(reduced),
     textStyle: { color: th.text },
     grid: { left: 56, right: 24, top: 40, bottom: 56, containLabel: false },
     legend: { type: "scroll", top: 4, textStyle: { fontSize: 11, color: th.text } },

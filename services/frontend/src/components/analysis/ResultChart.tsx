@@ -20,7 +20,8 @@ import {
   type ResultChart as ResultChartData,
   type ResultChartSeries,
 } from "@/lib/analyses";
-import { PALETTE, chartTheme } from "@/lib/chartStyle";
+import { PALETTE, chartMotion, chartTheme } from "@/lib/chartStyle";
+import { useReducedMotion } from "@/lib/motion";
 
 echarts.use([
   LineChart,
@@ -64,6 +65,7 @@ export function ResultChart({
   const language = i18n.language;
   const { resolved } = useTheme();
   const dark = resolved === "dark";
+  const reduced = useReducedMotion();
   const container = useRef<HTMLDivElement | null>(null);
   const instance = useRef<echarts.ECharts | null>(null);
   useEffect(() => {
@@ -105,12 +107,15 @@ export function ResultChart({
       (s, i) => colorOf?.(s) ?? PALETTE[i % PALETTE.length],
     );
     if (chart.kind === "network") {
-      instance.current?.setOption(networkOption(chart, th, dark, t), true);
+      instance.current?.setOption(
+        networkOption(chart, th, dark, reduced, t),
+        true,
+      );
       return;
     }
     if (chart.kind === "box") {
       instance.current?.setOption(
-        boxOption(chart, th, names, colors, labels),
+        boxOption(chart, th, names, colors, labels, reduced),
         true,
       );
       return;
@@ -158,7 +163,7 @@ export function ResultChart({
     // bars of days stand a bar to a day with its date under it
     const days = barDays(chart);
     const option: echarts.EChartsCoreOption = {
-      animation: false,
+      ...chartMotion(reduced),
       color: colors,
       tooltip: {
         trigger: rose ? "item" : "axis",
@@ -269,7 +274,7 @@ export function ResultChart({
       ],
     };
     instance.current?.setOption(option, true);
-  }, [chart, labels, colorOf, pointColors, dark, t, language]);
+  }, [chart, labels, colorOf, pointColors, dark, reduced, t, language]);
   return (
     <div
       ref={container}
@@ -291,10 +296,11 @@ function boxOption(
   names: string[],
   colors: string[],
   labels: Record<string, string> | undefined,
+  reduced: boolean,
 ): echarts.EChartsCoreOption {
   const categories = (chart.series[0]?.data ?? []).map((d) => String(d[0]));
   return {
-    animation: false,
+    ...chartMotion(reduced),
     tooltip: {
       trigger: "item",
       backgroundColor: th.tooltipBg,
@@ -355,6 +361,7 @@ function networkOption(
   chart: ResultChartData,
   th: ReturnType<typeof chartTheme>,
   dark: boolean,
+  reduced: boolean,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): echarts.EChartsCoreOption {
   const series = chart.series[0];
@@ -369,7 +376,7 @@ function networkOption(
   // time, and with many subjects the edges carry the structure anyway.
   const crowded = nodes.length > 12;
   return {
-    animation: false,
+    ...chartMotion(reduced),
     tooltip: {
       backgroundColor: th.tooltipBg,
       textStyle: { color: th.tooltipText, fontSize: 11 },

@@ -18,10 +18,12 @@ import { axisIndexOf, type ChartGroup, unitAxes } from "@/lib/explore";
 import {
   type ChartLine,
   chartLines,
+  chartMotion,
   chartTheme,
   MARK,
   PALETTE,
 } from "@/lib/chartStyle";
+import { useReducedMotion } from "@/lib/motion";
 import { useTheme } from "@/hooks/useTheme";
 
 echarts.use([
@@ -74,6 +76,7 @@ export function ExploreChart({
 }) {
   const { resolved } = useTheme();
   const dark = resolved === "dark";
+  const reduced = useReducedMotion();
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
@@ -151,10 +154,19 @@ export function ExploreChart({
     const instance = chart.current;
     if (!instance) return;
     instance.setOption(
-      buildOption(shown, groups, kind, xLabel ?? null, timezone, phone, dark),
+      buildOption(
+        shown,
+        groups,
+        kind,
+        xLabel ?? null,
+        timezone,
+        phone,
+        dark,
+        reduced,
+      ),
       true,
     );
-  }, [shown, groups, kind, xLabel, timezone, phone, dark]);
+  }, [shown, groups, kind, xLabel, timezone, phone, dark, reduced]);
 
   // the moments marked elsewhere: the pinned one as a dashed line, a hover from the drawer or
   // the map as a thin solid one; the chart's own tooltip appears only under the pointer
@@ -311,11 +323,12 @@ function buildOption(
   timezone: string,
   phone: boolean,
   dark: boolean,
+  reduced: boolean,
 ): echarts.EChartsCoreOption {
   const th = chartTheme(dark);
   const AXIS_TEXT = { color: th.text, fontSize: 11 };
   const base: echarts.EChartsCoreOption = {
-    animation: false,
+    ...chartMotion(reduced),
     textStyle: { fontFamily: "inherit", color: th.text },
     tooltip: {
       backgroundColor: th.tooltipBg,

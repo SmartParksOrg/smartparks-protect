@@ -14,7 +14,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useNow } from "@/hooks/useNow";
 import { useTheme } from "@/hooks/useTheme";
-import { chartTheme } from "@/lib/chartStyle";
+import { chartMotion, chartTheme } from "@/lib/chartStyle";
+import { useReducedMotion } from "@/lib/motion";
 import { formatInZone } from "@/lib/analytics";
 import { browserTimezone, type RangePreset, rangeFor } from "@/lib/analytics";
 import { formatAgo, formatDuration, formatTime } from "@/lib/format";
@@ -463,6 +464,7 @@ function Sparkline({
   to: number;
 }) {
   const { resolved } = useTheme();
+  const reduced = useReducedMotion();
   const dark = resolved === "dark";
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
@@ -526,7 +528,7 @@ function Sparkline({
         : `${v.toFixed(decimals)}${spec.unit ? ` ${spec.unit}` : ""}`;
     instance.setOption(
       {
-        animation: false,
+        ...chartMotion(reduced),
         grid: { left: 36, right: 8, top: 6, bottom: 18 },
         tooltip: {
           trigger: "axis",
@@ -580,7 +582,7 @@ function Sparkline({
       },
       true,
     );
-  }, [points, timezone, dark, specKey, from, to]);
+  }, [points, timezone, dark, specKey, from, to, reduced]);
   return (
     <div
       ref={container}

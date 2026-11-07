@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* the enter and exit animations shadcn's overlays are written with (decision D379) */
+@import "tw-animate-css";
 
 /* the `dark` class on <html> (lib/theme.ts) keys the dark tokens and the dark: variants */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -60,6 +62,20 @@
   --border: #2d3d35;
   --input: #2d3d35;
   --ring: var(--brand-green-light);
+}
+
+/* Motion that explains (decision D378): the operating system's reduce-motion setting ends every
+   CSS animation and transition at once; the map's loop and the charts read the same setting
+   through `useReducedMotion` in `lib/motion.ts`. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* MapLibre's own boxes follow the theme */

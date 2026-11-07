@@ -2088,7 +2088,7 @@ export function MapPage() {
         )}
       {/* the right column: cards, the layers panel and the object panel open from the right edge
           under the strip on desktop and from the bottom on a phone */}
-      <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 overflow-hidden sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto">
+      <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 overflow-hidden sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto [&>*]:animate-in [&>*]:fade-in-0 [&>*]:slide-in-from-bottom-4 [&>*]:duration-200 sm:[&>*]:slide-in-from-right-4">
         {tool && (
           <DrawBar
             purpose={tool}

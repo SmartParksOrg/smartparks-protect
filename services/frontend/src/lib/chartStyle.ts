@@ -1,4 +1,7 @@
+import type * as echarts from "echarts/core";
+
 import type { ChartGroup } from "@/lib/explore";
+import { DURATION } from "@/lib/motion";
 
 /** The look of the Explore chart (decision D152): the palette and the lines it draws. */
 /** Brand palette first, then muted variants; one colour per series. */
@@ -35,6 +38,20 @@ export function chartTheme(dark: boolean) {
         tooltipText: "#111827",
         shadow: "0 4px 12px rgba(0,0,0,0.08)",
       };
+}
+
+/** The motion of a chart (decision D382): ECharts' own transitions, a line drawing in and a bar
+ * rising on the first draw, the series morphing into the new one on a change, 300 ms; none
+ * when the person asked for less motion. Spread into the option in place of `animation`. */
+export function chartMotion(reduced: boolean): echarts.EChartsCoreOption {
+  if (reduced) return { animation: false };
+  return {
+    animation: true,
+    animationDuration: DURATION.chart,
+    animationDurationUpdate: DURATION.chart,
+    animationEasing: "cubicOut",
+    animationEasingUpdate: "cubicOut",
+  };
 }
 
 export interface ChartLine {
