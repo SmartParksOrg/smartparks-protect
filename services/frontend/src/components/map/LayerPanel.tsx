@@ -43,6 +43,8 @@ import {
   projectLayerOf,
   showDevices,
   showEntity,
+  hideEventType,
+  isEventTypeOn,
   showEventType,
   showFeature,
   showFeatureType,
@@ -1053,8 +1055,7 @@ export function LayerPanel({
             .filter((e) => e.event_type === type && matches(e.title, term))
             .sort((a, b) => b.time.localeCompare(a.time));
           if (term && items.length === 0) return null;
-          const typeOn =
-            choices.events && !choices.hidden_event_types.includes(type);
+          const typeOn = isEventTypeOn(choices, type);
           const open = expanded.has(`ev:${type}`) || Boolean(term);
           return (
             <div key={type}>
@@ -1079,14 +1080,7 @@ export function LayerPanel({
                     onChange(
                       v
                         ? showEventType(choices, type, eventTypes)
-                        : {
-                            ...choices,
-                            hidden_event_types: toggleInList(
-                              choices.hidden_event_types,
-                              type,
-                              false,
-                            ),
-                          },
+                        : hideEventType(choices, type),
                     )
                   }
                 />

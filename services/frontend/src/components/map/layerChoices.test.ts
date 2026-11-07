@@ -22,6 +22,9 @@ import {
   ungroupedLayerOf,
   withProjectShown,
   hideAllEvents,
+  hideEventType,
+  isEventVisible,
+  showEventType,
   hideAllFeatures,
   hideAllGateways,
   showAllEvents,
@@ -360,5 +363,35 @@ describe("the gateways the view's coverage read filters on", () => {
     expect(
       coverageGatewayIds({ ...DEFAULT_LAYERS, hidden_gateways: ["g2"] }, all),
     ).toEqual(["g1", "g3"]);
+  });
+});
+
+describe("the device's own reports start hidden on the map (decision D384)", () => {
+  const error = { event_type: "device_error" } as Parameters<
+    typeof isEventVisible
+  >[0];
+  const fence = { event_type: "geofence_exit" } as Parameters<
+    typeof isEventVisible
+  >[0];
+  it("hides a quiet type by default and shows every other type", () => {
+    expect(isEventVisible(error, DEFAULT_LAYERS)).toBe(false);
+    expect(isEventVisible(fence, DEFAULT_LAYERS)).toBe(true);
+    // a preference saved before the field existed reads the same
+    const saved = { ...DEFAULT_LAYERS, hidden_event_types: [] };
+    expect(isEventVisible(error, saved)).toBe(false);
+  });
+  it("switches a quiet type on and off again", () => {
+    const on = showEventType(DEFAULT_LAYERS, "device_error", [
+      "device_error",
+      "geofence_exit",
+    ]);
+    expect(isEventVisible(error, on)).toBe(true);
+    expect(isEventVisible(fence, on)).toBe(true);
+    const off = hideEventType(on, "device_error");
+    expect(isEventVisible(error, off)).toBe(false);
+    expect(off.shown_event_types).toEqual([]);
+  });
+  it("show all switches the quiet types on too", () => {
+    expect(isEventVisible(error, showAllEvents(DEFAULT_LAYERS))).toBe(true);
   });
 });

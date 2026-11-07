@@ -16,6 +16,8 @@ export interface LayerChoices {
   hidden_features: string[];
   events: boolean;
   hidden_event_types: string[];
+  /** The quiet event types a person switched on (decision D384); the others start hidden. */
+  shown_event_types: string[];
   gateways: boolean;
   hidden_gateways: string[];
   /** The two groups of the gateway layer (Tim, 2026-09-19): the ones the network hears and
@@ -43,6 +45,7 @@ export const DEFAULT_LAYERS: LayerChoices = {
   hidden_features: [],
   events: true,
   hidden_event_types: [],
+  shown_event_types: [],
   gateways: true,
   hidden_gateways: [],
   online_gateways: true,
@@ -199,13 +202,39 @@ export function isGatewayVisible(
   );
 }
 
+/** The device's own reports, a flag on a status frame or a reboot, start hidden on the map
+ * (decision D384, Tim, 2026-11-07: 21 AWT tags repeating their service coverage flag put 82
+ * events on Okonjima's map in a day and said nothing the health rows did not); the feed, the
+ * Events page and the health rows keep them, and the layers panel switches them on. */
+export const QUIET_EVENT_TYPES = ["device_error", "device_reset"];
+
+/** Whether an event type is on: the layer on, the type not hidden, and a quiet type switched
+ * on by the person. */
+export function isEventTypeOn(choices: LayerChoices, type: string): boolean {
+  return (
+    choices.events &&
+    !choices.hidden_event_types.includes(type) &&
+    (!QUIET_EVENT_TYPES.includes(type) ||
+      choices.shown_event_types.includes(type))
+  );
+}
+
 export function isEventVisible(
   props: EventFeatureProperties,
   choices: LayerChoices,
 ): boolean {
-  return (
-    choices.events && !choices.hidden_event_types.includes(props.event_type)
-  );
+  return isEventTypeOn(choices, props.event_type);
+}
+
+export function hideEventType(
+  choices: LayerChoices,
+  type: string,
+): LayerChoices {
+  return {
+    ...choices,
+    hidden_event_types: withAll(choices.hidden_event_types, [type]),
+    shown_event_types: without(choices.shown_event_types, [type]),
+  };
 }
 
 const without = (list: string[], ids: string[]) =>
@@ -330,7 +359,12 @@ export function hideAllFeatures(choices: LayerChoices): LayerChoices {
 }
 
 export function showAllEvents(choices: LayerChoices): LayerChoices {
-  return { ...choices, events: true, hidden_event_types: [] };
+  return {
+    ...choices,
+    events: true,
+    hidden_event_types: [],
+    shown_event_types: [...QUIET_EVENT_TYPES],
+  };
 }
 
 export function hideAllEvents(choices: LayerChoices): LayerChoices {
@@ -425,6 +459,7 @@ export function showEventType(
       allTypes,
       choices.events,
     ),
+    shown_event_types: withAll(choices.shown_event_types, [type]),
   };
 }
 
