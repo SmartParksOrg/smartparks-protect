@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type { CoverageResponse, GatewayDetail } from "@/api/types";
 import { HeardButton, MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
 import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
+import { CountUp } from "@/components/common/CountUp";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/useProjects";
@@ -89,7 +90,10 @@ export function GatewayPanel({
               {t("Seen {{ago}}", { ago: formatAgo(g.last_seen_at, now) })}
             </span>
             <span className="text-muted-foreground">
-              {t("{{count}} receptions", { count: g.receptions })}
+              <CountUp
+              value={g.receptions}
+              format={(n) => t("{{count}} receptions", { count: Math.round(n ?? 0) })}
+            />
             </span>
             {g.device_id && (
               <Link
@@ -166,7 +170,10 @@ export function GatewayPanel({
             )}
           </PanelRow>
           <PanelRow label={t("Last 7 days")}>
-            {t("{{count}} receptions", { count: g.receptions })}
+            <CountUp
+              value={g.receptions}
+              format={(n) => t("{{count}} receptions", { count: Math.round(n ?? 0) })}
+            />
             {", "}
             {t("{{count}} devices", { count: g.devices })}
             {g.mean_rssi != null ? `, ${Math.round(g.mean_rssi)} dBm` : ""}

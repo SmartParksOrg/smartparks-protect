@@ -81,7 +81,7 @@ export function FeedPanel({
           return (
             <li
               key={item.id}
-              className={`border-b last:border-b-0 ${unread ? "border-l-2 border-l-primary bg-primary/5" : ""}`}
+              className={`border-b last:border-b-0 animate-in fade-in-0 slide-in-from-top-2 duration-200 ${unread ? "border-l-2 border-l-primary bg-primary/5" : ""}`}
             >
               <button
                 type="button"

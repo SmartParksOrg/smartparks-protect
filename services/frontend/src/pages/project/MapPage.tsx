@@ -84,6 +84,14 @@ import {
   trackPointKey,
 } from "@/components/map/layers";
 import {
+  ensurePulseLayer,
+  glideKey,
+  onMotionFrame,
+  pulseAt,
+  startGlide,
+} from "@/components/map/motion";
+import { useReducedMotion } from "@/lib/motion";
+import {
   coverageGatewayIds,
   DEFAULT_LAYERS,
   isDeviceShown,
@@ -239,6 +247,7 @@ const NO_FEED_ITEMS: FeedItem[] = [];
 
 export function MapPage() {
   const { t } = useTranslation();
+  const reducedMotion = useReducedMotion();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const now = useNow();
@@ -1015,6 +1024,23 @@ export function MapPage() {
       const deviceFresh =
         Boolean(deviceId) &&
         isNewer(shownDevice?.properties.position_time, time);
+      // the marker glides there and a ring says which one just reported (decision D380)
+      if (!reducedMotion && (entityFresh || deviceFresh)) {
+        const map = mapRef.current;
+        if (entityFresh && entityId && shownEntity?.geometry.type === "Point")
+          startGlide(
+            glideKey("entity", entityId),
+            shownEntity.geometry.coordinates as [number, number],
+            coordinates,
+          );
+        if (deviceFresh && deviceId && shownDevice?.geometry?.type === "Point")
+          startGlide(
+            glideKey("device", deviceId),
+            shownDevice.geometry.coordinates as [number, number],
+            coordinates,
+          );
+        if (map) pulseAt(map, coordinates);
+      }
       if (entityFresh)
         client.setQueryData<CurrentState>(
           queryKeys.currentState(projectId),
@@ -1141,6 +1167,7 @@ export function MapPage() {
     ensureTrackLayers(map);
     ensureEventLayers(map);
     raiseMarkers(map);
+    ensurePulseLayer(map);
   }, [mapRef, ready]);
 
   // terrain on top of any base map; a style change drops it, so it is applied again on ready
@@ -1584,6 +1611,25 @@ export function MapPage() {
       selectedId,
     );
   }, [mapRef, ready, visibleFeatures, selectedId]);
+
+  // while a marker glides, every frame draws the markers where they are (decision D380)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    return onMotionFrame(() => {
+      if (visibleFeatures)
+        void setEntities(
+          map,
+          visibleFeatures as unknown as GeoJSON.Feature[],
+          selectedId,
+        );
+      void setDevices(
+        map,
+        visibleDevices as unknown as GeoJSON.Feature[],
+        selectedDeviceId,
+      );
+    });
+  }, [mapRef, ready, visibleFeatures, selectedId, visibleDevices, selectedDeviceId]);
 
   // fit to the project once per visit, to everything its enabled layers show (phase 19, and
   // Tim, 2026-09-21): a park whose devices have no animal yet, or hardware in the workshop,

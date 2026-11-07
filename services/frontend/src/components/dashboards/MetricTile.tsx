@@ -12,6 +12,7 @@ import type {
   SeriesResponse,
 } from "@/api/types";
 import { SeriesChart } from "@/components/analytics/SeriesChart";
+import { CountUp } from "@/components/common/CountUp";
 import { useMetricsByKey } from "@/hooks/useMetrics";
 import { useNow } from "@/hooks/useNow";
 import { browserTimezone, rangeFor, seriesLabel } from "@/lib/analytics";
@@ -154,7 +155,7 @@ export function MetricTile({
                   {row.subject}
                 </div>
                 <div className="text-2xl tabular-nums">
-                  {tileNumber(row.last)}
+                  <CountUp value={row.last} format={tileNumber} />
                   {row.unit && (
                     <span className="ml-1 text-sm text-muted-foreground">
                       {row.unit}
@@ -218,7 +219,7 @@ export function MetricTile({
                     </td>
                   )}
                   <td className="py-1 pr-2 text-right tabular-nums whitespace-nowrap">
-                    {tileNumber(row.last)}
+                    <CountUp value={row.last} format={tileNumber} />
                     {row.unit ? ` ${row.unit}` : ""}
                   </td>
                   <td

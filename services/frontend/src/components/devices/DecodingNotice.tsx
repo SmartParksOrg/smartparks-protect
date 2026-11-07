@@ -5,6 +5,7 @@ import { Callout } from "@/components/common/Callout";
 import { ProgressBar } from "@/components/common/ProgressBar";
 import { Button } from "@/components/ui/button";
 import type { Decoding } from "@/hooks/useDecoding";
+import { useJustFinished } from "@/lib/motion";
 
 /** Data coming in: the files and the walks over retained events the decoder is working on for
  * this device, or for the devices of this entity, with what is done and a bar, at the top of
@@ -22,6 +23,17 @@ export function DecodingNotice({
   const { t } = useTranslation();
   // the attribution job has its own notice above this one (AttributionProgress)
   const shown = decoding.filter((item) => item.kind !== "attribution");
+  // the notice says the data is in and fades (decision D381)
+  const finished = useJustFinished(shown.length > 0);
+  if (shown.length === 0 && finished)
+    return (
+      <Callout
+        kind="success"
+        className="animate-out fade-out-0 fill-mode-forwards duration-1000"
+      >
+        {t("New data received.")}
+      </Callout>
+    );
   if (shown.length === 0) return null;
   return (
     <Callout kind="info">

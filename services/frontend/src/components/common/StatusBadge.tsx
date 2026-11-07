@@ -44,5 +44,5 @@ const tones: Record<string, string> = {
 
 export function StatusBadge({ value, className }: { value: string | null | undefined; className?: string }) {
   if (!value) return null;
-  return <Badge variant="outline" className={cn(tones[value] ?? "", className)}>{value.replace("_", " ")}</Badge>;
+  return <Badge variant="outline" className={cn("transition-colors duration-200", tones[value] ?? "", className)}>{value.replace("_", " ")}</Badge>;
 }

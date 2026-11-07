@@ -11,6 +11,11 @@ import {
 } from "@/components/icons/markers";
 import { intensityFor, radiusExpression } from "@/components/map/heat";
 import { circlePolygon } from "@/components/map/networkLocations";
+import {
+  glideKey,
+  glidedCoordinates,
+  type LngLat,
+} from "@/components/map/motion";
 import { imprecise } from "@/lib/accuracy";
 import { FENCE_COLORS } from "@/lib/fence";
 
@@ -323,6 +328,18 @@ export function bindEntityClicks(
   };
 }
 
+/** A point where its glide has it at `now` (decision D380); any other geometry as it is. */
+function gliding(
+  geometry: GeoJSON.Geometry,
+  key: string,
+  now: number,
+): GeoJSON.Geometry {
+  if (geometry.type !== "Point") return geometry;
+  const to = geometry.coordinates as LngLat;
+  const at = glidedCoordinates(key, to, now);
+  return at === to ? geometry : { type: "Point", coordinates: at };
+}
+
 export async function setEntities(
   map: MapLibreMap,
   features: GeoJSON.Feature[],
@@ -330,6 +347,7 @@ export async function setEntities(
 ): Promise<void> {
   const source = map.getSource(SOURCES.entities) as GeoJSONSource | undefined;
   if (!source) return;
+  const now = performance.now();
   const withMarkers: GeoJSON.Feature[] = [];
   for (const feature of features) {
     const props = feature.properties as unknown as EntityFeatureProperties;
@@ -337,6 +355,11 @@ export async function setEntities(
     const marker = await ensureMarkerImage(map, props.icon_key, state);
     withMarkers.push({
       ...feature,
+      geometry: gliding(
+        feature.geometry,
+        glideKey("entity", props.entity_id),
+        now,
+      ),
       properties: { ...feature.properties, marker },
     });
   }
@@ -489,6 +512,7 @@ export async function setDevices(
 ): Promise<void> {
   const source = map.getSource(SOURCES.devices) as GeoJSONSource | undefined;
   if (!source) return;
+  const now = performance.now();
   const withMarkers: GeoJSON.Feature[] = [];
   for (const feature of features) {
     const props = feature.properties as unknown as DeviceFeatureProperties;
@@ -499,6 +523,11 @@ export async function setDevices(
     );
     withMarkers.push({
       ...feature,
+      geometry: gliding(
+        feature.geometry,
+        glideKey("device", props.device_id),
+        now,
+      ),
       properties: { ...feature.properties, marker },
     });
   }

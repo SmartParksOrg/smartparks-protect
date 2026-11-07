@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /** Motion that explains, never decorates (decision D378, ADR 0042): a thing moves because it
  * came from somewhere, changed, or is working. The durations every animation of the app takes,
@@ -41,4 +41,63 @@ const subscribe = (onChange: () => void) => {
 /** The reduce-motion setting as React state, so a component re-renders when it changes. */
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribe, prefersReducedMotion, () => false);
+}
+
+/** True for `ms` after `busy` fell from true to false, so a row can say "received" and fade
+ * where "data coming in" stood (decision D381); false on the first render and while busy. */
+export function useJustFinished(
+  busy: boolean,
+  ms: number = DURATION.ring,
+): boolean {
+  const [wasBusy, setWasBusy] = useState(busy);
+  // the fall counted, and the last fall whose time ran out
+  const [fell, setFell] = useState(0);
+  const [ended, setEnded] = useState(0);
+  if (busy !== wasBusy) {
+    setWasBusy(busy);
+    if (!busy) setFell((n) => n + 1);
+  }
+  useEffect(() => {
+    if (fell === 0) return;
+    const timer = window.setTimeout(() => setEnded(fell), ms);
+    return () => window.clearTimeout(timer);
+  }, [fell, ms]);
+  return fell > ended;
+}
+
+/** The number to show for `value` while it counts there (decision D383): from zero when it
+ * first appears, from the number shown before when it changes, eased over `ms`; the value
+ * itself at once under reduce motion or when it is not a finite number. */
+export function useCountUp(
+  value: number | null,
+  ms: number = DURATION.count,
+): number | null {
+  const reduced = useReducedMotion();
+  const target = value !== null && Number.isFinite(value) ? value : null;
+  const [shown, setShown] = useState(0);
+  const shownRef = useRef(shown);
+  useEffect(() => {
+    shownRef.current = shown;
+  }, [shown]);
+  useEffect(() => {
+    if (target === null || reduced) return;
+    const from = shownRef.current;
+    if (from === target) return;
+    const start = performance.now();
+    let frame = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      setShown(t < 1 ? from + (target - from) * easeOut(t) : target);
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, reduced, ms]);
+  return target === null || reduced ? target : shown;
+}
+
+/** Fast at first, settling at the end: the one easing every scripted motion uses. */
+export function easeOut(t: number): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  return 1 - (1 - clamped) ** 3;
 }
