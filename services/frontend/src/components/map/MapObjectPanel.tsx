@@ -40,6 +40,7 @@ import {
 } from "@/components/map/BatteryTrend";
 import { lastMovement, movementLevel } from "@/lib/movement";
 import { imprecise } from "@/lib/accuracy";
+import { useLiveNow } from "@/hooks/useNow";
 import { formatAgo, formatTime } from "@/lib/format";
 import {
   isDeviceFix,
@@ -246,7 +247,7 @@ export function PanelSummary({
   lastMovementAt,
   lastFixMovementAt,
   activity,
-  now,
+  now: baseNow,
 }: {
   lastSeenAt: string | null | undefined;
   positionTime: string | null | undefined;
@@ -269,6 +270,8 @@ export function PanelSummary({
 }) {
   const { t } = useTranslation();
   // the battery and movement trends unfold inside the panel (Tim, 2026-09-14), folded again
+  // the seconds count while a moment is fresh (decision D387)
+  const now = useLiveNow([lastSeenAt, positionTime], baseNow);
   // per object
   const [trendOpen, setTrendOpen] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);

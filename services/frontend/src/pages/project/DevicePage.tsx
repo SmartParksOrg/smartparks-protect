@@ -30,6 +30,7 @@ import type {
   ReattributeResult,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { LoadingLines } from "@/components/common/LoadingLines";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeviceControl } from "@/components/control/DeviceControl";
@@ -332,7 +333,7 @@ export function DevicePage() {
   if (!d)
     return (
       <Page>
-        <div className="text-muted-foreground">{t("Loading device…")}</div>
+        <LoadingLines lines={4} />
       </Page>
     );
 

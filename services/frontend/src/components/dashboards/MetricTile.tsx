@@ -12,7 +12,9 @@ import type {
   SeriesResponse,
 } from "@/api/types";
 import { SeriesChart } from "@/components/analytics/SeriesChart";
+import { Ago } from "@/components/common/Ago";
 import { CountUp } from "@/components/common/CountUp";
+import { Spark } from "@/components/common/Spark";
 import { useMetricsByKey } from "@/hooks/useMetrics";
 import { useNow } from "@/hooks/useNow";
 import { browserTimezone, rangeFor, seriesLabel } from "@/lib/analytics";
@@ -22,6 +24,7 @@ import {
   metricRows,
   metricTileQuery,
   type MetricTileOptions,
+  sparkOf,
   tileNumber,
 } from "@/lib/dashboards";
 import { formatAgo, formatTime, scaledUnit } from "@/lib/format";
@@ -94,6 +97,38 @@ export function MetricTile({
     () => (series.data ? inReadUnits(series.data) : undefined),
     [series.data],
   );
+  // the week behind a number (decision D388): one 14-day read in hour buckets, keyed by the
+  // hour so the query is stable within it
+  const hour = Math.floor(now / 3_600_000) * 3_600_000;
+  const sparkQuery = useMemo(() => {
+    const q = new URLSearchParams(
+      metricTileQuery(
+        { ...options, display: "line", aggregate: "last" },
+        {
+          from: new Date(hour - 14 * 86_400_000).toISOString(),
+          to: new Date(hour).toISOString(),
+        },
+      ),
+    );
+    q.set("bucket", "1h");
+    return q.toString();
+  }, [options, hour]);
+  const sparks = useQuery({
+    queryKey: queryKeys.analyticsSeries(projectId, {
+      q: sparkQuery,
+      tile: "spark",
+    }),
+    queryFn: () =>
+      api.get<SeriesResponse>(
+        `/api/v1/projects/${projectId}/analytics/series?${sparkQuery}`,
+      ),
+    enabled: options.display === "number" && options.metrics.length > 0,
+    refetchInterval: 60_000,
+  });
+  const sparkSeries = useMemo(
+    () => (sparks.data ? (inReadUnits(sparks.data).series ?? []) : []),
+    [sparks.data],
+  );
   const metricLabels = useMemo(
     () => new Map([...registry].map(([key, metric]) => [key, metric.label])),
     [registry],
@@ -162,11 +197,18 @@ export function MetricTile({
                     </span>
                   )}
                 </div>
-                <div
-                  className="text-xs text-muted-foreground"
-                  title={row.lastAt ? formatTime(row.lastAt) : undefined}
-                >
-                  {row.lastAt ? formatAgo(row.lastAt, now) : ""}
+                <TileWeek
+                  spark={sparkOf(
+                    sparkSeries.find(
+                      (s) =>
+                        `${s.entity_id ?? s.device_id ?? ""}|${s.metric_key}` ===
+                        row.key,
+                    ),
+                    now,
+                  )}
+                />
+                <div className="text-xs text-muted-foreground">
+                  {row.lastAt ? <Ago value={row.lastAt} /> : ""}
                 </div>
               </div>
             ))}
@@ -263,6 +305,32 @@ export function MetricTile({
         className="min-h-48 flex-1"
       />
       {footer}
+    </div>
+  );
+}
+
+/** The week's line and the change against the week before, beside a tile's number. */
+function TileWeek({ spark }: { spark: ReturnType<typeof sparkOf> }) {
+  if (spark.values.length < 2) return null;
+  const change = spark.change;
+  const sign = change === null ? "" : change > 0 ? "+" : "";
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Spark values={spark.values} />
+      {change !== null && (
+        <span
+          className={
+            change > 0
+              ? "text-brand-green-dark dark:text-brand-green-light"
+              : change < 0
+                ? "text-brand-coral"
+                : ""
+          }
+        >
+          {sign}
+          {Math.round(change * 100)} %
+        </span>
+      )}
     </div>
   );
 }

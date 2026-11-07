@@ -48,7 +48,8 @@ export function formatAgo(
   if (!value) return "never";
   const seconds = Math.round((now - new Date(value).getTime()) / 1000);
   if (seconds < -60) return "clock ahead"; // a device time from the future (decision D119)
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 10) return "just now"; // and counts from there (decision D387)
+  if (seconds < 60) return `${seconds} s ago`;
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
   return `${Math.round(seconds / 86400)} d ago`;

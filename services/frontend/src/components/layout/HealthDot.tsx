@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { api } from "@/api/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { dotLevel, type StatusSummary } from "@/lib/health";
+import { useJustChanged } from "@/lib/motion";
 import { useAuthStore } from "@/stores/auth";
 
 const COLOUR = {
@@ -30,6 +31,8 @@ export function HealthDot({ className = "" }: { className?: string }) {
   });
   // failureCount counts the failed polls since the last answer; two in a row means red
   const level = dotLevel(status.data, status.failureCount);
+  // one beat when the state changes, never while it stays (decision D390)
+  const beat = useJustChanged(level);
   const label =
     level === "ok"
       ? t("All systems working")
@@ -43,11 +46,17 @@ export function HealthDot({ className = "" }: { className?: string }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`flex size-4 items-center justify-center rounded-full ${className}`}
+          className={`relative flex size-4 items-center justify-center rounded-full ${className}`}
           aria-label={t("System health: {{state}}", { state: label })}
           title={label}
         >
-          <span className={`block size-2.5 rounded-full ${COLOUR[level]}`} />
+          {beat && (
+            <span
+              aria-hidden="true"
+              className={`absolute inline-flex size-2.5 animate-ping rounded-full ${COLOUR[level]}`}
+            />
+          )}
+          <span className={`relative block size-2.5 rounded-full ${COLOUR[level]}`} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 text-sm">

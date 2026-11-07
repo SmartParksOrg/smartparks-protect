@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTime, formatTimeShort } from "@/lib/format";
+import { formatAgo, formatTime, formatTimeShort } from "@/lib/format";
 
 describe("formatTimeShort", () => {
   const now = new Date(2026, 8, 7, 12, 0, 0);
@@ -76,5 +76,14 @@ describe("scaledUnit", () => {
     expect(scaledUnit("V")).toEqual({ factor: 1, unit: "V" });
     expect(formatMeasurement(12, "m/s")).toBe("43.20 km/h");
     expect(formatMeasurement(52, "10 ms")).toBe("520 ms");
+  });
+});
+
+describe("formatAgo counts the fresh moments (decision D387)", () => {
+  const now = Date.parse("2026-11-07T12:00:00Z");
+  it("says just now under ten seconds, then the seconds, then the minutes", () => {
+    expect(formatAgo("2026-11-07T11:59:55Z", now)).toBe("just now");
+    expect(formatAgo("2026-11-07T11:59:37Z", now)).toBe("23 s ago");
+    expect(formatAgo("2026-11-07T11:56:00Z", now)).toBe("4 min ago");
   });
 });

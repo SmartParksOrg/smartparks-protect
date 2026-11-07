@@ -23,10 +23,9 @@ import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
-import { useNow } from "@/hooks/useNow";
 import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
-import { formatAgo } from "@/lib/format";
+import { Ago } from "@/components/common/Ago";
 import { positionKindExplanation, positionKindLabel } from "@/lib/positionKind";
 
 // the order of the health levels, worst last, as the API judges them (decision D286)
@@ -78,7 +77,6 @@ export function EntitiesPage() {
     () => new Map(types.data?.items.map((t) => [t.id, t])),
     [types.data],
   );
-  const now = useNow();
   const allProjects = isAllProjects(projectId);
   const projectList = useProjects();
   const projectName = (id: string | null | undefined) =>
@@ -187,7 +185,7 @@ export function EntitiesPage() {
       header: t("Last seen"),
       meta: { filter: false },
       accessorFn: (e) => e.tracking?.last_seen_at ?? undefined,
-      cell: ({ getValue }) => formatAgo(getValue<string | undefined>(), now),
+      cell: ({ getValue }) => <Ago value={getValue<string | undefined>()} />,
     },
     {
       // when data last arrived, apart from the records' own time: an animal without a
@@ -197,7 +195,7 @@ export function EntitiesPage() {
       header: t("Data received"),
       meta: { filter: false },
       accessorFn: (e) => e.tracking?.data_received_at ?? undefined,
-      cell: ({ getValue }) => formatAgo(getValue<string | undefined>(), now),
+      cell: ({ getValue }) => <Ago value={getValue<string | undefined>()} />,
     },
     {
       id: "last_position",
@@ -211,7 +209,7 @@ export function EntitiesPage() {
         const kind = positionKindLabel(tracking.position_kind, t);
         return (
           <span>
-            {formatAgo(tracking.position_time, now)}
+            <Ago value={tracking.position_time} />
             {kind && (
               <span
                 className="ml-1 text-xs text-muted-foreground"

@@ -10,7 +10,8 @@ import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { type FeedItem, isUnread } from "@/lib/feed";
-import { formatAgo, formatTime } from "@/lib/format";
+import { Ago } from "@/components/common/Ago";
+import { LoadingLines } from "@/components/common/LoadingLines";
 import { eventIcon } from "@/lib/rules";
 
 /**
@@ -71,7 +72,11 @@ export function FeedPanel({
       <ul className="min-h-0 flex-1 overflow-y-auto">
         {items.length === 0 && (
           <li className="px-3 py-6 text-center text-muted-foreground">
-            {loading ? t("Loading…") : t("Nothing happened yet.")}
+            {loading ? (
+              <LoadingLines className="mx-auto w-2/3" />
+            ) : (
+              t("Nothing happened yet.")
+            )}
           </li>
         )}
         {items.map((item) => {
@@ -110,9 +115,7 @@ export function FeedPanel({
                       />
                     )}
                     {subject && <span className="truncate">{subject}</span>}
-                    <span title={formatTime(item.time)}>
-                      {formatAgo(item.time)}
-                    </span>
+                    <Ago value={item.time} />
                   </span>
                 </span>
                 {canWriteAlerts &&

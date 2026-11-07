@@ -163,6 +163,41 @@ export interface DeviceFeatureProperties {
 
 const OFFLINE_AFTER_MS = 24 * 3600_000;
 
+/** A marker ages (decision D385): full colour for a fix under an hour old, then a continuous
+ * fade to pale by 24 hours, where the offline grey takes over; the selected marker never
+ * fades. `nowS` is baked into the expression, so the caller re-applies it on the minute. */
+export function markerAgeOpacity(nowS: number): ExpressionSpecification {
+  return [
+    "case",
+    ["in", ":selected", ["get", "marker"]],
+    1,
+    [
+      "interpolate",
+      ["linear"],
+      ["-", nowS, ["coalesce", ["get", "seen_s"], nowS]],
+      3600,
+      1,
+      86400,
+      0.35,
+    ],
+  ];
+}
+
+/** Re-applies the markers' age to both marker layers; called every minute. */
+export function setMarkerAge(map: MapLibreMap, nowMs: number): void {
+  const opacity = markerAgeOpacity(Math.floor(nowMs / 1000));
+  for (const id of ["entity-markers", "device-markers"]) {
+    if (map.getLayer(id)) map.setPaintProperty(id, "icon-opacity", opacity);
+  }
+}
+
+/** The moment a feature was last seen, in epoch seconds, for the age expression. */
+function seenSeconds(at: string | null | undefined): number | null {
+  if (!at) return null;
+  const ms = new Date(at).getTime();
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+}
+
 /** The icon size of a layer: the selected marker, whose image carries a halo, a fifth larger
  * than the rest so it is the one the eye finds (Tim, 2026-09-21). */
 const SELECTED_SIZE = (size: number): ExpressionSpecification => [
@@ -248,6 +283,7 @@ export function ensureEntityLayers(map: MapLibreMap): void {
       "text-optional": true,
     },
     paint: {
+      "icon-opacity": markerAgeOpacity(Math.floor(Date.now() / 1000)),
       "text-color": "#1f2a24",
       "text-halo-color": "#ffffff",
       "text-halo-width": 1.2,
@@ -360,7 +396,11 @@ export async function setEntities(
         glideKey("entity", props.entity_id),
         now,
       ),
-      properties: { ...feature.properties, marker },
+      properties: {
+        ...feature.properties,
+        marker,
+        seen_s: seenSeconds(props.last_seen_at),
+      },
     });
   }
   source.setData({ type: "FeatureCollection", features: withMarkers });
@@ -458,6 +498,7 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
         "text-optional": true,
       },
       paint: {
+        "icon-opacity": markerAgeOpacity(Math.floor(Date.now() / 1000)),
         "text-color": "#2F4A3A",
         "text-halo-color": "#ffffff",
         "text-halo-width": 1.2,
@@ -528,7 +569,11 @@ export async function setDevices(
         glideKey("device", props.device_id),
         now,
       ),
-      properties: { ...feature.properties, marker },
+      properties: {
+        ...feature.properties,
+        marker,
+        seen_s: seenSeconds(props.last_seen_at),
+      },
     });
   }
   source.setData({ type: "FeatureCollection", features: withMarkers });
@@ -685,6 +730,42 @@ export function assignTrackColors(
   return out;
 }
 
+/** A track carries its time (decision D386): each step of the line is a feature with `t`
+ * from 0 at the oldest fix to 1 at the newest, so the line is faint where it is old and full
+ * and a touch thicker at its newest end. A line of one point gives no step. */
+export function trackSegments(
+  coordinates: GeoJSON.Position[],
+): { coordinates: [GeoJSON.Position, GeoJSON.Position]; t: number }[] {
+  const steps = coordinates.length - 1;
+  if (steps < 1) return [];
+  return coordinates.slice(1).map((end, i) => ({
+    coordinates: [coordinates[i], end],
+    t: steps === 1 ? 1 : i / (steps - 1),
+  }));
+}
+
+const TRACK_T: ExpressionSpecification = ["coalesce", ["get", "t"], 1];
+const TRACK_OPACITY: ExpressionSpecification = [
+  "interpolate",
+  ["linear"],
+  TRACK_T,
+  0,
+  0.2,
+  1,
+  0.9,
+];
+const trackWidth = (thin: number, thick: number): ExpressionSpecification => [
+  "interpolate",
+  ["linear"],
+  TRACK_T,
+  0,
+  thin,
+  0.85,
+  thin + (thick - thin) * 0.3,
+  1,
+  thick,
+];
+
 export function ensureTrackLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.track)) return;
   map.addSource(SOURCES.track, {
@@ -703,8 +784,8 @@ export function ensureTrackLayers(map: MapLibreMap): void {
       ],
       paint: {
         "line-color": ["coalesce", ["get", "color"], "#2F4A3A"],
-        "line-width": 3,
-        "line-opacity": 0.85,
+        "line-width": trackWidth(2, 4),
+        "line-opacity": TRACK_OPACITY,
       },
     },
     "entity-clusters",
@@ -722,8 +803,8 @@ export function ensureTrackLayers(map: MapLibreMap): void {
       ],
       paint: {
         "line-color": ["coalesce", ["get", "color"], "#2F4A3A"],
-        "line-width": 2.5,
-        "line-opacity": 0.85,
+        "line-width": trackWidth(1.8, 3),
+        "line-opacity": TRACK_OPACITY,
         "line-dasharray": [2, 1.5],
       },
     },
@@ -830,15 +911,20 @@ export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
   const colors = assignTrackColors(tracks);
   for (const track of tracks) {
     const color = colors.get(track.entityId) ?? trackColor(track.entityId);
-    features.push({
-      type: "Feature",
-      geometry: track.geometry,
-      properties: {
-        color,
-        entity_id: track.entityId,
-        kind: track.kind ?? "entity",
-      },
-    });
+    const kind = track.kind ?? "entity";
+    if (track.geometry.type === "LineString")
+      for (const step of trackSegments(track.geometry.coordinates))
+        features.push({
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: step.coordinates },
+          properties: { color, entity_id: track.entityId, kind, t: step.t },
+        });
+    else
+      features.push({
+        type: "Feature",
+        geometry: track.geometry,
+        properties: { color, entity_id: track.entityId, kind },
+      });
     const coordinates =
       track.geometry.type === "LineString"
         ? track.geometry.coordinates
@@ -853,7 +939,7 @@ export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
           color,
           time: track.times[i],
           owner_id: track.entityId,
-          kind: track.kind ?? "entity",
+          kind,
           key: trackPointKey(track.entityId, track.times[i]),
         },
       }),

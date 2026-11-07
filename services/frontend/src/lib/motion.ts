@@ -101,3 +101,38 @@ export function easeOut(t: number): number {
   const clamped = Math.max(0, Math.min(1, t));
   return 1 - (1 - clamped) ** 3;
 }
+
+/** True once `flag` has been true for `ms` without a break (decision D389): a skeleton that
+ * shows only when a read is slow, never on a fast one. */
+export function useDelayed(flag: boolean, ms: number): boolean {
+  const [passed, setPassed] = useState(false);
+  useEffect(() => {
+    if (!flag) return;
+    const timer = window.setTimeout(() => setPassed(true), ms);
+    return () => {
+      window.clearTimeout(timer);
+      setPassed(false);
+    };
+  }, [flag, ms]);
+  return flag && passed;
+}
+
+/** True for `ms` after `value` changed (decision D390), never on the first render. */
+export function useJustChanged<T>(
+  value: T,
+  ms: number = DURATION.ring,
+): boolean {
+  const [seen, setSeen] = useState(value);
+  const [changes, setChanges] = useState(0);
+  const [ended, setEnded] = useState(0);
+  if (!Object.is(value, seen)) {
+    setSeen(value);
+    setChanges((n) => n + 1);
+  }
+  useEffect(() => {
+    if (changes === 0) return;
+    const timer = window.setTimeout(() => setEnded(changes), ms);
+    return () => window.clearTimeout(timer);
+  }, [changes, ms]);
+  return changes > ended;
+}

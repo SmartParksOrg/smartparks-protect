@@ -10,6 +10,8 @@ import {
   bindEventClicks,
   bindFeatureClicks,
   bindGatewayClicks,
+  markerAgeOpacity,
+  trackSegments,
   bindTrackPointClicks,
   trackColor,
   trackPointKey,
@@ -313,5 +315,35 @@ describe("assignTrackColors", () => {
     ]);
     expect(colors.get("x")).toBe("#123456");
     expect(colors.get("y")).not.toBe("#123456");
+  });
+});
+
+describe("a track carries its time (decision D386)", () => {
+  it("cuts a line into steps with t from the oldest to the newest", () => {
+    const steps = trackSegments([
+      [16, -20],
+      [16.1, -20],
+      [16.2, -20],
+      [16.3, -20],
+    ]);
+    expect(steps.map((s) => s.t)).toEqual([0, 0.5, 1]);
+    expect(steps[2].coordinates).toEqual([
+      [16.2, -20],
+      [16.3, -20],
+    ]);
+  });
+  it("gives one full step for two points and none for one", () => {
+    expect(trackSegments([[16, -20], [17, -20]]).map((s) => s.t)).toEqual([1]);
+    expect(trackSegments([[16, -20]])).toEqual([]);
+  });
+});
+
+describe("a marker ages (decision D385)", () => {
+  it("fades from full at an hour to pale at a day, never the selected one", () => {
+    const expression = markerAgeOpacity(1_000_000) as unknown[];
+    expect(expression[0]).toBe("case");
+    const fade = expression[3] as unknown[];
+    expect(fade.slice(-4)).toEqual([3600, 1, 86400, 0.35]);
+    expect((fade[2] as unknown[])[1]).toBe(1_000_000);
   });
 });

@@ -223,3 +223,28 @@ export function tileNumber(value: number | null): string {
   if (size >= 1) return value.toFixed(2);
   return value.toFixed(3);
 }
+
+/** The week behind a number tile (decision D388): the hourly last values of the past seven
+ * days as a line, and the change of the newest value against the newest value of the week
+ * before, as a share; null when either week has no value. From one 14-day read. */
+export function sparkOf(
+  series: Series | undefined,
+  nowMs: number,
+): { values: number[]; change: number | null } {
+  if (!series) return { values: [], change: null };
+  const weekAgo = nowMs - 7 * 86_400_000;
+  const recent: number[] = [];
+  let before: number | null = null;
+  for (const point of series.points) {
+    const v = point.values.last;
+    if (typeof v !== "number") continue;
+    if (new Date(point.time).getTime() < weekAgo) before = v;
+    else recent.push(v);
+  }
+  const newest = recent.length > 0 ? recent[recent.length - 1] : null;
+  const change =
+    newest === null || before === null || before === 0
+      ? null
+      : (newest - before) / Math.abs(before);
+  return { values: recent, change };
+}

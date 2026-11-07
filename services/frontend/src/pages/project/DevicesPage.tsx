@@ -43,14 +43,12 @@ import {
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/icons/Icon";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
-import { useNow } from "@/hooks/useNow";
 import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
-import { formatAgo } from "@/lib/format";
+import { Ago } from "@/components/common/Ago";
 
 export function DevicesPage() {
   const { t } = useTranslation();
-  const now = useNow();
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -190,7 +188,7 @@ export function DevicesPage() {
       header: t("Last seen"),
       meta: { filter: false },
       accessorKey: "last_seen_at",
-      cell: ({ getValue }) => formatAgo(getValue<string | null>(), now),
+      cell: ({ getValue }) => <Ago value={getValue<string | null>()} />,
     },
     {
       header: t("Health"),

@@ -34,6 +34,7 @@ import type {
   MetricSummary,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { LoadingLines } from "@/components/common/LoadingLines";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { TrafficTable } from "@/components/network/TrafficTable";
@@ -362,7 +363,7 @@ export function EntityPage() {
   if (!e)
     return (
       <Page>
-        <div className="text-muted-foreground">{t("Loading entity…")}</div>
+        <LoadingLines lines={4} />
       </Page>
     );
 

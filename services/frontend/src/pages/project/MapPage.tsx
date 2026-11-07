@@ -69,6 +69,7 @@ import {
   type EntityFeatureProperties,
   type EventFeatureProperties,
   raiseMarkers,
+  setMarkerAge,
   setCoverage,
   setDevices,
   setEntities,
@@ -251,6 +252,8 @@ export function MapPage() {
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const now = useNow();
+  // the markers' age, re-applied on the minute (decision D385)
+  const minute = useNow(60_000);
   const selectedId = params.get("entity");
   const selectedDeviceId = params.get("device");
   // a gateway or a track point selected (phase 19): `?gateway=<id>`, `?point=<owner>,<time>`
@@ -1169,6 +1172,12 @@ export function MapPage() {
     raiseMarkers(map);
     ensurePulseLayer(map);
   }, [mapRef, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setMarkerAge(map, minute);
+  }, [mapRef, ready, minute]);
 
   // terrain on top of any base map; a style change drops it, so it is applied again on ready
   useEffect(() => {

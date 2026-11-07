@@ -35,6 +35,7 @@ import { useIsPhone } from "@/hooks/useMediaQuery";
 import { usePreference } from "@/hooks/usePreference";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDelayed } from "@/lib/motion";
 import {
   Table,
   TableBody,
@@ -134,6 +135,8 @@ export function DataTable<T>({
   columnFilters: withFilters,
   cardOf,
 }: Props<T>) {
+  // skeleton rows only once a read is slow (decision D389)
+  const slow = useDelayed(Boolean(isLoading), 300);
   const { t } = useTranslation();
   const empty = emptyMessage ?? t("Nothing here yet.");
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -315,7 +318,7 @@ export function DataTable<T>({
       )}
       {cardOf && (
         <ul className="divide-y md:hidden">
-          {isLoading &&
+          {slow &&
             Array.from({ length: 3 }).map((_, i) => (
               <li key={`c${i}`} className="px-3 py-3">
                 <Skeleton className="h-4 w-2/3" />
@@ -465,7 +468,7 @@ export function DataTable<T>({
               ))}
           </TableHeader>
           <TableBody>
-            {isLoading &&
+            {slow &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={`s${i}`}>
                   {table.getVisibleLeafColumns().map((c) => (
@@ -494,6 +497,7 @@ export function DataTable<T>({
                 <TableRow
                   key={row.id}
                   className={cn(
+                    "animate-in fade-in-0 duration-200",
                     onRowClick && "cursor-pointer",
                     rowClassName?.(row.original),
                   )}

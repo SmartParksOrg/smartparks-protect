@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { SeriesResponse } from "@/api/types";
+import type { Series, SeriesResponse } from "@/api/types";
 import {
   inReadUnits,
   metricRows,
   metricTileQuery,
   readMetricOptions,
+  sparkOf,
   tileNumber,
   writeMetricOptions,
 } from "@/lib/dashboards";
@@ -198,5 +199,39 @@ describe("a dashboard's metric tile", () => {
       "0.046",
     ]);
     expect(tileNumber(null)).toBe("");
+  });
+});
+
+describe("sparkOf (decision D388)", () => {
+  const now = Date.parse("2026-11-14T12:00:00Z");
+  const point = (daysAgo: number, last: number | null) => ({
+    time: new Date(now - daysAgo * 86_400_000).toISOString(),
+    values: { last },
+  });
+  const series = {
+    metric_key: "battery_voltage",
+    unit: "V",
+    entity_id: "e1",
+    device_id: null,
+    points: [
+      point(13, 3.9),
+      point(8, 3.8),
+      point(6, 3.7),
+      point(2, null),
+      point(1, 3.61),
+    ],
+  } as unknown as Series;
+  it("takes the last week's values and the change against the week before", () => {
+    const spark = sparkOf(series, now);
+    expect(spark.values).toEqual([3.7, 3.61]);
+    expect(spark.change).toBeCloseTo((3.61 - 3.8) / 3.8, 6);
+  });
+  it("has no change without a value in the week before, and nothing without a series", () => {
+    const recentOnly = {
+      ...series,
+      points: [point(6, 3.7), point(1, 3.61)],
+    } as unknown as Series;
+    expect(sparkOf(recentOnly, now).change).toBeNull();
+    expect(sparkOf(undefined, now)).toEqual({ values: [], change: null });
   });
 });

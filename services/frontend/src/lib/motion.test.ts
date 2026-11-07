@@ -5,6 +5,8 @@ import {
   easeOut,
   prefersReducedMotion,
   useCountUp,
+  useDelayed,
+  useJustChanged,
   useJustFinished,
   useReducedMotion,
 } from "@/lib/motion";
@@ -121,5 +123,41 @@ describe("easeOut", () => {
     expect(easeOut(1)).toBe(1);
     expect(easeOut(0.5)).toBeGreaterThan(0.5);
     expect(easeOut(2)).toBe(1);
+  });
+});
+
+describe("useDelayed", () => {
+  it("is true only once the flag held for the delay, and drops at once", () => {
+    vi.useFakeTimers();
+    const { result, rerender } = renderHook(
+      ({ flag }) => useDelayed(flag, 300),
+      {
+        initialProps: { flag: true },
+      },
+    );
+    expect(result.current).toBe(false);
+    act(() => vi.advanceTimersByTime(300));
+    expect(result.current).toBe(true);
+    rerender({ flag: false });
+    expect(result.current).toBe(false);
+    vi.useRealTimers();
+  });
+});
+
+describe("useJustChanged", () => {
+  it("is true for a while after the value changed, never on the first render", () => {
+    vi.useFakeTimers();
+    const { result, rerender } = renderHook(
+      ({ value }) => useJustChanged(value, 500),
+      {
+        initialProps: { value: "ok" },
+      },
+    );
+    expect(result.current).toBe(false);
+    rerender({ value: "degraded" });
+    expect(result.current).toBe(true);
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current).toBe(false);
+    vi.useRealTimers();
   });
 });

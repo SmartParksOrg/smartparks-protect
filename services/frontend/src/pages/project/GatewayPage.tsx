@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type { GatewayDay, GatewayDetail, TrafficRow } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { JsonView } from "@/components/common/JsonView";
+import { LoadingLines } from "@/components/common/LoadingLines";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeviceTraffic } from "@/components/devices/DeviceTraffic";
@@ -94,7 +95,12 @@ export function GatewayPage() {
         <Callout kind="error">{detail.error.message}</Callout>
       </Page>
     );
-  if (!g) return <Page>{t("Loading…")}</Page>;
+  if (!g)
+    return (
+      <Page>
+        <LoadingLines lines={4} />
+      </Page>
+    );
   const coordinates = (g.geometry as { coordinates?: [number, number] } | null)?.coordinates;
   // a gateway the platform's list does not carry: known from the uplinks it relayed alone, so
   // its name and its own status reports never reach Protect (D370)
