@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   RequireAuth,
@@ -268,152 +269,159 @@ function Loading() {
 
 export default function App() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route element={<RequireAuth />}>
-          <Route path="/oauth/consent" element={<ConsentPage />} />
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/projects" replace />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/account/connections" element={<ConnectionsPage />} />
-            <Route path="/projects/:projectId">
-              <Route index element={<Navigate to="map" replace />} />
-              <Route path="map" element={<MapPage />} />
-              <Route path="entities" element={<EntitiesPage />} />
-              <Route path="entities/:entityId" element={<EntityPage />} />
-              <Route path="devices" element={<DevicesPage />} />
-              <Route path="devices/:deviceId" element={<DevicePage />} />
-              <Route path="alerts" element={<AlertsPage />} />
-              <Route path="rules" element={<RulesPage />} />
-              <Route path="rules/events" element={<EventsPage />} />
-              <Route path="rules/automations" element={<AutomationsPage />} />
-              <Route path="control/commands" element={<CommandsPage />} />
+    <ErrorBoundary>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route element={<RequireAuth />}>
+            <Route path="/oauth/consent" element={<ConsentPage />} />
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Navigate to="/projects" replace />} />
+              <Route path="/projects" element={<ProjectsPage />} />
               <Route
-                path="admin/notifications"
-                element={<NotificationsPage />}
+                path="/account/connections"
+                element={<ConnectionsPage />}
               />
-              <Route path="analyze/explorer" element={<ExplorerPage />} />
-              <Route path="analyze/exports" element={<ExportsPage />} />
-              <Route path="analyze/curation" element={<CurationPage />} />
-              <Route path="analyze/dashboards" element={<DashboardsPage />} />
-              <Route element={<RequireAnalysisModule module="movement" />}>
-                <Route path="analyze/movement" element={<MovementPage />} />
-              </Route>
-              <Route element={<RequireAnalysisModule module="grazing" />}>
-                <Route path="analyze/grazing" element={<GrazingPage />} />
-              </Route>
-              <Route
-                element={<RequireAnalysisModule module="contact_tracing" />}
-              >
+              <Route path="/projects/:projectId">
+                <Route index element={<Navigate to="map" replace />} />
+                <Route path="map" element={<MapPage />} />
+                <Route path="entities" element={<EntitiesPage />} />
+                <Route path="entities/:entityId" element={<EntityPage />} />
+                <Route path="devices" element={<DevicesPage />} />
+                <Route path="devices/:deviceId" element={<DevicePage />} />
+                <Route path="alerts" element={<AlertsPage />} />
+                <Route path="rules" element={<RulesPage />} />
+                <Route path="rules/events" element={<EventsPage />} />
+                <Route path="rules/automations" element={<AutomationsPage />} />
+                <Route path="control/commands" element={<CommandsPage />} />
                 <Route
-                  path="analyze/contact-tracing"
-                  element={<ContactTracingPage />}
+                  path="admin/notifications"
+                  element={<NotificationsPage />}
                 />
-              </Route>
-              <Route element={<RequireAnalysisModule module="cardiac" />}>
-                <Route path="analyze/cardiac" element={<CardiacPage />} />
-              </Route>
-              <Route element={<RequireAnalysisModule module="vehicle_use" />}>
-                <Route path="analyze/vehicles" element={<VehiclePage />} />
-              </Route>
-              <Route
-                element={<RequireAnalysisModule module="habitat_selection" />}
-              >
-                <Route path="analyze/habitat" element={<HabitatPage />} />
-              </Route>
-              <Route
-                element={<RequireAnalysisModule module="device_performance" />}
-              >
+                <Route path="analyze/explorer" element={<ExplorerPage />} />
+                <Route path="analyze/exports" element={<ExportsPage />} />
+                <Route path="analyze/curation" element={<CurationPage />} />
+                <Route path="analyze/dashboards" element={<DashboardsPage />} />
+                <Route element={<RequireAnalysisModule module="movement" />}>
+                  <Route path="analyze/movement" element={<MovementPage />} />
+                </Route>
+                <Route element={<RequireAnalysisModule module="grazing" />}>
+                  <Route path="analyze/grazing" element={<GrazingPage />} />
+                </Route>
                 <Route
-                  path="analyze/device-performance"
-                  element={<DevicePerformancePage />}
-                />
-              </Route>
-              <Route path="network/traffic" element={<TrafficPage />} />
-              <Route path="network/gateways" element={<GatewaysPage />} />
-              <Route
-                path="network/gateways/:gatewayId"
-                element={<GatewayPage />}
-              />
-              <Route path="network/offload" element={<OffloadPage />} />
-              <Route
-                path="integrate/integrations"
-                element={<IntegrationsPage />}
-              />
-              <Route path="network/traces" element={<TracesPage />} />
-              <Route
-                element={
-                  <RequireProjectPermission permission="members:write" />
-                }
-              >
-                <Route path="admin/members" element={<MembersPage />} />
-              </Route>
-              <Route
-                element={
-                  <RequireProjectPermission permission="features:write" />
-                }
-              >
-                <Route path="admin/features" element={<FeaturesPage />} />
+                  element={<RequireAnalysisModule module="contact_tracing" />}
+                >
+                  <Route
+                    path="analyze/contact-tracing"
+                    element={<ContactTracingPage />}
+                  />
+                </Route>
+                <Route element={<RequireAnalysisModule module="cardiac" />}>
+                  <Route path="analyze/cardiac" element={<CardiacPage />} />
+                </Route>
+                <Route element={<RequireAnalysisModule module="vehicle_use" />}>
+                  <Route path="analyze/vehicles" element={<VehiclePage />} />
+                </Route>
                 <Route
-                  path="features/:featureId/fence"
-                  element={<FenceLinePage />}
-                />
-              </Route>
-              <Route
-                element={
-                  <RequireProjectPermission permission="entities:write" />
-                }
-              >
-                <Route path="admin/groups" element={<GroupsPage />} />
-              </Route>
-              <Route
-                element={
-                  <RequireProjectPermission permission="project:write" />
-                }
-              >
+                  element={<RequireAnalysisModule module="habitat_selection" />}
+                >
+                  <Route path="analyze/habitat" element={<HabitatPage />} />
+                </Route>
                 <Route
-                  path="admin/settings"
-                  element={<ProjectSettingsPage />}
+                  element={
+                    <RequireAnalysisModule module="device_performance" />
+                  }
+                >
+                  <Route
+                    path="analyze/device-performance"
+                    element={<DevicePerformancePage />}
+                  />
+                </Route>
+                <Route path="network/traffic" element={<TrafficPage />} />
+                <Route path="network/gateways" element={<GatewaysPage />} />
+                <Route
+                  path="network/gateways/:gatewayId"
+                  element={<GatewayPage />}
                 />
+                <Route path="network/offload" element={<OffloadPage />} />
+                <Route
+                  path="integrate/integrations"
+                  element={<IntegrationsPage />}
+                />
+                <Route path="network/traces" element={<TracesPage />} />
+                <Route
+                  element={
+                    <RequireProjectPermission permission="members:write" />
+                  }
+                >
+                  <Route path="admin/members" element={<MembersPage />} />
+                </Route>
+                <Route
+                  element={
+                    <RequireProjectPermission permission="features:write" />
+                  }
+                >
+                  <Route path="admin/features" element={<FeaturesPage />} />
+                  <Route
+                    path="features/:featureId/fence"
+                    element={<FenceLinePage />}
+                  />
+                </Route>
+                <Route
+                  element={
+                    <RequireProjectPermission permission="entities:write" />
+                  }
+                >
+                  <Route path="admin/groups" element={<GroupsPage />} />
+                </Route>
+                <Route
+                  element={
+                    <RequireProjectPermission permission="project:write" />
+                  }
+                >
+                  <Route
+                    path="admin/settings"
+                    element={<ProjectSettingsPage />}
+                  />
+                </Route>
               </Route>
+              <Route path="/admin" element={<RequireServerAdmin />}>
+                <Route index element={<Navigate to="attention" replace />} />
+                <Route path="attention" element={<AttentionPage />} />
+                <Route path="health" element={<HealthPage />} />
+                <Route path="traffic" element={<AdminTrafficPage />} />
+                <Route path="backups" element={<BackupsPage />} />
+                <Route path="alerts" element={<AdminAlertsPage />} />
+                <Route path="automations" element={<AdminAutomationsPage />} />
+                <Route
+                  path="notifications"
+                  element={<AdminNotificationsPage />}
+                />
+                <Route path="projects" element={<AdminProjectsPage />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="users/:userId" element={<UserPage />} />
+                <Route path="devices" element={<AdminDevicesPage />} />
+                <Route path="devices/:deviceId" element={<DevicePage />} />
+                <Route path="data-sources" element={<DataSourcesPage />} />
+                <Route
+                  path="data-sources/:sourceId/traffic"
+                  element={<DataSourceTrafficPage />}
+                />
+                <Route path="device-types" element={<DeviceTypesPage />} />
+                <Route path="entity-types" element={<EntityTypesPage />} />
+                <Route path="metrics" element={<MetricsPage />} />
+                <Route path="audit" element={<AuditPage />} />
+                <Route path="ai-policy" element={<AiPolicyPage />} />
+                <Route path="environment" element={<EnvironmentPage />} />
+              </Route>
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
-            <Route path="/admin" element={<RequireServerAdmin />}>
-              <Route index element={<Navigate to="attention" replace />} />
-              <Route path="attention" element={<AttentionPage />} />
-              <Route path="health" element={<HealthPage />} />
-              <Route path="traffic" element={<AdminTrafficPage />} />
-              <Route path="backups" element={<BackupsPage />} />
-              <Route path="alerts" element={<AdminAlertsPage />} />
-              <Route path="automations" element={<AdminAutomationsPage />} />
-              <Route
-                path="notifications"
-                element={<AdminNotificationsPage />}
-              />
-              <Route path="projects" element={<AdminProjectsPage />} />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="users/:userId" element={<UserPage />} />
-              <Route path="devices" element={<AdminDevicesPage />} />
-              <Route path="devices/:deviceId" element={<DevicePage />} />
-              <Route path="data-sources" element={<DataSourcesPage />} />
-              <Route
-                path="data-sources/:sourceId/traffic"
-                element={<DataSourceTrafficPage />}
-              />
-              <Route path="device-types" element={<DeviceTypesPage />} />
-              <Route path="entity-types" element={<EntityTypesPage />} />
-              <Route path="metrics" element={<MetricsPage />} />
-              <Route path="audit" element={<AuditPage />} />
-              <Route path="ai-policy" element={<AiPolicyPage />} />
-              <Route path="environment" element={<EnvironmentPage />} />
-            </Route>
-            <Route path="*" element={<NotFoundPage />} />
           </Route>
-        </Route>
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }

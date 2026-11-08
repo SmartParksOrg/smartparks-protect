@@ -1028,7 +1028,7 @@ export function MapPage() {
       // the marker glides there and a ring says which one just reported (decision D380)
       if (!reducedMotion && (entityFresh || deviceFresh)) {
         const map = mapRef.current;
-        if (entityFresh && entityId && shownEntity?.geometry.type === "Point")
+        if (entityFresh && entityId && shownEntity?.geometry?.type === "Point")
           startGlide(
             glideKey("entity", entityId),
             shownEntity.geometry.coordinates as [number, number],

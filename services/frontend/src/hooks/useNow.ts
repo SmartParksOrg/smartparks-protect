@@ -20,7 +20,11 @@ export function useLiveNow(
 ): number {
   const [fast, setFast] = useState(false);
   const tick = useNow(fast ? 1_000 : 30_000);
-  const now = fast ? tick : (base ?? tick);
+  // the fresher of the two clocks, whichever rhythm is on: the answer must not depend on
+  // `fast`, or a base clock up to 30 s behind the second clock makes the hook flip between
+  // "fresh" and "not" for ever at the minute mark, which React stops with a white page
+  // (Tim, 2026-11-08)
+  const now = Math.max(tick, base ?? 0);
   const recent = values.some(
     (v) => v && Math.abs(now - new Date(v).getTime()) < 60_000,
   );
