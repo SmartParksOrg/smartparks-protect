@@ -3,6 +3,7 @@ import { Languages, LogOut, PanelLeftClose, Plug } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
 import {
+  matchesExactly,
   sectionsFor,
   serverSections,
   type NavItem,
@@ -16,10 +17,13 @@ import i18n, { LANGUAGES } from "@/i18n";
 
 function Item({
   item,
+  siblings,
   projectId,
   onNavigate,
 }: {
   item: NavItem;
+  /** The items of the same section, to tell a parent link from a leaf. */
+  siblings: NavItem[];
   projectId?: string;
   onNavigate?: () => void;
 }) {
@@ -45,6 +49,7 @@ function Item({
   return (
     <NavLink
       to={to}
+      end={matchesExactly(item, siblings)}
       onClick={onNavigate}
       className={({ isActive }) =>
         cn(
@@ -118,6 +123,7 @@ export function Sidebar({
                     <Item
                       key={item.label}
                       item={item}
+                      siblings={section.items}
                       projectId={projectId}
                       onNavigate={onNavigate}
                     />
@@ -134,7 +140,12 @@ export function Sidebar({
               </div>
               <div className="space-y-0.5">
                 {section.items.map((item) => (
-                  <Item key={item.label} item={item} onNavigate={onNavigate} />
+                  <Item
+                    key={item.label}
+                    item={item}
+                    siblings={section.items}
+                    onNavigate={onNavigate}
+                  />
                 ))}
               </div>
             </div>

@@ -68,6 +68,16 @@ export interface NavSection {
   permission?: PermissionKey;
 }
 
+/** Whether the item's link should light up only on its own path: true when another item's
+ * path lies under it (Rules at `rules`, Events at `rules/events`), so a visit to the child does
+ * not light up both (Tim, 2026-11-08). An item without a child keeps matching its sub-pages, so
+ * Devices stays lit on a device's page. */
+export function matchesExactly(item: NavItem, items: NavItem[]): boolean {
+  if (!item.to) return false;
+  const prefix = `${item.to}/`;
+  return items.some((other) => other.to?.startsWith(prefix) ?? false);
+}
+
 /** The sections as they apply to a scope: in the all scope only the items that work there. */
 export function sectionsFor(allProjects: boolean): NavSection[] {
   if (!allProjects) return projectSections;

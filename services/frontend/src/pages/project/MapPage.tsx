@@ -18,7 +18,7 @@ import * as maplibregl from "maplibre-gl";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -166,7 +166,6 @@ import {
 import { TracksCard, TrackSettingsPanel } from "@/components/map/TrackSettings";
 import { useTrackLengthLabel } from "@/components/map/useTrackLengthLabel";
 import { useMap } from "@/components/map/useMap";
-import { Badge } from "@/components/ui/badge";
 import { useGroups } from "@/hooks/useGroups";
 import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
@@ -326,7 +325,6 @@ export function MapPage() {
   const [followPausedFor, setFollowPausedFor] = useState<string | null>(null);
   // a burst of positions (a raw log decoded now) refreshes the tracks and heatmaps once
   const settle = useMemo(() => createSettler(5_000), []);
-  const navigate = useNavigate();
   const selectedEvent = params.get("event");
   const setLast = useProjectStore((s) => s.setLastProjectId);
   useEffect(() => setLast(projectId), [projectId, setLast]);
@@ -2113,25 +2111,12 @@ export function MapPage() {
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <div ref={container} className="absolute! inset-0 z-0" />
-      {/* the layers and feed buttons and the events count in the top left (decisions D137, D174, D177); the entity and device count went on 2026-09-12 at Tim's word, the layers panel carries the numbers */}
+      {/* the layers and feed buttons in the top left (decisions D137, D174, D177); the entity and device count went on 2026-09-12 at Tim's word and the events count on 2026-11-08 (decision D391), the layers panel carries the numbers */}
       <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] items-start gap-2 [&>*]:pointer-events-auto">
         <ControlStrip
           items={[layersItem, feedItem]}
           label={t("Layers and feed")}
         />
-        <div className="flex flex-wrap gap-2 [&>*]:pointer-events-auto">
-          {events.data && events.data.features.length > 0 && (
-            <Badge
-              variant="secondary"
-              className="pointer-events-auto cursor-pointer bg-card"
-              onClick={() =>
-                void navigate(`/projects/${projectId}/rules/events`)
-              }
-            >
-              {events.data.features.length} {t("events, 24 h")}
-            </Badge>
-          )}
-        </div>
       </div>
       {/* the control strips, rendered into the map's own top right and bottom right stacks */}
       {stripHost &&

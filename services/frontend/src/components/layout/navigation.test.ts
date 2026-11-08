@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { sectionsFor } from "@/components/layout/navigation";
+import {
+  matchesExactly,
+  sectionsFor,
+} from "@/components/layout/navigation";
 
 describe("navigation sections", () => {
   it("keeps the Network section for admins and the rest for everyone (decision D134)", () => {
@@ -22,5 +25,21 @@ describe("analysis items", () => {
     expect(grazing?.module).toBe("grazing");
     expect(movement?.permission).toBeUndefined();
     expect(sectionsFor(true).find((s) => s.label === "Analyze")?.items.some((i) => i.module)).toBeFalsy();
+  });
+});
+
+describe("matchesExactly", () => {
+  it("lights a parent link only on its own path and a leaf on its sub-pages too (Tim, 2026-11-08)", () => {
+    const rules = sectionsFor(false).find((s) => s.label === "Rules");
+    const items = rules?.items ?? [];
+    const parent = items.find((i) => i.to === "rules");
+    const child = items.find((i) => i.to === "rules/events");
+    expect(parent && matchesExactly(parent, items)).toBe(true);
+    expect(child && matchesExactly(child, items)).toBe(false);
+    const monitor = sectionsFor(false).find((s) => s.label === "Monitor");
+    const devices = monitor?.items.find((i) => i.to === "devices");
+    expect(devices && matchesExactly(devices, monitor?.items ?? [])).toBe(
+      false,
+    );
   });
 });
