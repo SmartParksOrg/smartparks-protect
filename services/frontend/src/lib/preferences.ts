@@ -5,7 +5,9 @@
  * still too large it lets the oldest of those go as well, never the current one, so a save
  * always lands and the choices of the projects in use stay. */
 
-export const PREFERENCES_MAX_BYTES = 32 * 1024;
+/** The server's bound is 32 KB of compact JSON; the document is kept a kilobyte under it, so
+ * a key written between two saves does not tip it over. */
+export const PREFERENCES_MAX_BYTES = 31 * 1024;
 export const RECENT_SCOPES_MAX = 10;
 /** The keys whose value is a map of scope to a value. */
 export const SCOPED_KEYS = ["map_layers", "map_view", "feed_seen"] as const;

@@ -35,7 +35,12 @@ class UserUpdate(schemas.BaseUserUpdate):
     @field_validator("preferences")
     @classmethod
     def _bounded(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
-        if value is not None and len(json.dumps(value)) > PREFERENCES_MAX_BYTES:
+        # measured compactly, as the browser measures before it saves (decision D392); the
+        # default separators added a space per comma and colon, 900 bytes on a full document
+        if (
+            value is not None
+            and len(json.dumps(value, separators=(",", ":"))) > PREFERENCES_MAX_BYTES
+        ):
             raise ValueError("preferences must stay under 32 KB")
         return value
 

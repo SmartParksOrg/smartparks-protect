@@ -117,3 +117,21 @@ async def test_preferences_are_kept_per_user_and_bounded(client, db):
     assert too_big.status_code == 422
     other = await actor(client, db)
     assert (await client.get("/api/v1/users/me", headers=other.headers)).json()["preferences"] == {}
+
+
+def test_preferences_bound_is_measured_compactly():
+    """Decision D392: the browser trims the document by its compact JSON length, so the server
+    measures the same way; a document of 31.5 KB compact passed through the old measure's
+    spaces as 32.4 KB and was refused while the browser saw room."""
+    from protect_api.auth.schemas import PREFERENCES_MAX_BYTES, UserUpdate
+
+    ids = [f"00000000-0000-0000-0000-{n:012d}" for n in range(830)]
+    document = {"map_layers": {"all": {"shown_devices": ids}}, "theme": "dark"}
+    import json
+
+    compact = len(json.dumps(document, separators=(",", ":")))
+    assert compact < PREFERENCES_MAX_BYTES < len(json.dumps(document))
+    assert UserUpdate(preferences=document).preferences == document
+    too_big = {"map_layers": {"all": {"shown_devices": ids + ids[:60]}}}
+    with pytest.raises(ValueError):
+        UserUpdate(preferences=too_big)
