@@ -54,7 +54,8 @@ jobs:
         run: sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core
       - name: go-pmtiles (the offline maps, phase 43 P3)
         run: |
-          curl -fsSL -o pmtiles.tgz https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles_1.31.2_Linux_x86_64.tar.gz
+          # GitHub's release downloads answer 504 now and then (2026-11-08, three runs in a row): retried
+          curl -fsSL --retry 6 --retry-all-errors --retry-delay 20 -o pmtiles.tgz https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles_1.31.2_Linux_x86_64.tar.gz
           echo "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f  pmtiles.tgz" | sha256sum -c -
           sudo tar -xzf pmtiles.tgz -C /usr/local/bin pmtiles && pmtiles version
       - name: Ruff

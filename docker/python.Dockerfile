@@ -26,12 +26,21 @@ ARG PMTILES_VERSION=1.31.2
 ARG PMTILES_SHA256=3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f
 RUN python3 - "$PMTILES_VERSION" "$PMTILES_SHA256" <<'PY' \
     && tar -xzf /tmp/pmtiles.tgz -C /usr/local/bin pmtiles && rm /tmp/pmtiles.tgz
-import hashlib, platform, sys, urllib.request
+import hashlib, platform, sys, time, urllib.error, urllib.request
 version, expected = sys.argv[1], sys.argv[2]
 if platform.machine() not in ("x86_64", "AMD64"):
     sys.exit(f"pmtiles is pinned for x86_64; this image builds on {platform.machine()}")
 url = f"https://github.com/protomaps/go-pmtiles/releases/download/v{version}/go-pmtiles_{version}_Linux_x86_64.tar.gz"
-data = urllib.request.urlopen(url, timeout=120).read()
+# GitHub's release downloads answer 504 now and then (2026-11-08): six tries, 20 s apart
+for attempt in range(6):
+    try:
+        data = urllib.request.urlopen(url, timeout=120).read()
+        break
+    except (urllib.error.URLError, TimeoutError) as error:
+        if attempt == 5:
+            raise
+        print(f"pmtiles download failed ({error}), trying again", file=sys.stderr)
+        time.sleep(20)
 if hashlib.sha256(data).hexdigest() != expected:
     sys.exit("pmtiles download does not match its pinned digest")
 open("/tmp/pmtiles.tgz", "wb").write(data)
