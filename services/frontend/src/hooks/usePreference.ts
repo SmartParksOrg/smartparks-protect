@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { api } from "@/api/client";
 import type { User } from "@/api/types";
+import { prunePreferences, withRecentScope } from "@/lib/preferences";
 import { useAuthStore } from "@/stores/auth";
 
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -14,14 +15,29 @@ function scheduleSave(): void {
     timer = null;
     const user = useAuthStore.getState().user;
     if (!user) return;
+    // the document stays under the server's bound (decision D392): the scopes visited least
+    // recently let go of their layer choices, map view and feed mark
+    const preferences = prunePreferences(user.preferences ?? {});
+    if (preferences !== user.preferences)
+      useAuthStore.setState({ user: { ...user, preferences } });
     void api
-      .patch<User>("/api/v1/users/me", {
-        body: { preferences: user.preferences },
-      })
-      .catch(() => {
+      .patch<User>("/api/v1/users/me", { body: { preferences } })
+      .catch((error: unknown) => {
         // the choice stays in this session; the next change tries again
+        console.warn("Preferences not saved", error);
       });
   }, 800);
+}
+
+/** Marks `scope` (a project id or "all") as the one in use, so its choices are the last to
+ * go when the document is trimmed (decision D392). Called when the live map opens a scope. */
+export function rememberScope(scope: string): void {
+  const user = useAuthStore.getState().user;
+  if (!user) return;
+  const preferences = withRecentScope(user.preferences ?? {}, scope);
+  if (preferences === user.preferences) return;
+  useAuthStore.setState({ user: { ...user, preferences } });
+  scheduleSave();
 }
 
 /** One key of the user's interface preferences, kept on the server (`users.preferences`). The

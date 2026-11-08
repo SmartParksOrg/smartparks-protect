@@ -167,7 +167,7 @@ import { TracksCard, TrackSettingsPanel } from "@/components/map/TrackSettings";
 import { useTrackLengthLabel } from "@/components/map/useTrackLengthLabel";
 import { useMap } from "@/components/map/useMap";
 import { useGroups } from "@/hooks/useGroups";
-import { usePreference } from "@/hooks/usePreference";
+import { rememberScope, usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { useNow } from "@/hooks/useNow";
 import { useIsPhone } from "@/hooks/useMediaQuery";
@@ -306,6 +306,11 @@ export function MapPage() {
     "map_view",
     {},
   );
+  // this scope is the one in use: its choices are the last the bounded document lets go of
+  // (decision D392)
+  useEffect(() => {
+    if (projectId) rememberScope(projectId);
+  }, [projectId]);
   const rememberedView = projectId ? mapViews[projectId] : undefined;
   // which project's map has been placed, by the fit or by the remembered view; until then
   // nothing about the view is worth remembering
