@@ -41,6 +41,7 @@ import {
 import { lastMovement, movementLevel } from "@/lib/movement";
 import { imprecise } from "@/lib/accuracy";
 import { useLiveNow } from "@/hooks/useNow";
+import { Ago } from "@/components/common/Ago";
 import { formatAgo, formatTime } from "@/lib/format";
 import {
   isDeviceFix,
@@ -464,8 +465,9 @@ function HealthRows({
   const phone = useIsPhone();
   return (
     <>
+      {/* the unfolded rows count the seconds as the folded line does (Tim, 2026-11-08) */}
       <PanelRow label={t("Last seen")} title={formatTime(lastSeenAt)}>
-        {formatAgo(lastSeenAt, now)}
+        <Ago value={lastSeenAt} />
       </PanelRow>
       <PanelRow label={t("Position")}>
         {positionTime && onOpenPosition ? (
@@ -784,7 +786,7 @@ function HealthRows({
           {lastContactAt && (
             <span className="text-muted-foreground">
               {" "}
-              · {formatAgo(lastContactAt, now)}
+              · <Ago value={lastContactAt} />
             </span>
           )}
         </PanelRow>
@@ -817,10 +819,10 @@ function HealthRows({
               )}
               onClick={onOpenState}
             >
-              {formatAgo(lastStatusAt, now)}
+              <Ago value={lastStatusAt} />
             </button>
           ) : (
-            formatAgo(lastStatusAt, now)
+            <Ago value={lastStatusAt} />
           )}
         </PanelRow>
       )}
