@@ -34,6 +34,10 @@ export interface LayerChoices {
   network_locations?: boolean;
   /** The device layer (decision D113) is a shown set: every device is off until switched on. */
   shown_devices: string[];
+  /** The gateway layer was switched on for the heard positions feature (Tim, 2026-11-08): the
+   * lines and the toggled gateways mean little without the gateways on the map, so opening the
+   * feature shows them and closing it hides them again, unless the person had them on. */
+  gateways_for_heard?: boolean;
 }
 
 export const UNGROUPED_LAYER = "ungrouped";
@@ -377,6 +381,19 @@ export function showAllGateways(choices: LayerChoices): LayerChoices {
 
 export function hideAllGateways(choices: LayerChoices): LayerChoices {
   return { ...choices, gateways: false };
+}
+
+/** The heard positions feature opened: the gateways come on, remembered as lent when they
+ * were off (Tim, 2026-11-08). */
+export function lendGateways(choices: LayerChoices): LayerChoices {
+  if (choices.gateways) return choices;
+  return { ...choices, gateways: true, gateways_for_heard: true };
+}
+
+/** The heard positions feature closed: gateways that were lent go off again. */
+export function returnGateways(choices: LayerChoices): LayerChoices {
+  if (!choices.gateways_for_heard) return choices;
+  return { ...choices, gateways: false, gateways_for_heard: false };
 }
 
 export function showGateway(

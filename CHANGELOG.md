@@ -19,6 +19,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- **The heard positions feature brings the gateways with it** (Tim, 2026-11-08). Switching heard positions on from any panel, row or the Coverage tab shows the gateway layer, since the lines and the toggled gateways mean little without the gateways on the map; closing the feature hides the layer again, unless the person had it on already.
 - **The interface preferences stay within their bound** (Tim, 2026-11-08, decision D392: the operations account on dev had 754 device ids under "shown devices" in the All projects scope, its document at the 32 KB limit, and every save was refused silently). The layer choices, the remembered map view and the feed's mark are kept for the ten projects visited most recently; when the document would still be too large the oldest of those are let go as well, never the project in use. A refused save now leaves a warning in the browser console.
 - **The events count left the live map** (Tim, 2026-11-08, decision D391). The pill top left that read "65 events, 24 h" repeated the layers panel's Events tab, which carries the count and the types; the Events page keeps the list.
 - **The device's own reports start hidden on the live map** (Tim, 2026-11-07, decision D384: 21 AWT tags of Okonjima repeating their service coverage flag put 82 events on the map in a day). "Device reports errors" and "Device rebooted" events no longer show on the map's events layer unless you tick them in the layers panel; the tick is remembered per user, Show all switches them on too. The feed, the Events page and the device's health rows keep them, and the drivers raise them as before.
@@ -34,6 +35,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- **The Movement value in the live map's panel reads from the left** (Tim, 2026-11-08: a value that wrapped on a phone was centred while every other row started at the left).
 - **The live map's panel no longer blanks the page at the minute mark** (Tim, 2026-11-08: the page went white on his phone with a sheep's panel open at "Seen 1 min ago"). The panel's clock, which counts the seconds while a moment is under a minute old, judged "fresh" by one clock and showed another, so with the parent's clock up to 30 s behind it flipped between the two for ever once a fix turned a minute old, and React gave up with a white page. It reads one clock now, the fresher of the two; tested at the minute mark. The app also gained an error boundary: a render that fails shows "Something went wrong" with the error and Reload instead of a white page. A first position for an entity that had none no longer errors in the live update. The unfolded panel's "Last seen", "Last status" and last contact rows count the seconds as the folded line does (Tim, 2026-11-08: they stood still while the summary line counted).
 - **The navigation lit Rules and Events together** (Tim, 2026-11-08). A link whose page has pages under it, Rules with Events and Automations, lights up on its own path alone now; Devices and Entities stay lit on a device's or an entity's page.
 

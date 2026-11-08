@@ -35,6 +35,8 @@ import {
   revealGateway,
   revealFeature,
   coverageGatewayIds,
+  lendGateways,
+  returnGateways,
 } from "@/components/map/layerChoices";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 
@@ -393,5 +395,23 @@ describe("the device's own reports start hidden on the map (decision D384)", () 
   });
   it("show all switches the quiet types on too", () => {
     expect(isEventVisible(error, showAllEvents(DEFAULT_LAYERS))).toBe(true);
+  });
+});
+
+describe("the gateway layer lent to the heard positions feature (Tim, 2026-11-08)", () => {
+  it("comes on when the feature opens and goes off again when it closes", () => {
+    const off = { ...DEFAULT_LAYERS, gateways: false };
+    const lent = lendGateways(off);
+    expect(lent.gateways).toBe(true);
+    expect(lent.gateways_for_heard).toBe(true);
+    const returned = returnGateways(lent);
+    expect(returned.gateways).toBe(false);
+    expect(returned.gateways_for_heard).toBe(false);
+  });
+
+  it("leaves gateways the person had on alone, on open and on close", () => {
+    const on = { ...DEFAULT_LAYERS, gateways: true };
+    expect(lendGateways(on)).toBe(on);
+    expect(returnGateways(on)).toBe(on);
   });
 });

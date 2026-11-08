@@ -105,6 +105,8 @@ import {
   revealEntity,
   revealFeature,
   revealGateway,
+  lendGateways,
+  returnGateways,
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
 import { FeedPanel } from "@/components/map/FeedPanel";
@@ -498,6 +500,13 @@ export function MapPage() {
       ),
     [setParams],
   );
+  // the feature shows the gateways it draws lines to, and hides them again when it closes
+  // unless the person had them on (Tim, 2026-11-08)
+  const heardActive = heardOn || layers.coverage;
+  useEffect(() => {
+    const next = heardActive ? lendGateways(layers) : returnGateways(layers);
+    if (next !== layers) setLayers(next);
+  }, [heardActive, layers, setLayers]);
   const toggleHeard = (entityId: string) =>
     setHeardLists(toggleId(heardIds, entityId), heardDeviceIds, heardGatewayIds);
   const toggleDeviceHeard = (deviceId: string) =>

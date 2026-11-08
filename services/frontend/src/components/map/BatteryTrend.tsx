@@ -152,7 +152,7 @@ export function MovementValue({
   return (
     <button
       type="button"
-      className={`underline underline-offset-2 hover:text-primary ${className ?? ""}`}
+      className={`text-left underline underline-offset-2 hover:text-primary ${className ?? ""}`}
       title={open ? t("Hide the movement trend") : t("Show the movement trend")}
       aria-expanded={open}
       onClick={onToggle}
