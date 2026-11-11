@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -24,7 +25,9 @@ import type {
   SourceEventSummary,
   UnknownIdentity,
 } from "@/api/types";
+import { CreatedProgress, WalkRows } from "@/components/admin/WalkProgress";
 import { Callout } from "@/components/common/Callout";
+import { ProgressBar } from "@/components/common/ProgressBar";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
@@ -36,7 +39,6 @@ import {
 } from "@/components/devices/ProvenancePanel";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +57,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatAgo, formatTime } from "@/lib/format";
+import { useJustFinished } from "@/lib/motion";
 import { useQueryClient } from "@tanstack/react-query";
 
 const DEAD_TOPICS = [
@@ -134,15 +137,29 @@ function QueueProgress({
       onDrained();
     }
   }, [queued, onDrained, t]);
+  // the card says the work is done and fades, as the device page's notice does (decision D381)
+  const finished = useJustFinished(queued > 0);
+  if (queued === 0 && finished)
+    return (
+      <Callout
+        kind="success"
+        className="animate-out fade-out-0 fill-mode-forwards duration-1000"
+      >
+        {t("New data received.")}
+      </Callout>
+    );
   if (queued === 0) return null;
   const total = Math.max(peak, queued);
   const done = total - queued;
   return (
-    <Card id={QUEUE_PROGRESS_ID}>
-      <CardContent className="space-y-2 pt-4">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">{t("Processing retained events")}</span>
-          <span className="text-muted-foreground">
+    <Callout kind="info">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="flex items-center gap-2 font-medium">
+            <Loader2 className="size-4 shrink-0 animate-spin" />
+            {t("Processing retained events")}
+          </span>
+          <span className="text-xs text-muted-foreground tabular-nums">
             {t("{{done}} of {{total}} done, {{queued}} waiting", {
               done,
               total,
@@ -150,96 +167,39 @@ function QueueProgress({
             })}
           </span>
         </div>
-        <div
-          className="h-2 w-full overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={done}
-          aria-label={t("Processing retained events")}
-        >
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-500"
-            style={{
-              width: `${total ? Math.round((done / total) * 100) : 0}%`,
-            }}
-          />
-        </div>
-        {walks.length > 0 && (
-          <ul className="space-y-1 text-sm">
-            {walks.map((w) => {
-              const percent =
-                w.total > 0 ? Math.min(100, (w.done / w.total) * 100) : 0;
-              return (
-                <li
-                  key={w.identity_id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
-                >
-                  <span className="truncate">
-                    <Link
-                      className="underline"
-                      to={`/admin/devices/${w.device_id}`}
-                    >
-                      {w.device_name ?? w.external_id ?? w.device_id}
-                    </Link>
-                    {w.external_id && w.device_name && (
-                      <span className="ml-1 font-mono text-xs text-muted-foreground">
-                        {w.external_id}
-                      </span>
-                    )}
-                  </span>
-                  <div className="col-span-2 sm:col-span-1">
-                    <div
-                      className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                      role="progressbar"
-                      aria-valuemin={0}
-                      aria-valuemax={w.total}
-                      aria-valuenow={w.done}
-                      aria-label={w.device_name ?? w.external_id ?? ""}
-                    >
-                      <div
-                        className="h-full rounded-full bg-primary transition-[width] duration-500"
-                        style={{ width: `${Math.round(percent)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {/* a walk behind other work says so, not "0 of 25" (Tim, 2026-11-11) */}
-                    {w.begun
-                      ? t("{{done}} of {{total}}", {
-                          done: w.done,
-                          total: w.total,
-                        })
-                      : t("Waiting")}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ProgressBar percent={total ? (done / total) * 100 : 0} />
+        {walks.length > 0 && <WalkRows walks={walks} />}
         <p className="text-xs text-muted-foreground">
           {t(
             "The decoder works through them in the background; the counts, the devices and the map fill in as it goes. You can leave this page.",
           )}
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </Callout>
   );
 }
 
-/** The progress card's id: the toast's "Show progress" scrolls to it (Tim, 2026-09-24). */
-const QUEUE_PROGRESS_ID = "queue-progress";
-
-const showProgress = () =>
-  document
-    .getElementById(QUEUE_PROGRESS_ID)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+/** The create button's words, with a spinner while the request runs. */
+function CreateLabel({ pending }: { pending: boolean }) {
+  const { t } = useTranslation();
+  return pending ? (
+    <>
+      <Loader2 className="size-4 animate-spin" />
+      {t("Creating…")}
+    </>
+  ) : (
+    t("Create and reprocess")
+  );
+}
 
 function CreateDeviceDialog({
   identity,
+  walks,
   onClose,
 }: {
   identity: UnknownIdentity | null;
+  /** The summary's walks, which the dialog follows once the device exists. */
+  walks: DeviceWalk[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -268,6 +228,8 @@ function CreateDeviceDialog({
   );
   const [start, setStart] = useState<AssignmentStart>("first_seen");
   const [startDate, setStartDate] = useState("");
+  // the device made, after which the dialog shows its retained uplinks being decoded
+  const [created, setCreated] = useState<Device | null>(null);
   const create = useMutationToast({
     mutationFn: () =>
       api.post<Device>(
@@ -289,82 +251,89 @@ function CreateDeviceDialog({
       queryKeys.attentionSummary,
       queryKeys.devices({}),
     ],
-    success: (device: Device) =>
-      t("{{name}} created; its retained uplinks are being decoded", {
-        name: device.name,
-      }),
-    action: { label: t("Show progress"), onClick: showProgress },
-    onSuccess: onClose,
+    onSuccess: setCreated,
   });
   return (
     <Dialog open={identity != null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {t("Create device for")} {identity?.external_id}
+            {created
+              ? created.name
+              : `${t("Create device for")} ${identity?.external_id ?? ""}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <Field label={t("Device name")} htmlFor="new-device-name">
-            <Input
-              id="new-device-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <Field label={t("Device type")} htmlFor="new-device-type">
-            <Select value={typeId} onValueChange={setTypeId}>
-              <SelectTrigger id="new-device-type">
-                <SelectValue placeholder={t("Choose")} />
-              </SelectTrigger>
-              <SelectContent>
-                {types.data?.items.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.label} ({t.driver_key})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label={t("Assign to project")} htmlFor="new-device-project">
-            <Select
-              value={projectId || "none"}
-              onValueChange={(v) => setProjectId(v === "none" ? "" : v)}
-            >
-              <SelectTrigger id="new-device-project">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("No project yet")}</SelectItem>
-                {projects.data?.items.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          {projectId && (
-            <AssignmentStartField
-              id="new-device-start"
-              start={start}
-              onStart={setStart}
-              date={startDate}
-              onDate={setStartDate}
-              firstSeen={identity?.first_seen_at ?? null}
-            />
-          )}
-        </div>
+        {created ? (
+          <CreatedProgress walks={walks} deviceIds={[created.id]} />
+        ) : (
+          <div className="space-y-3">
+            <Field label={t("Device name")} htmlFor="new-device-name">
+              <Input
+                id="new-device-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field label={t("Device type")} htmlFor="new-device-type">
+              <Select value={typeId} onValueChange={setTypeId}>
+                <SelectTrigger id="new-device-type">
+                  <SelectValue placeholder={t("Choose")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.data?.items.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label} ({t.driver_key})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label={t("Assign to project")} htmlFor="new-device-project">
+              <Select
+                value={projectId || "none"}
+                onValueChange={(v) => setProjectId(v === "none" ? "" : v)}
+              >
+                <SelectTrigger id="new-device-project">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("No project yet")}</SelectItem>
+                  {projects.data?.items.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {projectId && (
+              <AssignmentStartField
+                id="new-device-start"
+                start={start}
+                onStart={setStart}
+                date={startDate}
+                onDate={setStartDate}
+                firstSeen={identity?.first_seen_at ?? null}
+              />
+            )}
+          </div>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            {t("Cancel")}
-          </Button>
-          <Button
-            disabled={!name || !typeId || create.isPending}
-            onClick={() => create.mutate()}
-          >
-            {t("Create and reprocess")}
-          </Button>
+          {created ? (
+            <Button onClick={onClose}>{t("Close")}</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose}>
+                {t("Cancel")}
+              </Button>
+              <Button
+                disabled={!name || !typeId || create.isPending}
+                onClick={() => create.mutate()}
+              >
+                <CreateLabel pending={create.isPending} />
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -386,10 +355,13 @@ const platformName = (identity: UnknownIdentity) =>
 
 function BulkCreateDialog({
   identities,
+  walks,
   onClose,
   onDone,
 }: {
   identities: UnknownIdentity[];
+  /** The summary's walks, which the dialog follows once the devices exist. */
+  walks: DeviceWalk[];
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -439,16 +411,10 @@ function BulkCreateDialog({
       queryKeys.attentionSummary,
       queryKeys.devices({}),
     ],
-    success: (data: BulkCreateResult) =>
-      t(
-        "{{created}} devices created; {{queued}} retained uplinks are being decoded",
-        { created: data.created, queued: data.queued },
-      ),
-    action: { label: t("Show progress"), onClick: showProgress },
+    // the dialog stays open on the decoding of the new devices (Tim, 2026-11-11)
     onSuccess: (data: BulkCreateResult) => {
       setResult(data);
       onDone();
-      if (data.skipped.length === 0) onClose();
     },
   });
   const names = identities.map(platformName);
@@ -463,16 +429,13 @@ function BulkCreateDialog({
         </DialogHeader>
         {result ? (
           <div className="space-y-2 text-sm">
-            <Callout kind="info">
-              {t(
-                "{{created}} devices and {{entities}} entities created, {{queued}} retained events handed to the decoder; they are processed in the background.",
-                {
-                  created: result.created,
-                  entities: result.entities,
-                  queued: result.queued,
-                },
-              )}
-            </Callout>
+            <p>
+              {t("{{created}} devices and {{entities}} entities created.", {
+                created: result.created,
+                entities: result.entities,
+              })}
+            </p>
+            <CreatedProgress walks={walks} deviceIds={result.device_ids} />
             {result.skipped.length > 0 && (
               <ul className="list-disc space-y-1 pl-5 text-xs">
                 {result.skipped.map((s) => (
@@ -591,7 +554,7 @@ function BulkCreateDialog({
                 disabled={!typeId || create.isPending}
                 onClick={() => create.mutate()}
               >
-                {t("Create and reprocess")}
+                <CreateLabel pending={create.isPending} />
               </Button>
             </>
           )}
@@ -1591,11 +1554,13 @@ export function AttentionPage() {
       <CreateDeviceDialog
         key={creating?.id ?? "create-none"}
         identity={creating}
+        walks={s?.walks ?? []}
         onClose={() => setCreating(null)}
       />
       <BulkCreateDialog
         key={bulk.map((i) => i.id).join(",") || "bulk-none"}
         identities={bulk}
+        walks={s?.walks ?? []}
         onClose={() => setBulk([])}
         onDone={() => setSelected(new Set())}
       />
