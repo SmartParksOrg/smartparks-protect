@@ -90,9 +90,10 @@ def build_worker() -> Worker:
             )
 
     async def on_identity_reprocess(message: Message) -> None:
-        """Walk the retained events of an identity that got a device (decision D121): oldest
-        first, in pages, each given the device and decoded and committed on its own, with the
-        receptions of the page linked as it goes, so a redelivery of the message carries on
+        """Walk the retained events of an identity that got a device (decision D121): marked
+        begun, then oldest first, in pages, each given the device and decoded and committed on
+        its own with the progress moved after it, the receptions of the page linked as it
+        goes, so a redelivery of the message carries on
         with what is left and a failing event (marked failed by the pipeline) does not stop
         the rest. Nothing is marked up front: a statement over an identity's whole history
         decompresses every compressed batch of its source, and TimescaleDB stops a
@@ -109,6 +110,7 @@ def build_worker() -> Worker:
                 return
             device_id = identity.device_id
             session.expunge(identity)
+        await reprocessing.begin_walk(worker.bus.redis, identity_id)
         after: tuple[datetime, int] | None = None
         processed = failed = 0
         touched_files: set[uuid.UUID] = set()  # the card files whose frames were walked (D342)
@@ -152,7 +154,10 @@ def build_worker() -> Worker:
                     failed += 1
                     log.exception("retained event failed", source_event_id=event_id)
                 after = (ingested_at, event_id)
-            await reprocessing.advance_walk(worker.bus.redis, identity_id, processed + failed)
+                # after every event, not every page: a device with 26 events stood at "0 of
+                # 26" for its whole walk and a person reloads a page that seems stuck (Tim,
+                # 2026-11-11); one small Redis write beside an event's own transaction
+                await reprocessing.advance_walk(worker.bus.redis, identity_id, processed + failed)
         # the SD card files the walk touched say what their frames became now (decision D342:
         # a tracker added after the card was read, its files processed without a second upload)
         for file_id in touched_files:

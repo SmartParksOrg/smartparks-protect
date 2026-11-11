@@ -1117,19 +1117,27 @@ async def _sample_beside(
     session: AsyncSession, device_id: uuid.UUID, at: datetime, *, before: bool
 ) -> Sample | None:
     """The device's complete accelerometer sample nearest to `at` on one side of it, from the
-    valid measurement rows (a clock-ahead sample is invalid and does not count)."""
-    statement = select(Measurement.time, Measurement.metric_key, Measurement.value_num).where(
-        Measurement.device_id == device_id,
-        Measurement.metric_key.in_(AXES),
-        Measurement.valid.is_(True),
-        Measurement.value_num.is_not(None),
-    )
-    if before:
-        statement = statement.where(Measurement.time < at).order_by(Measurement.time.desc())
-    else:
-        statement = statement.where(Measurement.time > at).order_by(Measurement.time.asc())
-    rows = (await session.execute(statement.limit(5 * len(AXES)))).all()
-    samples = complete_samples((time, key, value) for time, key, value in rows)
+    valid measurement rows (a clock-ahead sample is invalid and does not count).
+
+    One query per axis, so each walks the `(device_id, metric_key, time)` index in time order.
+    One over the three axes together cannot be ordered by that index; the planner walked every
+    uncompressed chunk's time index instead and filtered by device, which found nothing for a
+    device without measurements near `at` until it had read them all: 14 to 60 s per frame of
+    a device just made from Needs attention on dev, 0.4 s per axis (Tim, 2026-11-11)."""
+    rows: list[tuple[datetime, str, Any]] = []
+    for axis in AXES:
+        statement = select(Measurement.time, Measurement.metric_key, Measurement.value_num).where(
+            Measurement.device_id == device_id,
+            Measurement.metric_key == axis,
+            Measurement.valid.is_(True),
+            Measurement.value_num.is_not(None),
+        )
+        if before:
+            statement = statement.where(Measurement.time < at).order_by(Measurement.time.desc())
+        else:
+            statement = statement.where(Measurement.time > at).order_by(Measurement.time.asc())
+        rows.extend((await session.execute(statement.limit(5))).tuples().all())
+    samples = complete_samples(rows)
     if not samples:
         return None
     return samples[-1] if before else samples[0]

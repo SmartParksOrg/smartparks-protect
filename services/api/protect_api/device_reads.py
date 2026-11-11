@@ -147,6 +147,7 @@ async def walk_reads(session: AsyncSession, walks: list[reprocessing.Walk]) -> l
             device_name=names.get(w.device_id),
             total=w.total,
             done=w.done,
+            begun=w.begun,
         )
         for w in sorted(walks, key=lambda w: (names.get(w.device_id) or "", str(w.identity_id)))
     ]

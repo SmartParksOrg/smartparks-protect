@@ -97,6 +97,7 @@ export function useDecoding(
 
 /** The share done of one item, 0 to 100, or null while nothing says how far it is. */
 export function decodingPercent(item: Decoding): number | null {
+  if (item.kind === "walk" && !item.walk.begun) return null;
   if (item.kind === "walk")
     return item.walk.total > 0 ? Math.min(100, (item.walk.done / item.walk.total) * 100) : 0;
   if (item.kind === "attribution")

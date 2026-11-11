@@ -339,6 +339,7 @@
   "{{table}} as CSV": "{{table}} as CSV",
   "{{total}} records are waiting to be given their project and entity.": "{{total}} records are waiting to be given their project and entity.",
   "{{total}} records waiting for their project and entity": "{{total}} records waiting for their project and entity",
+  "{{total}} retained uplinks waiting for the decoder": "{{total}} retained uplinks waiting for the decoder",
   "{{type}} {{id}} at {{time}}": "{{type}} {{id}} at {{time}}",
   "{{type}} at {{time}}": "{{type}} at {{time}}",
   "{{type}}, circle of {{radius}}": "{{type}}, circle of {{radius}}",

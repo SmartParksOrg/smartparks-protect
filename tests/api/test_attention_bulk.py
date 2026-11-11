@@ -102,6 +102,9 @@ async def test_linking_gives_the_receptions_the_device(client, db):
         assert (walk.total, walk.done, str(walk.device_id)) == (1, 0, device_id)
         summary = (await client.get("/api/v1/attention/summary", headers=h)).json()
         assert summary["queued_source_events"] >= 1
+        # not taken up by the decoder yet: the page says waiting, not "0 of 1"
+        read = next(w for w in summary["walks"] if w["identity_id"] == identity["id"])
+        assert (read["done"], read["total"], read["begun"]) == (0, 1, False)
 
         worker = build_worker()
         worker.bus = bus

@@ -15470,6 +15470,8 @@ export interface components {
             total: number;
             /** Done */
             done: number;
+            /** Begun */
+            begun: boolean;
         };
         /** WorkerHealth */
         WorkerHealth: {

@@ -7,6 +7,8 @@ export function decodingLabel(
 ): string {
   const percent = decodingPercent(item);
   const share = percent === null ? "" : `, ${Math.floor(percent)}%`;
+  if (item.kind === "walk" && !item.walk.begun)
+    return t("{{total}} retained uplinks waiting for the decoder", { total: item.walk.total });
   if (item.kind === "walk")
     return t("Decoding retained uplinks: {{done}} of {{total}}{{share}}", {
       done: item.walk.done,

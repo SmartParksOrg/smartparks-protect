@@ -21,6 +21,8 @@ class WalkRead(BaseModel):
     device_name: str | None = None
     total: int
     done: int
+    #: False while the walk waits on the bus behind the decoder's other work.
+    begun: bool
 
 
 class DeviceLogFileRead(ORMModel):

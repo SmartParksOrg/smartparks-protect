@@ -3375,6 +3375,7 @@
   "{{what}} is waiting for the decoder": "{{what}} wacht op de decoder",
   "Data coming in": "Data komt binnen",
   "Decoding {{what}}: {{done}} of {{total}} frames{{share}}": "{{what}} wordt gedecodeerd: {{done}} van {{total}} frames{{share}}",
+  "{{total}} retained uplinks waiting for the decoder": "{{total}} bewaarde uplinks wachten op de decoder",
   "Decoding retained uplinks: {{done}} of {{total}}{{share}}": "Bewaarde uplinks worden gedecodeerd: {{done}} van {{total}}{{share}}",
   "Gateway id": "Gateway-id",
   "gateway page": "gatewaypagina",

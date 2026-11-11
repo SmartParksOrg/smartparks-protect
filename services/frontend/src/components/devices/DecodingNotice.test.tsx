@@ -29,6 +29,7 @@ const walk: Decoding = {
     device_name: "SP052271",
     total: 73,
     done: 18,
+    begun: true,
   },
 };
 
@@ -49,5 +50,13 @@ describe("DecodingNotice", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+  });
+
+  it("says a walk behind other work waits, without a bar at nought", () => {
+    if (walk.kind !== "walk") throw new Error("the fixture is a walk");
+    const waiting: Decoding = { ...walk, walk: { ...walk.walk, done: 0, begun: false } };
+    render(<DecodingNotice decoding={[waiting]} />);
+    expect(screen.getByText("SP052271 is waiting for the decoder.")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });

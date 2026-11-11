@@ -228,9 +228,10 @@ async def test_unknown_device_is_retained_and_processed_after_linking(db, bus, w
     assert position.project_id == world.project_a.id
 
 
-async def test_identity_walker_processes_the_retained_events_in_order(db, bus, world):
+async def test_identity_walker_processes_the_retained_events_in_order(db, bus, world, monkeypatch):
     """The decoder walks the retained events of an identity that got a device, oldest first,
-    each on its own commit (decision D121)."""
+    each on its own commit (decision D121), begun when it takes the walk up and its progress
+    moved after every event, not every page (Tim, 2026-11-11)."""
     from shared.ingest import queue_identity_reprocess
 
     unknown_id = uuid.uuid4().hex[:16].upper()
@@ -262,8 +263,17 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
     assert {s for s, _ in rows} == {ProcessingStatus.UNASSIGNED}
     assert all(d is None for _, d in rows)
     walk = next(w for w in await reprocessing.walks(bus.redis) if w.identity_id == identity_id)
-    assert (walk.total, walk.done, walk.device_id) == (3, 0, world.device.id)
+    assert (walk.total, walk.done, walk.device_id, walk.begun) == (3, 0, world.device.id, False)
 
+    seen: list[tuple[bool, int]] = []
+    advance = reprocessing.advance_walk
+
+    async def watched(redis, walked_id, done):
+        await advance(redis, walked_id, done)
+        entry = next(w for w in await reprocessing.walks(redis) if w.identity_id == walked_id)
+        seen.append((entry.begun, entry.done))
+
+    monkeypatch.setattr(reprocessing, "advance_walk", watched)
     worker = build_worker()
     worker.bus = bus
     handler = next(h for t, h in worker._subscriptions if t == Topic.IDENTITY_REPROCESS_REQUESTED)
@@ -273,6 +283,7 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
             payload={"external_identity_id": str(identity_id), "device_id": str(world.device.id)},
         )
     )
+    assert seen == [(True, 1), (True, 2), (True, 3)]
     device_id = world.device.id
     db.expire_all()
     rows = (

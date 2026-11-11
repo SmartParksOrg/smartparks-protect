@@ -50198,6 +50198,10 @@
      "done": {
       "type": "integer",
       "title": "Done"
+     },
+     "begun": {
+      "type": "boolean",
+      "title": "Begun"
      }
     },
     "type": "object",
@@ -50205,7 +50209,8 @@
      "identity_id",
      "device_id",
      "total",
-     "done"
+     "done",
+     "begun"
     ],
     "title": "WalkRead",
     "description": "The decoder's walk over the retained events of an identity that got a device (decision\nD121), as far as it is: the progress card on Needs attention and the data coming in notice\nof the device and entity pages read it."

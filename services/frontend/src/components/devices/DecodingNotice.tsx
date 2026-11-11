@@ -54,18 +54,22 @@ export function DecodingNotice({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Loader2 className="size-4 shrink-0 animate-spin" />
                   <span className="font-medium">
-                    {t(
-                      "Decoding the retained uplinks of {{what}}: {{done}} of {{total}}, {{percent}}%.",
-                      {
-                        what,
-                        done: walk.done,
-                        total: walk.total,
-                        percent: Math.floor(percent),
-                      },
-                    )}
+                    {walk.begun
+                      ? t(
+                          "Decoding the retained uplinks of {{what}}: {{done}} of {{total}}, {{percent}}%.",
+                          {
+                            what,
+                            done: walk.done,
+                            total: walk.total,
+                            percent: Math.floor(percent),
+                          },
+                        )
+                      : t("{{what}} is waiting for the decoder.", { what })}
                   </span>
                 </div>
-                <ProgressBar className="max-w-md" percent={percent} />
+                {walk.begun && (
+                  <ProgressBar className="max-w-md" percent={percent} />
+                )}
               </div>
             );
           }

@@ -204,10 +204,13 @@ function QueueProgress({
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {t("{{done}} of {{total}}", {
-                      done: w.done,
-                      total: w.total,
-                    })}
+                    {/* a walk behind other work says so, not "0 of 25" (Tim, 2026-11-11) */}
+                    {w.begun
+                      ? t("{{done}} of {{total}}", {
+                          done: w.done,
+                          total: w.total,
+                        })
+                      : t("Waiting")}
                   </span>
                 </li>
               );
