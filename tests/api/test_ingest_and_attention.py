@@ -336,3 +336,52 @@ async def test_viewer_cannot_see_attention_or_other_project_positions(client, db
     assert (
         await client.get(f"/api/v1/projects/{project.id}/positions", headers=viewer.headers)
     ).status_code == 200
+
+
+async def test_first_message_is_the_first_sighting_of_a_listed_identity(client, db, bus):
+    """Decision D393: a platform's device list makes identities without a first sighting; the
+    first message stamps it, and create-device without a start date falls back to the earliest
+    retained event of the identity."""
+    from sqlalchemy import select
+
+    from shared.models import DeviceProjectAssignment, ExternalIdentity
+
+    admin, project, device_type, source, _device, _external = await _setup(client, db)
+    listed = uuid.uuid4().hex[:16].upper()
+    identity = ExternalIdentity(
+        data_source_id=uuid.UUID(source["id"]), external_id=listed, identity_type="dev_eui"
+    )
+    db.add(identity)
+    await db.commit()
+    assert identity.first_seen_at is None
+    auth = {"Authorization": f"Bearer {source['webhook_token']}"}
+    body = {"device_id": listed, "time": "2026-03-21T10:00:00+00:00", "lat": -24.8, "lon": 31.4}
+    accepted = await client.post(f"/api/v1/ingest/http/{source['id']}", json=body, headers=auth)
+    assert accepted.status_code == 202
+    arrived = await _ingested_at(db, accepted.json()["source_event_ids"][0])
+    await db.refresh(identity)
+    assert identity.first_seen_at is not None
+
+    # an identity from before the stamp: the fallback reads the earliest retained event
+    identity.first_seen_at = None
+    await db.commit()
+    created = await client.post(
+        f"/api/v1/attention/identities/{identity.id}/create-device",
+        json={
+            "name": unique_name("listed"),
+            "device_type_id": device_type["id"],
+            "project_id": str(project.id),
+            "reprocess": False,
+        },
+        headers=admin.headers,
+    )
+    assert created.status_code == 201, created.text
+    validity = await db.scalar(
+        select(DeviceProjectAssignment.validity).where(
+            DeviceProjectAssignment.device_id == uuid.UUID(created.json()["id"])
+        )
+    )
+    assert validity is not None and validity.lower == arrived
+    assert await db.scalar(
+        select(ExternalIdentity.device_id).where(ExternalIdentity.id == identity.id)
+    ) == uuid.UUID(created.json()["id"])

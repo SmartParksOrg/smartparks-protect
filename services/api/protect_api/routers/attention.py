@@ -567,12 +567,15 @@ async def _suggested_projects(
 async def _first_sighting(session: AsyncSession, identity: ExternalIdentity) -> datetime | None:
     """When the identity was first seen: the recorded first sighting, else the arrival of its
     earliest retained event (a platform's device list gives no sighting until a message
-    comes), else nothing."""
+    comes), else nothing. Named by the source and the external id, which the events' index
+    leads with (decision D393: the identity id alone read every chunk, 5 to 80 s on dev)."""
     if identity.first_seen_at is not None:
         return identity.first_seen_at
     earliest = await session.scalar(
         select(func.min(SourceEvent.ingested_at)).where(
-            SourceEvent.external_identity_id == identity.id
+            SourceEvent.data_source_id == identity.data_source_id,
+            SourceEvent.external_id == identity.external_id,
+            SourceEvent.external_identity_id == identity.id,
         )
     )
     return earliest if isinstance(earliest, datetime) else None

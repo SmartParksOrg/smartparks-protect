@@ -248,6 +248,10 @@ async def resolve_identity(
         if owner is not None:
             identity.device_id = owner
             identity.attributes = {**(identity.attributes or {}), "linked_by": "serial"}
+    if identity.first_seen_at is None:
+        # a platform's device list makes identities before any message (decision D393): the
+        # first message is the first sighting
+        identity.first_seen_at = now
     identity.last_seen_at = now
     identity.event_count = (identity.event_count or 0) + 1
     if message.identity_attributes:

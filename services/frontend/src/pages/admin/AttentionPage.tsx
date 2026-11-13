@@ -246,11 +246,9 @@ function CreateDeviceDialog({
           },
         },
       ),
-    invalidate: [
-      queryKeys.unknownIdentities,
-      queryKeys.attentionSummary,
-      queryKeys.devices({}),
-    ],
+    // the progress comes from the summary; the lists follow in the background (D393)
+    invalidate: [queryKeys.attentionSummary],
+    refresh: [queryKeys.unknownIdentities, queryKeys.devices({})],
     onSuccess: setCreated,
   });
   return (
@@ -406,11 +404,8 @@ function BulkCreateDialog({
           },
         },
       ),
-    invalidate: [
-      queryKeys.unknownIdentities,
-      queryKeys.attentionSummary,
-      queryKeys.devices({}),
-    ],
+    invalidate: [queryKeys.attentionSummary],
+    refresh: [queryKeys.unknownIdentities, queryKeys.devices({})],
     // the dialog stays open on the decoding of the new devices (Tim, 2026-11-11)
     onSuccess: (data: BulkCreateResult) => {
       setResult(data);
