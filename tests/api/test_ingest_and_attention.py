@@ -216,6 +216,8 @@ async def test_unknown_device_needs_attention_then_processed(client, db, bus):
         headers=admin.headers,
     )
     assert created.status_code == 201, created.text
+    # the answer says how many retained events went to the decoder (decision D394)
+    assert created.json()["queued"] == 1
     # linking queues the retained event for the decoder's walk (decision D121)
     await bus.consume(Topic.IDENTITY_REPROCESS_REQUESTED, group, "c1", walk, once=True)
     positions = (
@@ -340,8 +342,7 @@ async def test_viewer_cannot_see_attention_or_other_project_positions(client, db
 
 async def test_first_message_is_the_first_sighting_of_a_listed_identity(client, db, bus):
     """Decision D393: a platform's device list makes identities without a first sighting; the
-    first message stamps it, and create-device without a start date falls back to the earliest
-    retained event of the identity."""
+    first message stamps it, and create-device without a start date starts there."""
     from sqlalchemy import select
 
     from shared.models import DeviceProjectAssignment, ExternalIdentity
@@ -360,11 +361,8 @@ async def test_first_message_is_the_first_sighting_of_a_listed_identity(client, 
     assert accepted.status_code == 202
     arrived = await _ingested_at(db, accepted.json()["source_event_ids"][0])
     await db.refresh(identity)
-    assert identity.first_seen_at is not None
+    assert identity.first_seen_at == arrived
 
-    # an identity from before the stamp: the fallback reads the earliest retained event
-    identity.first_seen_at = None
-    await db.commit()
     created = await client.post(
         f"/api/v1/attention/identities/{identity.id}/create-device",
         json={
@@ -376,6 +374,7 @@ async def test_first_message_is_the_first_sighting_of_a_listed_identity(client, 
         headers=admin.headers,
     )
     assert created.status_code == 201, created.text
+    assert created.json()["queued"] == 0  # reprocess was not asked for
     validity = await db.scalar(
         select(DeviceProjectAssignment.validity).where(
             DeviceProjectAssignment.device_id == uuid.UUID(created.json()["id"])
@@ -385,3 +384,178 @@ async def test_first_message_is_the_first_sighting_of_a_listed_identity(client, 
     assert await db.scalar(
         select(ExternalIdentity.device_id).where(ExternalIdentity.id == identity.id)
     ) == uuid.UUID(created.json()["id"])
+
+
+async def test_walk_moves_a_first_sighting_start_back_to_the_earliest_record(client, db, bus):
+    """Decision D395: a record's device time is earlier than its arrival, so a device made to
+    start at its first sighting left the records of its retained uplinks without a project.
+    The walk moves the new assignment back to the earliest record it decoded and queues the
+    rewrite; a start given by hand stays where it was put."""
+    from sqlalchemy import select
+
+    from shared.domain.attribution import run_attribution_job
+    from shared.models import AttributionJob, DeviceProjectAssignment, ExternalIdentity, Position
+
+    admin, project, device_type, source, _device, _external = await _setup(client, db)
+    group, _handler, walk = await _decode_pending(db, bus)
+    auth = {"Authorization": f"Bearer {source['webhook_token']}"}
+
+    async def retained(external_id: str) -> uuid.UUID:
+        for minute in (0, 5):
+            body = {
+                "device_id": external_id,
+                "time": f"2026-03-21T10:0{minute}:00+00:00",
+                "lat": -24.8,
+                "lon": 31.4,
+            }
+            accepted = await client.post(
+                f"/api/v1/ingest/http/{source['id']}", json=body, headers=auth
+            )
+            assert accepted.status_code == 202
+        identity_id = await db.scalar(
+            select(ExternalIdentity.id).where(ExternalIdentity.external_id == external_id)
+        )
+        assert identity_id is not None
+        return identity_id
+
+    async def create(identity_id: uuid.UUID, **extra: str) -> uuid.UUID:
+        created = await client.post(
+            f"/api/v1/attention/identities/{identity_id}/create-device",
+            json={
+                "name": unique_name("walked"),
+                "device_type_id": device_type["id"],
+                "project_id": str(project.id),
+                **extra,
+            },
+            headers=admin.headers,
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["queued"] == 2
+        await bus.consume(Topic.IDENTITY_REPROCESS_REQUESTED, group, "c1", walk, once=True)
+        return uuid.UUID(created.json()["id"])
+
+    async def start_of(device_id: uuid.UUID) -> datetime:
+        validity = await db.scalar(
+            select(DeviceProjectAssignment.validity).where(
+                DeviceProjectAssignment.device_id == device_id
+            )
+        )
+        assert validity is not None
+        return validity.lower
+
+    # no start given: the assignment follows the records, and the rewrite gives them the project
+    device_id = await create(await retained(uuid.uuid4().hex[:16].upper()))
+    assert await start_of(device_id) == datetime.fromisoformat("2026-03-21T10:00:00+00:00")
+    job = await db.scalar(select(AttributionJob).where(AttributionJob.device_id == device_id))
+    assert job is not None and job.reason == "identity.history"
+    await run_attribution_job({"job_id": str(job.id)})
+    projects = (
+        await db.scalars(select(Position.project_id).where(Position.device_id == device_id))
+    ).all()
+    assert projects == [project.id, project.id]
+
+    # a start given by hand stays, and the records before it keep no project
+    chosen = "2026-06-01T00:00:00+00:00"
+    device_id = await create(await retained(uuid.uuid4().hex[:16].upper()), valid_from=chosen)
+    assert await start_of(device_id) == datetime.fromisoformat(chosen)
+    projects = (
+        await db.scalars(select(Position.project_id).where(Position.device_id == device_id))
+    ).all()
+    assert projects == [None, None]
+    await bus.redis.xgroup_destroy(Topic.IDENTITY_REPROCESS_REQUESTED, group)
+
+
+async def test_first_messages_at_the_same_moment_all_arrive(client, db):
+    """Decision D396: several first messages of one identity at once, for a new identity and
+    for one a platform's device list made, are all accepted, counted, and the first sighting
+    is the arrival of the earliest."""
+    import asyncio
+
+    from sqlalchemy import func, select
+
+    from shared.models import ExternalIdentity, SourceEvent
+
+    _admin, _project, _type, source, _device, _external = await _setup(client, db)
+    auth = {"Authorization": f"Bearer {source['webhook_token']}"}
+    listed = uuid.uuid4().hex[:16].upper()
+    db.add(
+        ExternalIdentity(
+            data_source_id=uuid.UUID(source["id"]), external_id=listed, identity_type="dev_eui"
+        )
+    )
+    await db.commit()
+    for external_id in (uuid.uuid4().hex[:16].upper(), listed):
+        answers = await asyncio.gather(
+            *(
+                client.post(
+                    f"/api/v1/ingest/http/{source['id']}",
+                    json={"device_id": external_id, "lat": -24.8, "lon": 31.4 + n / 1000},
+                    headers=auth,
+                )
+                for n in range(6)
+            )
+        )
+        assert [a.status_code for a in answers] == [202] * 6
+        first_seen, count = (
+            await db.execute(
+                select(ExternalIdentity.first_seen_at, ExternalIdentity.event_count).where(
+                    ExternalIdentity.external_id == external_id
+                )
+            )
+        ).one()
+        earliest = await db.scalar(
+            select(func.min(SourceEvent.ingested_at)).where(SourceEvent.external_id == external_id)
+        )
+        assert count == 6
+        assert first_seen == earliest
+
+
+async def test_create_device_refuses_a_bad_start_and_a_second_create(client, db):
+    """Decision D397: a start without a timezone or in the future is a 422, and creates for
+    one identity at the same moment make one device."""
+    import asyncio
+
+    from sqlalchemy import func, select
+
+    from shared.models import Device
+
+    admin, project, device_type, source, _device, _external = await _setup(client, db)
+    auth = {"Authorization": f"Bearer {source['webhook_token']}"}
+    unknown = uuid.uuid4().hex[:16].upper()
+    await client.post(
+        f"/api/v1/ingest/http/{source['id']}",
+        json={"device_id": unknown, "lat": -24.8, "lon": 31.4},
+        headers=auth,
+    )
+    identities = (await client.get("/api/v1/attention/identities", headers=admin.headers)).json()
+    identity = next(i for i in identities["items"] if i["external_id"] == unknown)
+    url = f"/api/v1/attention/identities/{identity['id']}/create-device"
+    body = {"device_type_id": device_type["id"], "project_id": str(project.id)}
+    prefix = unique_name("raced")
+    for start in ("2026-01-01T00:00:00", "2090-01-01T00:00:00+00:00"):
+        refused = await client.post(
+            url, json={**body, "name": prefix, "valid_from": start}, headers=admin.headers
+        )
+        assert refused.status_code == 422, refused.text
+    bulk = await client.post(
+        "/api/v1/attention/identities/bulk-create-devices",
+        json={
+            "identity_ids": [identity["id"]],
+            "device_type_id": device_type["id"],
+            "project_id": str(project.id),
+            "valid_from": "2090-01-01T00:00:00+00:00",
+        },
+        headers=admin.headers,
+    )
+    assert bulk.status_code == 422, bulk.text
+    answers = await asyncio.gather(
+        *(
+            client.post(url, json={**body, "name": f"{prefix}-{n}"}, headers=admin.headers)
+            for n in range(4)
+        )
+    )
+    assert sorted(a.status_code for a in answers) == [201, 409, 409, 409]
+    made = await db.scalar(
+        select(func.count()).select_from(Device).where(Device.name.like(f"{prefix}-%"))
+    )
+    assert made == 1

@@ -48,6 +48,7 @@ export type DeviceSetting = Schemas["DeviceSettingRead"];
 export type DeviceHealth = Schemas["DeviceHealth"];
 export type HealthValue = Schemas["HealthValue"];
 export type BulkCreateResult = Schemas["BulkCreateResult"];
+export type CreatedDevice = Schemas["CreatedDevice"];
 export type BulkAssignResult = Schemas["BulkAssignResult"];
 export type MoveResult = Schemas["MoveResult"];
 export type MoveDevice = Schemas["MoveDeviceRead"];

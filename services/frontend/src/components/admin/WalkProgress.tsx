@@ -1,4 +1,5 @@
 import { CircleCheck, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
@@ -63,20 +64,37 @@ export function WalkRows({ walks }: { walks: (DeviceWalk | FollowedWalk)[] }) {
 
 /** What the create dialogs show after the devices exist (Tim, 2026-11-11: after "Create and
  * reprocess" nothing said the decoder was at work): the decoding of their retained uplinks,
- * live from the summary the page polls, then that it is done. */
+ * then that it is done. The count comes from the create's own answer (decision D394), so the
+ * progress shows at once; the summary the page polls fills in how far the decoder is. A walk
+ * that ended before the first summary after the create came back was never seen in one, and
+ * still reads as decoded, not as nothing waiting. */
 export function CreatedProgress({
   walks,
+  summaryAt,
+  queued,
   deviceIds,
 }: {
   walks: DeviceWalk[];
+  /** When the summary behind `walks` was read; a change means one came after the create. */
+  summaryAt: number;
+  /** How many retained uplinks the create handed to the decoder. */
+  queued: number;
   deviceIds: readonly string[];
 }) {
   const { t } = useTranslation();
   const rows = useFollowedWalks(walks, deviceIds);
-  const busy = rows.some((w) => !w.finished);
-  const total = rows.reduce((sum, w) => sum + w.total, 0);
-  const done = rows.reduce((sum, w) => sum + (w.begun ? w.done : 0), 0);
-  if (rows.length === 0)
+  // the summary on screen when the devices were made says nothing about their walks yet
+  const [madeAt] = useState(summaryAt);
+  const settled = summaryAt !== madeAt;
+  const live = rows.filter((w) => !w.finished);
+  const waiting = live.reduce(
+    (sum, w) => sum + w.total - (w.begun ? w.done : 0),
+    0,
+  );
+  const busy = queued > 0 && (!settled || live.length > 0);
+  const total = queued;
+  const done = settled ? Math.max(queued - waiting, 0) : 0;
+  if (queued === 0)
     return (
       <Callout kind="success">
         {t("Created. No retained uplinks wait for the decoder.")}
@@ -86,9 +104,12 @@ export function CreatedProgress({
     <div className="space-y-2">
       <Callout kind={busy ? "info" : "success"}>
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
-            {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
-            <span>
+          {/* no wrap: on a phone the spinner stood alone on a line above its sentence */}
+          <div className="flex items-start gap-x-2 font-medium">
+            {busy && (
+              <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+            )}
+            <span className="min-w-0">
               {busy
                 ? t(
                     "Created. Decoding the retained uplinks: {{done}} of {{total}}.",

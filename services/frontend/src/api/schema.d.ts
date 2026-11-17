@@ -7827,6 +7827,117 @@ export interface components {
              */
             reprocess: boolean;
         };
+        /**
+         * CreatedDevice
+         * @description The device made for an identity, with how many of its retained events went to the
+         *     decoder (decision D394): the dialog shows its progress from this number at once, without
+         *     waiting for a summary that takes seconds at times.
+         */
+        CreatedDevice: {
+            /**
+             * Location Source
+             * @default device
+             */
+            location_source: string;
+            /**
+             * Location Fallback Hours
+             * @default 24
+             */
+            location_fallback_hours: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Type Id
+             * Format: uuid
+             */
+            device_type_id: string;
+            /** Name */
+            name: string;
+            /** Serial Number */
+            serial_number: string | null;
+            /** Status */
+            status: string;
+            /** Firmware Version */
+            firmware_version: string | null;
+            /**
+             * Ble Mac
+             * @description The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets
+             */
+            ble_mac?: string | null;
+            /**
+             * Static Position
+             * @description Where the device is, set by a person (decision D261), as GeoJSON; null when it has none
+             */
+            static_position?: {
+                [key: string]: unknown;
+            } | null;
+            /** Static Position At */
+            static_position_at?: string | null;
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes: string | null;
+            /**
+             * Picture Updated At
+             * @description Set when the device has a profile picture (decision D110)
+             */
+            picture_updated_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Last Seen At
+             * @description Newest record of any kind (decision D104)
+             */
+            last_seen_at?: string | null;
+            /**
+             * Data Received At
+             * @description When the decoder last wrote for the device: the arrival of its newest data
+             */
+            data_received_at?: string | null;
+            /** @description What the driver declares as health, from the current state */
+            health?: components["schemas"]["DeviceHealth"] | null;
+            /**
+             * Entity Id
+             * @description The entity it tracks today
+             */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /**
+             * Project Id
+             * @description The project the device is assigned to today, if any
+             */
+            project_id?: string | null;
+            /**
+             * Group Id
+             * @description The group of that entity (decision D98)
+             */
+            group_id?: string | null;
+            /**
+             * Data Source Names
+             * @description The data sources holding an identity of the device, by name
+             */
+            data_source_names?: string[];
+            /**
+             * Queued
+             * @description Retained events handed to the decoder
+             * @default 0
+             */
+            queued: number;
+        };
         /** CurationSummary */
         CurationSummary: {
             /** Requires Approval */
@@ -21065,7 +21176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceRead"];
+                    "application/json": components["schemas"]["CreatedDevice"];
                 };
             };
             /** @description Validation Error */

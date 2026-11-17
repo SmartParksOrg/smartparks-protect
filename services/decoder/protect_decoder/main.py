@@ -15,6 +15,7 @@ from protect_decoder.pipeline import Outcome, process_source_event, publish_outc
 from shared import reprocessing
 from shared.bus import Message, Topic
 from shared.database import session_scope
+from shared.domain.attribution import extend_first_assignments, publish_job
 from shared.ingest import (
     ReceptionRef,
     link_event_receptions,
@@ -113,6 +114,7 @@ def build_worker() -> Worker:
         await reprocessing.begin_walk(worker.bus.redis, identity_id)
         after: tuple[datetime, int] | None = None
         processed = failed = 0
+        earliest: datetime | None = None  # the oldest record the walk decoded (D395)
         touched_files: set[uuid.UUID] = set()  # the card files whose frames were walked (D342)
         while True:
             async with session_scope() as session:
@@ -142,7 +144,7 @@ def build_worker() -> Worker:
                 break
             for event_id, ingested_at in page:
                 try:
-                    await decode(
+                    outcome = await decode(
                         event_id,
                         ingested_at,
                         reprocess=True,
@@ -150,6 +152,8 @@ def build_worker() -> Worker:
                         receptions=receptions.get((event_id, ingested_at), ()),
                     )
                     processed += 1
+                    if outcome.earliest is not None:
+                        earliest = min(earliest or outcome.earliest, outcome.earliest)
                 except Exception:
                     failed += 1
                     log.exception("retained event failed", source_event_id=event_id)
@@ -166,6 +170,21 @@ def build_worker() -> Worker:
                 if row is not None:
                     await refresh_summary(session, row)
                     await session.commit()
+        # a device made to start at its first sighting gets the records its retained uplinks
+        # carried from before they arrived (decision D395, Tim, 2026-11-17: a record's device
+        # time is always earlier than its arrival, so the first one of every new device, and
+        # everything a device had buffered, stayed without a project). The rule and its guards
+        # are the log file's (decision D330): one project assignment ever, or nothing moves.
+        moved = 0
+        if message.payload.get("history") and earliest is not None:
+            async with session_scope() as session:
+                extended, jobs = await extend_first_assignments(
+                    session, device_id, earliest, reason="identity.history"
+                )
+                await session.commit()
+            for job in jobs:
+                await publish_job(worker.bus, job)
+            moved = len(extended)
         await reprocessing.end_walk(worker.bus.redis, identity_id)
         log.info(
             "identity reprocessed",
@@ -173,6 +192,7 @@ def build_worker() -> Worker:
             processed=processed,
             failed=failed,
             files_refreshed=len(touched_files),
+            assignments_moved=moved,
         )
 
     async def on_log_file(message: Message) -> None:

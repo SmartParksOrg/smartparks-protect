@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import Range, array
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -141,8 +141,16 @@ class CreateDeviceForIdentity(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     device_type_id: uuid.UUID
     project_id: uuid.UUID | None = None
-    valid_from: datetime | None = None
+    valid_from: AwareDatetime | None = None
     reprocess: bool = True
+
+
+class CreatedDevice(DeviceRead):
+    """The device made for an identity, with how many of its retained events went to the
+    decoder (decision D394): the dialog shows its progress from this number at once, without
+    waiting for a summary that takes seconds at times."""
+
+    queued: int = Field(default=0, description="Retained events handed to the decoder")
 
 
 class LinkIdentity(BaseModel):
@@ -166,7 +174,7 @@ class BulkCreateDevices(BulkIdentityIds):
 
     device_type_id: uuid.UUID
     project_id: uuid.UUID | None = None
-    valid_from: datetime | None = Field(
+    valid_from: AwareDatetime | None = Field(
         default=None,
         description="Start of every assignment; without it each device starts at its identity's "
         "first sighting (Tim, 2026-09-16: the retained events from before get the project too)",
@@ -564,34 +572,50 @@ async def _suggested_projects(
     return {k: v[0] for k, v in per_source.items() if len(v) == 1}
 
 
-async def _first_sighting(session: AsyncSession, identity: ExternalIdentity) -> datetime | None:
-    """When the identity was first seen: the recorded first sighting, else the arrival of its
-    earliest retained event (a platform's device list gives no sighting until a message
-    comes), else nothing. Named by the source and the external id, which the events' index
-    leads with (decision D393: the identity id alone read every chunk, 5 to 80 s on dev)."""
-    if identity.first_seen_at is not None:
-        return identity.first_seen_at
-    earliest = await session.scalar(
-        select(func.min(SourceEvent.ingested_at)).where(
-            SourceEvent.data_source_id == identity.data_source_id,
-            SourceEvent.external_id == identity.external_id,
-            SourceEvent.external_identity_id == identity.id,
+def _chosen_start(value: datetime | None) -> datetime | None:
+    """The start a person gave for the new assignments, refused when it lies in the future
+    (decision D397: a start of 2030 made a device nothing was attributed to). The browser's
+    clock may run a little ahead of ours, so "now" from there passes within the tolerance the
+    records get."""
+    if value is None:
+        return None
+    ahead = timedelta(seconds=get_settings().clock_ahead_tolerance_seconds)
+    if value > utc_now() + ahead:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "The assignment cannot start in the future"
         )
+    return value
+
+
+async def _locked_identity(session: AsyncSession, identity_id: uuid.UUID) -> ExternalIdentity:
+    """The identity, locked until the request commits: two creates for it at the same moment
+    run one after the other and the second finds it linked (decision D397: four at once made
+    four devices, three of them without an identity)."""
+    identity = await session.scalar(
+        select(ExternalIdentity).where(ExternalIdentity.id == identity_id).with_for_update()
     )
-    return earliest if isinstance(earliest, datetime) else None
+    if identity is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "External identity not found")
+    return identity
 
 
 async def _reprocess_identity(
-    session: AsyncSession, bus: RedisStreamsBus, identity: ExternalIdentity
+    session: AsyncSession,
+    bus: RedisStreamsBus,
+    identity: ExternalIdentity,
+    *,
+    history: bool = False,
 ) -> int:
     """Queue the retained events of this identity for the decoder; the request does not wait
-    for the processing (decision D121)."""
-    return await queue_identity_reprocess(session, bus, identity)
+    for the processing (decision D121). `history` is for a device made to start at its first
+    sighting: its retained uplinks carry records dated before they arrived, and the walk moves
+    the new assignments back to the earliest of them (decision D395)."""
+    return await queue_identity_reprocess(session, bus, identity, history=history)
 
 
 @router.post(
     "/identities/{identity_id}/create-device",
-    response_model=DeviceRead,
+    response_model=CreatedDevice,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_device_for_identity(
@@ -600,8 +624,9 @@ async def create_device_for_identity(
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
     bus: RedisStreamsBus = Depends(get_bus),
-) -> Device:
-    identity = await get_or_404(session, ExternalIdentity, identity_id, "External identity")
+) -> CreatedDevice:
+    start = _chosen_start(body.valid_from)
+    identity = await _locked_identity(session, identity_id)
     if identity.device_id is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Identity is already linked to a device")
     await get_or_404(session, DeviceType, body.device_type_id, "Device type")
@@ -612,11 +637,9 @@ async def create_device_for_identity(
     await fill_serial_from_identity(session, device, identity)  # D101
     if body.project_id is not None:
         await get_or_404(session, Project, body.project_id, "Project")
-        valid_from = (
-            require_aware(body.valid_from)
-            if body.valid_from
-            else (await _first_sighting(session, identity) or device.created_at)
-        )
+        # an identity without a sighting was never heard (the first message stamps it,
+        # decision D393), so there is nothing earlier to start at than the device itself
+        valid_from = start or identity.first_seen_at or device.created_at
         session.add(
             DeviceProjectAssignment(
                 device_id=device.id,
@@ -637,17 +660,23 @@ async def create_device_for_identity(
         details={"device_id": str(device.id), "external_id": identity.external_id},
     )
     await session.commit()
-    if body.reprocess:
-        await _reprocess_identity(session, bus, identity)
-    return device
+    # a start nobody chose follows the records; a start given by hand stays where it was put
+    history = body.project_id is not None and body.valid_from is None
+    queued = (
+        await _reprocess_identity(session, bus, identity, history=history) if body.reprocess else 0
+    )
+    return CreatedDevice.model_validate(device).model_copy(update={"queued": queued})
 
 
 async def _identities_for_bulk(
     session: AsyncSession, ids: list[uuid.UUID]
 ) -> tuple[list[ExternalIdentity], list[BulkSkipped]]:
     """The unlinked, not ignored identities among `ids`, and why the others are left out."""
+    # locked until the request commits, as the single create does (decision D397)
     rows = (
-        await session.scalars(select(ExternalIdentity).where(ExternalIdentity.id.in_(set(ids))))
+        await session.scalars(
+            select(ExternalIdentity).where(ExternalIdentity.id.in_(set(ids))).with_for_update()
+        )
     ).all()
     by_id = {r.id: r for r in rows}
     usable: list[ExternalIdentity] = []
@@ -698,7 +727,7 @@ async def bulk_create_devices(
     assignments start at `valid_from` when given, else at each identity's first sighting, so
     the retained events from before the creation get the project when they are decoded."""
     await get_or_404(session, DeviceType, body.device_type_id, "Device type")
-    start = require_aware(body.valid_from) if body.valid_from is not None else None
+    start = _chosen_start(body.valid_from)
     if body.project_id is not None:
         await get_or_404(session, Project, body.project_id, "Project")
     if body.entity_type_id is not None:
@@ -754,7 +783,7 @@ async def bulk_create_devices(
         await session.flush()
         identity.device_id = device.id
         await fill_serial_from_identity(session, device, identity)  # D101
-        valid_from = start or await _first_sighting(session, identity) or now
+        valid_from = start or identity.first_seen_at or now
         if body.project_id is not None:
             session.add(
                 DeviceProjectAssignment(
@@ -804,8 +833,9 @@ async def bulk_create_devices(
     await session.commit()
     queued = 0
     if body.reprocess:
+        history = body.project_id is not None and start is None
         for identity in linked:
-            queued += await _reprocess_identity(session, bus, identity)
+            queued += await _reprocess_identity(session, bus, identity, history=history)
     return BulkCreateResult(
         created=len(created),
         entities=entities,

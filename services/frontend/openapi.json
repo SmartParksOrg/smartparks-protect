@@ -9543,7 +9543,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/DeviceRead"
+         "$ref": "#/components/schemas/CreatedDevice"
         }
        }
       }
@@ -29662,6 +29662,252 @@
      "device_type_id"
     ],
     "title": "CreateDeviceForIdentity"
+   },
+   "CreatedDevice": {
+    "properties": {
+     "location_source": {
+      "type": "string",
+      "title": "Location Source",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "title": "Location Fallback Hours",
+      "default": 24
+     },
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_type_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Type Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "serial_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serial Number"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "firmware_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware Version"
+     },
+     "ble_mac": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ble Mac",
+      "description": "The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets"
+     },
+     "static_position": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Static Position",
+      "description": "Where the device is, set by a person (decision D261), as GeoJSON; null when it has none"
+     },
+     "static_position_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Static Position At"
+     },
+     "attributes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Attributes"
+     },
+     "notes": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Notes"
+     },
+     "picture_updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Picture Updated At",
+      "description": "Set when the device has a profile picture (decision D110)"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At",
+      "description": "Newest record of any kind (decision D104)"
+     },
+     "data_received_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Received At",
+      "description": "When the decoder last wrote for the device: the arrival of its newest data"
+     },
+     "health": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeviceHealth"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What the driver declares as health, from the current state"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id",
+      "description": "The entity it tracks today"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id",
+      "description": "The project the device is assigned to today, if any"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id",
+      "description": "The group of that entity (decision D98)"
+     },
+     "data_source_names": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Data Source Names",
+      "description": "The data sources holding an identity of the device, by name"
+     },
+     "queued": {
+      "type": "integer",
+      "title": "Queued",
+      "description": "Retained events handed to the decoder",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_type_id",
+     "name",
+     "serial_number",
+     "status",
+     "firmware_version",
+     "attributes",
+     "notes",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "CreatedDevice",
+    "description": "The device made for an identity, with how many of its retained events went to the\ndecoder (decision D394): the dialog shows its progress from this number at once, without\nwaiting for a summary that takes seconds at times."
    },
    "CurationSummary": {
     "properties": {

@@ -13,8 +13,8 @@ import type {
   BulkCreateResult,
   BulkIgnoreResult,
   ClockAheadDevice,
+  CreatedDevice,
   DeadLetter,
-  Device,
   DeviceType,
   DeviceWalk,
   NameConflict,
@@ -195,11 +195,14 @@ function CreateLabel({ pending }: { pending: boolean }) {
 function CreateDeviceDialog({
   identity,
   walks,
+  summaryAt,
   onClose,
 }: {
   identity: UnknownIdentity | null;
   /** The summary's walks, which the dialog follows once the device exists. */
   walks: DeviceWalk[];
+  /** When that summary was read. */
+  summaryAt: number;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -229,40 +232,51 @@ function CreateDeviceDialog({
   const [start, setStart] = useState<AssignmentStart>("first_seen");
   const [startDate, setStartDate] = useState("");
   // the device made, after which the dialog shows its retained uplinks being decoded
-  const [created, setCreated] = useState<Device | null>(null);
+  const [created, setCreated] = useState<CreatedDevice | null>(null);
   const create = useMutationToast({
     mutationFn: () =>
-      api.post<Device>(
+      api.post<CreatedDevice>(
         `/api/v1/attention/identities/${identity?.id}/create-device`,
         {
           body: {
             name,
             device_type_id: typeId,
             project_id: projectId || null,
-            valid_from:
-              assignmentStartValue(start, startDate) ??
-              identity?.first_seen_at ??
-              null,
+            // null lets the server start at the first sighting and follow the records the
+            // retained uplinks carry from before it (decision D395)
+            valid_from: projectId
+              ? assignmentStartValue(start, startDate)
+              : null,
           },
         },
       ),
-    // the progress comes from the summary; the lists follow in the background (D393)
-    invalidate: [queryKeys.attentionSummary],
-    refresh: [queryKeys.unknownIdentities, queryKeys.devices({})],
+    // the answer says how many uplinks wait, so the progress shows at once (D394); the
+    // summary and the lists follow in the background (D393)
+    refresh: [
+      queryKeys.attentionSummary,
+      queryKeys.unknownIdentities,
+      queryKeys.devices({}),
+    ],
     onSuccess: setCreated,
   });
   return (
     <Dialog open={identity != null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
+          {/* room for the close button: a long device name ran under it on a phone */}
+          <DialogTitle className="px-6 break-words sm:pl-0">
             {created
               ? created.name
               : `${t("Create device for")} ${identity?.external_id ?? ""}`}
           </DialogTitle>
         </DialogHeader>
         {created ? (
-          <CreatedProgress walks={walks} deviceIds={[created.id]} />
+          <CreatedProgress
+            walks={walks}
+            summaryAt={summaryAt}
+            queued={created.queued}
+            deviceIds={[created.id]}
+          />
         ) : (
           <div className="space-y-3">
             <Field label={t("Device name")} htmlFor="new-device-name">
@@ -354,12 +368,15 @@ const platformName = (identity: UnknownIdentity) =>
 function BulkCreateDialog({
   identities,
   walks,
+  summaryAt,
   onClose,
   onDone,
 }: {
   identities: UnknownIdentity[];
   /** The summary's walks, which the dialog follows once the devices exist. */
   walks: DeviceWalk[];
+  /** When that summary was read. */
+  summaryAt: number;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -404,8 +421,11 @@ function BulkCreateDialog({
           },
         },
       ),
-    invalidate: [queryKeys.attentionSummary],
-    refresh: [queryKeys.unknownIdentities, queryKeys.devices({})],
+    refresh: [
+      queryKeys.attentionSummary,
+      queryKeys.unknownIdentities,
+      queryKeys.devices({}),
+    ],
     // the dialog stays open on the decoding of the new devices (Tim, 2026-11-11)
     onSuccess: (data: BulkCreateResult) => {
       setResult(data);
@@ -430,7 +450,12 @@ function BulkCreateDialog({
                 entities: result.entities,
               })}
             </p>
-            <CreatedProgress walks={walks} deviceIds={result.device_ids} />
+            <CreatedProgress
+              walks={walks}
+              summaryAt={summaryAt}
+              queued={result.queued}
+              deviceIds={result.device_ids}
+            />
             {result.skipped.length > 0 && (
               <ul className="list-disc space-y-1 pl-5 text-xs">
                 {result.skipped.map((s) => (
@@ -1550,12 +1575,14 @@ export function AttentionPage() {
         key={creating?.id ?? "create-none"}
         identity={creating}
         walks={s?.walks ?? []}
+        summaryAt={summary.dataUpdatedAt}
         onClose={() => setCreating(null)}
       />
       <BulkCreateDialog
         key={bulk.map((i) => i.id).join(",") || "bulk-none"}
         identities={bulk}
         walks={s?.walks ?? []}
+        summaryAt={summary.dataUpdatedAt}
         onClose={() => setBulk([])}
         onDone={() => setSelected(new Set())}
       />
@@ -1572,7 +1599,8 @@ export function AttentionPage() {
 type AssignmentStart = "first_seen" | "now" | "date";
 
 /** When the project (and entity) assignments of new devices start (Tim, 2026-09-16): at the
- * identity's first sighting, so the retained events from before get the project once decoded;
+ * identity's first sighting, moved back by the decoder to the earliest record the retained
+ * uplinks carry (decision D395), so all of them get the project once decoded;
  * now; or a date of one's own. The other assignment dialogs offer the same choice. */
 function AssignmentStartField({
   id,
@@ -1595,11 +1623,11 @@ function AssignmentStartField({
     start === "first_seen"
       ? firstSeen
         ? t(
-            "From the first time the identity was seen ({{when}}); retained events from then on get the project once decoded.",
+            "From the first time the identity was seen ({{when}}), or earlier when its retained uplinks carry older records: they all get the project once decoded.",
             { when: formatTime(firstSeen) },
           )
         : t(
-            "No first sighting is recorded: the assignment starts at the identity's earliest retained event, or now when there is none. Choose a date to start earlier.",
+            "The identity was never heard: the assignment starts now. Choose a date to start earlier.",
           )
       : start === "now"
         ? t("From this moment; earlier events stay without a project.")

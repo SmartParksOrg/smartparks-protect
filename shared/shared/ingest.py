@@ -222,12 +222,33 @@ async def resolve_identity(
 ) -> ExternalIdentity | None:
     if message.external_id is None:
         return None
-    identity = await session.scalar(
-        select(ExternalIdentity).where(
+    # The row is locked for the rest of the delivery, so two messages of one identity at the
+    # same moment count one after the other and the first sighting stays the first (decision
+    # D396: six at once left a count of 3 and a sighting later than the first event).
+    known = (
+        select(ExternalIdentity)
+        .where(
             ExternalIdentity.data_source_id == source.id,
             ExternalIdentity.external_id == message.external_id,
         )
+        .with_for_update()
     )
+    identity = await session.scalar(known)
+    if identity is None:
+        # Two first messages of a new identity at once: a plain insert answered the loser with
+        # a 500 on the unique key and its message was lost (decision D396). The deliveries
+        # queue on an advisory lock named after the identity, and the one behind reads the
+        # winner's row. Not an insert that waits on the unique key: while it waits it holds
+        # its table lock, and the winner's first event of a week needs that table to make the
+        # new chunk of the source events, which is a deadlock (seen on a fresh database).
+        await session.execute(
+            select(
+                func.pg_advisory_xact_lock(
+                    func.hashtextextended(f"identity:{source.id}:{message.external_id}", 0)
+                )
+            )
+        )
+        identity = await session.scalar(known)
     if identity is None:
         identity = ExternalIdentity(
             data_source_id=source.id,
@@ -733,7 +754,11 @@ async def link_event_receptions(
 
 
 async def queue_identity_reprocess(
-    session: AsyncSession, bus: RedisStreamsBus, identity: ExternalIdentity
+    session: AsyncSession,
+    bus: RedisStreamsBus,
+    identity: ExternalIdentity,
+    *,
+    history: bool = False,
 ) -> int:
     """Hand the retained source events of a linked identity to the decoder (decision D121):
     count them, start the walk's progress entry for the summary, and publish one message. The
@@ -741,7 +766,9 @@ async def queue_identity_reprocess(
     it decodes it, one commit per event. Nothing here writes to a hypertable: one statement
     over an identity's whole history decompresses every compressed batch of its source (64,564
     tuples for one KPN identity on dev on 2026-09-24) and TimescaleDB stops a transaction at
-    100,000. Returns how many events wait."""
+    100,000. `history` asks the decoder to move the device's first assignments back to the
+    earliest record the walk decoded (decision D395), for a device made to start at its first
+    sighting. Returns how many events wait."""
     if identity.device_id is None:
         raise ValueError("The identity has no device")
     queued = int(
@@ -756,6 +783,7 @@ async def queue_identity_reprocess(
                 "external_identity_id": str(identity.id),
                 "device_id": str(identity.device_id),
                 "queued": queued,
+                "history": history,
             },
         )
     return queued

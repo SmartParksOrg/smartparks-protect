@@ -14,15 +14,35 @@ const walk = (done: number, begun = true): DeviceWalk => ({
   begun,
 });
 
-const shown = (walks: DeviceWalk[]) => (
+/** The dialog after a create that queued `queued` uplinks; `at` is when the summary was read. */
+const shown = (walks: DeviceWalk[], at = 2, queued = 26) => (
   <MemoryRouter>
-    <CreatedProgress walks={walks} deviceIds={["d1"]} />
+    <CreatedProgress
+      walks={walks}
+      summaryAt={at}
+      queued={queued}
+      deviceIds={["d1"]}
+    />
   </MemoryRouter>
 );
 
+/** Mounted on the summary from before the create, then given the one read after it. */
+const afterSummary = (walks: DeviceWalk[], queued = 26) => {
+  const view = render(shown([], 1, queued));
+  view.rerender(shown(walks, 2, queued));
+  return view;
+};
+
 describe("CreatedProgress", () => {
+  it("shows the decoding at once, before any summary names the walk", () => {
+    render(shown([], 1));
+    expect(
+      screen.getByText("Created. Decoding the retained uplinks: 0 of 26."),
+    ).toBeInTheDocument();
+  });
+
   it("says a walk waits behind other work", () => {
-    render(shown([walk(0, false)]));
+    afterSummary([walk(0, false)]);
     expect(
       screen.getByText("Created. Decoding the retained uplinks: 0 of 26."),
     ).toBeInTheDocument();
@@ -30,12 +50,12 @@ describe("CreatedProgress", () => {
   });
 
   it("counts while the decoder works and says when it is done", () => {
-    const { rerender } = render(shown([walk(5)]));
+    const { rerender } = afterSummary([walk(5)]);
     expect(
       screen.getByText("Created. Decoding the retained uplinks: 5 of 26."),
     ).toBeInTheDocument();
     expect(screen.getByText("5 of 26")).toBeInTheDocument();
-    rerender(shown([]));
+    rerender(shown([], 3));
     expect(
       screen.getByText(/the 26 retained uplinks are decoded/),
     ).toBeInTheDocument();
@@ -46,8 +66,18 @@ describe("CreatedProgress", () => {
     );
   });
 
+  it("reads a walk that ended before the first summary as decoded (decision D394)", () => {
+    afterSummary([], 3);
+    expect(
+      screen.getByText(/the 3 retained uplinks are decoded/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Created. No retained uplinks wait for the decoder."),
+    ).not.toBeInTheDocument();
+  });
+
   it("says when nothing waited for the decoder", () => {
-    render(shown([]));
+    render(shown([], 1, 0));
     expect(
       screen.getByText("Created. No retained uplinks wait for the decoder."),
     ).toBeInTheDocument();
