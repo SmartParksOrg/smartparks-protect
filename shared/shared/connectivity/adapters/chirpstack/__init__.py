@@ -69,6 +69,74 @@ def parse_chirpstack_time(value: Any) -> datetime | None:
     return require_aware(datetime.fromisoformat(text.replace("Z", "+00:00")))
 
 
+def _hop_count(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def uplink_receptions(data: dict[str, Any]) -> list[GatewayReceptionData]:
+    """The gateways that heard an uplink, from its `rxInfo` (decision D398).
+
+    On a Gateway Mesh the border gateway forwards what a relay heard and ChirpStack names the
+    border as `gatewayId`; the relay that heard the device is in `metadata.relay_id` (4 bytes,
+    hex) beside `metadata.hop_count`, and `rssi` and `snr` are the relay's
+    (chirpstack-gateway-mesh, `proxy_uplink_mesh_packet`). Such a reception belongs to the
+    relay: its gateway id is the relay id, and `mesh` in the attributes keeps the borders it
+    came through and the fewest hops. One relay's uplink that reaches the server through two
+    borders is one reception. `location` on a relayed entry is the border's, so it is left
+    out. With more than one hop the relays in between are not reported."""
+    frequency = (data.get("txInfo") or {}).get("frequency")
+    receptions: list[GatewayReceptionData] = []
+    relayed: dict[str, GatewayReceptionData] = {}
+    for rx in data.get("rxInfo") or []:
+        if not isinstance(rx, dict) or not rx.get("gatewayId"):
+            continue
+        gateway_id = str(rx["gatewayId"]).lower()
+        metadata = rx.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        relay_id = str(metadata.get("relay_id") or "").lower()
+        if not relay_id:
+            receptions.append(
+                GatewayReceptionData(
+                    gateway_id=gateway_id,
+                    rssi=rx.get("rssi"),
+                    snr=rx.get("snr"),
+                    frequency_hz=frequency,
+                    channel=rx.get("channel"),
+                    attributes={
+                        k: v for k, v in rx.items() if k in ("uplinkId", "location", "metadata")
+                    },
+                )
+            )
+            continue
+        hops = _hop_count(metadata.get("hop_count"))
+        known = relayed.get(relay_id)
+        if known is None:
+            known = GatewayReceptionData(
+                gateway_id=relay_id,
+                rssi=rx.get("rssi"),
+                snr=rx.get("snr"),
+                frequency_hz=frequency,
+                channel=rx.get("channel"),
+                attributes={
+                    **{k: v for k, v in rx.items() if k in ("uplinkId", "metadata")},
+                    "mesh": {"border_gateway_ids": [gateway_id], "hop_count": hops},
+                },
+            )
+            relayed[relay_id] = known
+            receptions.append(known)
+            continue
+        mesh = known.attributes["mesh"]
+        if gateway_id not in mesh["border_gateway_ids"]:
+            mesh["border_gateway_ids"].append(gateway_id)
+        if hops is not None and (mesh["hop_count"] is None or hops < mesh["hop_count"]):
+            mesh["hop_count"] = hops
+    return receptions
+
+
 def parse_event(source: DataSourceContext, topic: str, payload: bytes) -> InboundMessage:
     try:
         data = json.loads(payload.decode("utf-8"))
@@ -92,18 +160,7 @@ def parse_event(source: DataSourceContext, topic: str, payload: bytes) -> Inboun
     dev_eui = str(info.get("devEui") or "").upper() or None
     if dev_eui is None and len(parts) >= 4 and parts[-3] == "device":
         dev_eui = parts[-4].upper() if parts[-4] else None
-    receptions = [
-        GatewayReceptionData(
-            gateway_id=str(rx.get("gatewayId", "")).lower(),
-            rssi=rx.get("rssi"),
-            snr=rx.get("snr"),
-            frequency_hz=(data.get("txInfo") or {}).get("frequency"),
-            channel=rx.get("channel"),
-            attributes={k: v for k, v in rx.items() if k in ("uplinkId", "location", "metadata")},
-        )
-        for rx in data.get("rxInfo") or []
-        if rx.get("gatewayId")
-    ]
+    receptions = uplink_receptions(data)
     best = max(receptions, key=lambda r: r.rssi if r.rssi is not None else -999, default=None)
     modulation = ((data.get("txInfo") or {}).get("modulation") or {}).get("lora") or {}
     return InboundMessage(
@@ -232,10 +289,11 @@ def parse_gateway_event(source: DataSourceContext, topic: str, payload: bytes) -
 def gateway_updates_from_relays(items: list[dict[str, Any]]) -> list[GatewayUpdate]:
     """`ListRelayGateways` items (relayId, name, description, state, lastSeenAt,
     regionConfigId) to registry updates (decision D237). A relay gateway has no backhaul: its
-    uplinks reach ChirpStack through a border gateway and are credited to that one, so a relay
-    never has receptions of its own; ChirpStack knows it from its heartbeats and keeps no
-    location or counters for it. The registry row is marked `kind: relay`, the relay id (4
-    bytes) is its external id, and a name equal to the id counts as no name."""
+    uplinks reach ChirpStack through a border gateway, which names the relay in the reception's
+    metadata, and `uplink_receptions` gives them to the relay (decision D398). ChirpStack knows
+    the relay from its heartbeats and keeps no location or counters for it. The registry row is
+    marked `kind: relay`, the relay id (4 bytes) is its external id, and a name equal to the id
+    counts as no name."""
     updates = []
     for item in items:
         relay_id = str(item.get("relayId") or "").lower()

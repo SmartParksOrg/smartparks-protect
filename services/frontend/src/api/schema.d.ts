@@ -14121,6 +14121,16 @@ export interface components {
             frequency_hz: number | null;
             /** Channel */
             channel: number | null;
+            /**
+             * Border Gateway Ids
+             * @description For a Gateway Mesh relay's reception: the border gateways that forwarded it to the network server (decision D398)
+             */
+            border_gateway_ids?: string[];
+            /**
+             * Hop Count
+             * @description Mesh hops from the relay that heard it to the border
+             */
+            hop_count?: number | null;
         };
         /** RecordCounts */
         RecordCounts: {

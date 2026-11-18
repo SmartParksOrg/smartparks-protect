@@ -100,7 +100,7 @@ export function GatewaysPage() {
               variant="outline"
               className="ml-2 align-middle"
               title={t(
-                "A Gateway Mesh relay: no backhaul of its own, its uplinks reach the network through a border gateway and count there",
+                "A Gateway Mesh relay: no backhaul of its own. What it hears reaches the network through a border gateway and counts for the relay",
               )}
             >
               {t("Relay (mesh)")}

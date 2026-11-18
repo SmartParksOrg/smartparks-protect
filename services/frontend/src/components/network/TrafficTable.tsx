@@ -166,6 +166,18 @@ function detailsText(r: TrafficRow, t: T): string {
       );
     if (r.gateway_count)
       parts.push(t("{{count}} gateways", { count: r.gateway_count }));
+    // a Gateway Mesh relay heard it and a border gateway forwarded it (decision D398)
+    for (const rx of r.receptions) {
+      if (!rx.border_gateway_ids?.length) continue;
+      parts.push(
+        rx.hop_count != null
+          ? t("heard by mesh relay {{id}}, {{count}} hops to the border", {
+              id: rx.gateway_id.toUpperCase(),
+              count: rx.hop_count,
+            })
+          : t("heard by mesh relay {{id}}", { id: rx.gateway_id.toUpperCase() }),
+      );
+    }
   } else if (r.acquisition_channel === "lp0") {
     // a frame an offload station stored (phase 42, decision D322): the port and counter of
     // the LoRaWAN frame, the signal the station saw, the station, when the card was read

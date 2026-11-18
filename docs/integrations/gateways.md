@@ -13,10 +13,20 @@ gateway heard one of them (decision D175, ADR 0027); the all-projects scope sees
 - Gateway events: the ChirpStack adapter subscribes to `gateway/+/event/stats` (counters and
   location) and `gateway/+/state/conn` (online, offline). They are stored as source events
   without a device and update the registry; nothing is published on the bus.
-- Gateway Mesh relays (ChirpStack 4.9 and later, decision D237): a relay gateway has no
-  backhaul; its uplinks reach ChirpStack through a border gateway and are credited to that
-  one, so a relay never has receptions of its own, and ChirpStack learns of it from the
-  heartbeat it sends every stats interval. The sync reads the tenant's relay gateways with the
+- Gateway Mesh relays (ChirpStack 4.9 and later, decisions D237 and D398): a relay gateway
+  has no backhaul; what it hears reaches ChirpStack through a border gateway. ChirpStack names
+  the border as the `gatewayId` of such an uplink and puts the relay that heard the device in
+  `metadata.relay_id`, with `metadata.hop_count` and the relay's own RSSI and SNR. Protect
+  gives the reception to the relay: the relay's coverage, range, devices and counts are what
+  its radio heard, and a border's are what the border heard itself, never what it forwarded.
+  One uplink of a relay that reaches the server through two borders is one reception; the
+  borders and the fewest hops stay on it (`mesh` in the reception's attributes) and a
+  message's line on the Traffic pages says "heard by mesh relay F136FD99, 1 hop to the
+  border". The coordinates on a relayed uplink are the border's, so they never place the
+  relay; a border that forwards counts as seen. With more than one hop ChirpStack reports the
+  first relay and the count, not the relays in between. Migration 0062 moved the receptions
+  stored under the borders before 2026-11-18 to their relays. ChirpStack learns of a relay from
+  the heartbeat it sends every stats interval. The sync reads the tenant's relay gateways with the
   ordinary ones and keeps them in the registry marked `kind: relay` (the 4-byte relay id as
   the external id, state, last seen, region), so the Gateways page and the map show them
   beside the border gateways with a "Relay (mesh)" mark; a person can set a relay's location

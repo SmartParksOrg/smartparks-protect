@@ -66,6 +66,43 @@ def test_uplink_event():
     assert message.payload["data"] == "qg=="
 
 
+def test_a_mesh_relays_uplink_belongs_to_the_relay():
+    """Decision D398: ChirpStack names the border as the gateway of a relayed uplink and the
+    relay in the metadata; the reception is the relay's, once, whatever borders forwarded it."""
+    raw = (FIXTURES / "up_mesh_relayed_live.json").read_bytes()
+    message = parse_event(source(), topic("up"), raw)
+    assert message.provider_metadata["gateway_count"] == 1
+    assert message.provider_metadata["best_rssi"] == -141
+    (reception,) = message.gateway_receptions
+    assert reception.gateway_id == "f136fd99"
+    assert reception.rssi == -141 and reception.snr == -23.0
+    assert reception.attributes["mesh"] == {
+        "border_gateway_ids": ["0016c001f1369271", "0016c001f1366ff3"],
+        "hop_count": 1,
+    }
+    # the coordinates on a relayed entry are the border's, never the relay's
+    assert "location" not in reception.attributes
+    assert reception.attributes["metadata"]["relay_id"] == "f136fd99"
+
+    # a border that also heard the device itself keeps its own reception beside the relay's,
+    # and of two paths the shorter one is the hop count
+    data = json.loads(raw)
+    direct = {k: v for k, v in data["rxInfo"][0].items() if k != "metadata"}
+    direct.update(rssi=-97, snr=6.5)
+    data["rxInfo"][1]["metadata"]["hop_count"] = "2"
+    data["rxInfo"] = [data["rxInfo"][1], data["rxInfo"][0], direct]
+    message = parse_event(source(), topic("up"), json.dumps(data).encode())
+    assert [(r.gateway_id, r.rssi) for r in message.gateway_receptions] == [
+        ("f136fd99", -141),
+        ("0016c001f1369271", -97),
+    ]
+    assert message.gateway_receptions[0].attributes["mesh"]["hop_count"] == 1
+    assert message.gateway_receptions[1].attributes["location"]["latitude"] == 52.1
+    assert "mesh" not in message.gateway_receptions[1].attributes
+    assert message.provider_metadata["gateway_count"] == 2
+    assert message.provider_metadata["best_rssi"] == -97
+
+
 @pytest.mark.parametrize(
     ("fixture", "event_type"),
     [

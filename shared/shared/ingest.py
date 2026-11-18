@@ -110,7 +110,9 @@ async def upsert_gateways(
     A reception's `location` attribute (latitude, longitude, optional altitude; every adapter
     normalises to this shape) places the gateway unless an administrator placed it. A gateway
     a sibling source of the same platform instance already holds is updated there, every
-    holder alike, and gets no second row (decision D376)."""
+    holder alike, and gets no second row (decision D376). A reception with `mesh` in its
+    attributes was heard by a Gateway Mesh relay and forwarded by the borders named there
+    (decision D398): the relay is marked as one and the borders count as seen."""
     siblings: tuple[uuid.UUID, ...] = (data_source_id,)
     if receptions:
         siblings = siblings_of(await instance_groups(session), data_source_id)
@@ -119,22 +121,42 @@ async def upsert_gateways(
             continue
         location = reception.attributes.get("location") if reception.attributes else None
         update = GatewayUpdate(gateway_id=reception.gateway_id, seen_at=now)
+        mesh = reception.attributes.get("mesh") if reception.attributes else None
+        if isinstance(mesh, dict):
+            # a Gateway Mesh relay heard it (decision D398): the row is a relay even when the
+            # platform's relay list never named it, and the borders that forwarded it are alive
+            update.attributes = {"kind": "relay"}
+            for border in mesh.get("border_gateway_ids") or []:
+                await _touch_gateway(
+                    session, data_source_id, siblings, GatewayUpdate(str(border), seen_at=now), now
+                )
         if isinstance(location, dict):
             update.latitude = location.get("latitude")
             update.longitude = location.get("longitude")
             update.altitude_m = location.get("altitude")
-        holders: list[uuid.UUID] = [data_source_id]
-        if len(siblings) > 1:
-            holders = list(
-                await session.scalars(
-                    select(Gateway.data_source_id).where(
-                        Gateway.data_source_id.in_(siblings),
-                        Gateway.external_id == reception.gateway_id.lower(),
-                    )
+        await _touch_gateway(session, data_source_id, siblings, update, now)
+
+
+async def _touch_gateway(
+    session: AsyncSession,
+    data_source_id: uuid.UUID,
+    siblings: tuple[uuid.UUID, ...],
+    update: GatewayUpdate,
+    now: datetime,
+) -> None:
+    """One gateway seen through a reception, on every sibling source that holds it (D376)."""
+    holders: list[uuid.UUID] = [data_source_id]
+    if len(siblings) > 1:
+        holders = list(
+            await session.scalars(
+                select(Gateway.data_source_id).where(
+                    Gateway.data_source_id.in_(siblings),
+                    Gateway.external_id == update.gateway_id.lower(),
                 )
-            ) or [data_source_id]
-        for holder in holders:
-            await apply_gateway_update(session, holder, update, now, from_reception=True)
+            )
+        ) or [data_source_id]
+    for holder in holders:
+        await apply_gateway_update(session, holder, update, now, from_reception=True)
 
 
 async def apply_gateway_update(

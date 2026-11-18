@@ -1,6 +1,7 @@
 """Gateways per project, detail, connectivity analysis, the server registry, the sync action
 and polling cursors."""
 
+import os
 import uuid
 
 import pytest
@@ -681,3 +682,158 @@ async def test_a_second_tenant_key_names_the_gateways_of_the_same_chirpstack(
         )
     ).json()
     assert detail["gateway"]["receptions"] == 2 and detail["devices"][0]["receptions"] == 2
+
+
+def _migration_0062():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "services/api/alembic/versions"
+    spec = importlib.util.spec_from_file_location(
+        "migration_0062", path / "0062_mesh_receptions_to_their_relay.py"
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    return migration
+
+
+async def test_a_mesh_relays_receptions_and_the_stored_ones_moved(client, db, bus):  # noqa: F811
+    """Decision D398: an uplink a Gateway Mesh relay heard counts for the relay and not for the
+    border that forwarded it; migration 0062 moves the receptions stored under the border."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import create_engine, text
+
+    from shared.connectivity.adapters.chirpstack import uplink_receptions
+
+    admin, project, _entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    row = await db.get(DataSource, uuid.UUID(source["id"]))
+    external_id = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()[
+        "external_identities"
+    ][0]["external_id"]
+    tag = uuid.uuid4().hex[:6]
+    relay, border_a, border_b = f"f1{tag}", f"0016c001f1{tag}", f"0016c001f2{tag}"
+    now = datetime.now(UTC).replace(microsecond=0)
+
+    def rx(border: str, hops: str | None, rssi: int) -> dict:
+        entry = {
+            "gatewayId": border,
+            "rssi": rssi,
+            "snr": -20.0,
+            "location": {"latitude": -24.9, "longitude": 31.5, "altitude": 300.0},
+        }
+        if hops:
+            entry["metadata"] = {"relay_id": relay, "hop_count": hops}
+        return entry
+
+    async def uplink(entries: list[dict], when: datetime, *, as_stored_before: bool) -> None:
+        receptions = (
+            [
+                GatewayReceptionData(
+                    gateway_id=e["gatewayId"],
+                    rssi=e["rssi"],
+                    snr=e["snr"],
+                    attributes={k: e[k] for k in ("location", "metadata") if k in e},
+                )
+                for e in entries
+            ]
+            if as_stored_before
+            else uplink_receptions({"rxInfo": entries})
+        )
+        message = InboundMessage(
+            external_id=external_id,
+            event_type="uplink",
+            payload={"time": when.isoformat(), "lat": -24.9, "lon": 31.5},
+            acquisition_channel=AcquisitionChannel.LORAWAN,
+            ingestion_method=IngestionMethod.MQTT,
+            network_received_at=when,
+            gateway_receptions=receptions,
+        )
+        await commit_and_publish(db, bus, [await store_inbound(db, row, message)])
+
+    # the relay heard it, both borders forwarded it; border A heard the next one itself
+    await uplink(
+        [rx(border_a, "1", -130), rx(border_b, "2", -130)],
+        now - timedelta(minutes=3),
+        as_stored_before=False,
+    )
+    await uplink([rx(border_a, None, -90)], now - timedelta(minutes=2), as_stored_before=False)
+
+    base = f"/api/v1/projects/{project.id}"
+
+    async def gateways() -> dict:
+        return {
+            g["external_id"]: g
+            for g in (await client.get(f"{base}/gateways", params={"hours": 24}, headers=h)).json()
+        }
+
+    listed = await gateways()
+    assert listed[relay]["receptions"] == 1 and listed[relay]["mean_rssi"] == -130
+    assert listed[relay]["attributes"]["kind"] == "relay"
+    assert listed[relay]["geometry"] is None  # the coordinates on the uplink were the border's
+    assert listed[border_a]["receptions"] == 1 and listed[border_a]["mean_rssi"] == -90
+    assert listed[border_b]["receptions"] == 0 and listed[border_b]["status"] == "online"
+    assert "kind" not in listed[border_a]["attributes"]
+
+    window = {
+        "from": (now - timedelta(hours=1)).isoformat(),
+        "to": (now + timedelta(hours=1)).isoformat(),
+    }
+    traffic = (
+        await client.get(
+            f"{base}/traffic", params={**window, "gateway_id": listed[relay]["id"]}, headers=h
+        )
+    ).json()
+    assert len(traffic) == 1 and traffic[0]["gateway_count"] == 1
+    assert traffic[0]["receptions"] == [
+        {
+            "gateway_id": relay,
+            "rssi": -130.0,
+            "snr": -20.0,
+            "frequency_hz": None,
+            "channel": None,
+            "border_gateway_ids": [border_a, border_b],
+            "hop_count": 1,
+        }
+    ]
+    forwarded = await client.get(
+        f"{base}/traffic", params={**window, "gateway_id": listed[border_b]["id"]}, headers=h
+    )
+    assert forwarded.json() == []
+
+    # the same two uplinks as they were stored before the change, through another relay id
+    old_relay = f"f2{tag}"
+    relay = old_relay
+    await uplink(
+        [rx(border_a, "2", -128), rx(border_b, "1", -128)],
+        now - timedelta(minutes=1),
+        as_stored_before=True,
+    )
+    before = await gateways()
+    assert old_relay not in before and before[border_b]["receptions"] == 1
+
+    migration = _migration_0062()
+    # over psycopg, as Alembic runs it
+    engine = create_engine(
+        os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql+psycopg://")
+    )
+    with engine.begin() as connection:
+        assert migration.recredit(connection) >= 2
+    with engine.begin() as connection:
+        assert migration.recredit(connection) == 0  # nothing left to move
+    engine.dispose()
+    await db.rollback()  # a fresh snapshot for the reads below
+
+    after = await gateways()
+    assert after[old_relay]["receptions"] == 1 and after[old_relay]["mean_rssi"] == -128
+    assert after[old_relay]["attributes"]["kind"] == "relay"
+    assert after[border_a]["receptions"] == 1 and after[border_b]["receptions"] == 0
+    stored = (
+        await db.execute(
+            text("SELECT attributes FROM gateway_receptions WHERE gateway_id = :relay"),
+            {"relay": old_relay},
+        )
+    ).scalar_one()
+    assert stored["mesh"] == {"border_gateway_ids": [border_a, border_b], "hop_count": 1}
+    assert "location" not in stored

@@ -46421,6 +46421,26 @@
        }
       ],
       "title": "Channel"
+     },
+     "border_gateway_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Border Gateway Ids",
+      "description": "For a Gateway Mesh relay's reception: the border gateways that forwarded it to the network server (decision D398)"
+     },
+     "hop_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hop Count",
+      "description": "Mesh hops from the relay that heard it to the border"
      }
     },
     "type": "object",

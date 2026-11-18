@@ -65,6 +65,14 @@ class ReceptionRead(BaseModel):
     snr: float | None
     frequency_hz: int | None
     channel: int | None
+    border_gateway_ids: list[str] = Field(
+        default_factory=list,
+        description="For a Gateway Mesh relay's reception: the border gateways that forwarded "
+        "it to the network server (decision D398)",
+    )
+    hop_count: int | None = Field(
+        default=None, description="Mesh hops from the relay that heard it to the border"
+    )
 
 
 class SatelliteSessionRead(BaseModel):
@@ -488,7 +496,10 @@ async def traffic_rows(
                 f_cnt=meta.get("f_cnt"),
                 spreading_factor=meta.get("spreading_factor"),
                 frequency_hz=meta.get("frequency_hz"),
-                gateway_count=int(meta.get("gateway_count") or len(receptions.get(event.id, []))),
+                # the stored rows first: a count taken at ingest before decision D398 counted a
+                # mesh relay once per border it came through
+                gateway_count=len(receptions.get(event.id, []))
+                or int(meta.get("gateway_count") or 0),
                 best_rssi=meta.get("best_rssi"),
                 best_snr=meta.get("best_snr"),
                 processing_status=event.processing_status,
@@ -503,6 +514,10 @@ async def traffic_rows(
                         snr=r.snr,
                         frequency_hz=r.frequency_hz,
                         channel=r.channel,
+                        border_gateway_ids=list(
+                            ((r.attributes or {}).get("mesh") or {}).get("border_gateway_ids") or []
+                        ),
+                        hop_count=((r.attributes or {}).get("mesh") or {}).get("hop_count"),
                     )
                     for r in receptions.get(event.id, [])
                 ],

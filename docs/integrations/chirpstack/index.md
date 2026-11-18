@@ -165,6 +165,8 @@ Other setups:
 `api_token` credential. "Test connection" on the data source calls the API with it; "Sync
 devices" turns the tenant's devices into identities to link; "Sync gateways" fills the
 gateway registry, Gateway Mesh relay gateways included (marked "Relay (mesh)", decision D237).
+An uplink a relay heard counts for the relay and not for the border gateway that forwarded it
+(decision D398, see [Gateways](../gateways.md)).
 
 The DevEUI is the identity: register the devices' DevEUIs on the data source, or accept them
 from Needs attention as their first uplinks arrive. While connecting, Server admin, Data
