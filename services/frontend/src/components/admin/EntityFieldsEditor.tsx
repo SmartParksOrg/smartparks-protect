@@ -73,7 +73,10 @@ export function EntityFieldsEditor({
         const id = `own-field-${index}`;
         const numeric = draft.kind === "number" || draft.kind === "integer";
         return (
-          <div key={index} className="space-y-2 rounded-md border p-3">
+          <div
+            key={index}
+            className="space-y-2 rounded-md border px-3 pt-3 pb-2"
+          >
             <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
               <Input
                 id={id}
@@ -101,22 +104,30 @@ export function EntityFieldsEditor({
               </Select>
             </div>
             {numeric && (
-              <Input
-                aria-label={t("Unit")}
-                placeholder={t("Unit, for example cm (optional)")}
-                value={draft.unit}
-                onChange={(e) => patch(index, { unit: e.target.value })}
-              />
+              <label className="flex items-center gap-2 text-sm">
+                <span className="w-16 shrink-0 text-muted-foreground">
+                  {t("Unit")}
+                </span>
+                <Input
+                  placeholder={t("for example cm (optional)")}
+                  value={draft.unit}
+                  onChange={(e) => patch(index, { unit: e.target.value })}
+                />
+              </label>
             )}
             {draft.kind === "choice" && (
-              <Input
-                aria-label={t("Choices")}
-                placeholder={t("Choices, separated by commas")}
-                value={draft.choices}
-                onChange={(e) => patch(index, { choices: e.target.value })}
-              />
+              <label className="flex items-center gap-2 text-sm">
+                <span className="w-16 shrink-0 text-muted-foreground">
+                  {t("Choices")}
+                </span>
+                <Input
+                  placeholder={t("separated by commas")}
+                  value={draft.choices}
+                  onChange={(e) => patch(index, { choices: e.target.value })}
+                />
+              </label>
             )}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <label className="inline-flex items-center gap-2">
                 <Switch
                   size="sm"
@@ -132,14 +143,14 @@ export function EntityFieldsEditor({
                     checked={draft.search}
                     onCheckedChange={(search) => patch(index, { search })}
                   />
-                  {t("Found by the search")}
+                  {t("In the search")}
                 </label>
               )}
               <span className="ml-auto inline-flex">
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size="icon-sm"
                   aria-label={t("Move up")}
                   disabled={index === 0}
                   onClick={() => move(index, -1)}
@@ -149,7 +160,7 @@ export function EntityFieldsEditor({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size="icon-sm"
                   aria-label={t("Move down")}
                   disabled={index === value.length - 1}
                   onClick={() => move(index, 1)}
@@ -159,7 +170,7 @@ export function EntityFieldsEditor({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size="icon-sm"
                   aria-label={t("Remove field")}
                   onClick={() => onChange(value.filter((_, i) => i !== index))}
                 >

@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { DataTable } from "@/components/data/DataTable";
@@ -42,5 +42,22 @@ describe("DataTable", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(headerRenders).toBeLessThan(5);
+  });
+
+  it("finds a code typed with other spacing than it is stored with", async () => {
+    // an ear tag is stored without spaces and typed with them (decision D406)
+    const rows = [
+      "Cow 01 NL100020003001",
+      "Cow 02 NL100020003002",
+      ...Array.from({ length: 6 }, (_, i) => `Goat ${i}`),
+    ].map((name) => ({ name }));
+    render(<DataTable<Row> columns={columns} data={rows} searchable />);
+    fireEvent.change(screen.getAllByPlaceholderText("Search this list")[0]!, {
+      target: { value: "nl 1000 2000 3002" },
+    });
+    await act(async () => {});
+    expect(screen.queryAllByText(/Cow 02/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Cow 01/)).toHaveLength(0);
+    expect(screen.queryAllByText(/Goat/)).toHaveLength(0);
   });
 });

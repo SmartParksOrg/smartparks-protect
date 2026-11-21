@@ -68,6 +68,18 @@ export function choiceLabel(
   return choice ? text(field, choice.label, translate) : value;
 }
 
+/** A stored date (`2025-08-14`) in the reader's own notation, without a time and without
+ * a timezone shift; anything that is no such date as it is. */
+function formatDay(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  return new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  ).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
 const isEmpty = (value: unknown) =>
   value == null || (typeof value === "string" && value.trim() === "");
 
@@ -80,6 +92,7 @@ export function fieldValueText(
 ): string {
   if (field.kind === "boolean")
     return value ? translate(t("Yes")) : translate(t("No"));
+  if (field.kind === "date") return formatDay(String(value));
   if (field.kind === "choice")
     return choiceLabel(field, String(value), translate);
   return field.unit ? `${String(value)} ${field.unit}` : String(value);

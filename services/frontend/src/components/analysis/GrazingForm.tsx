@@ -94,8 +94,11 @@ export function GrazingForm({
         query: { limit: 500 },
       }),
   });
-  // the weighting reads a number field of the animals (decision D406)
-  const weightFields = numericFields(types.data?.items);
+  // the weighting reads a number field of the animals (decision D406): the weight, or one
+  // an admin added such as a livestock unit; a birth year or a frequency weighs nothing
+  const weightFields = numericFields(types.data?.items).filter(
+    (field) => field.key === "weight_kg" || field.origin === "own",
+  );
   const features = useQuery({
     queryKey: queryKeys.features(projectId),
     queryFn: () =>

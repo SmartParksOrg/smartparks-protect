@@ -44,7 +44,7 @@ export function EntityDetailsCard({
             {t("Nothing filled in yet.")}
           </p>
         ) : (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          <dl className="grid grid-cols-[fit-content(45%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
             {filled.map(({ field, value }) => (
               <div key={field.key} className="contents">
                 <dt className="text-muted-foreground">

@@ -69,6 +69,15 @@ describe("the texts of a field", () => {
     ).toBe("No");
     expect(fieldValueText(sex, "bull", nl)).toBe("bull");
   });
+  it("shows a date without a time and leaves what is no date as it is", () => {
+    const day = field({ key: "tagged_on", kind: "date" });
+    expect(fieldValueText(day, "2025-08-14", nl)).toBe(
+      new Date(2025, 7, 14).toLocaleDateString(undefined, {
+        dateStyle: "medium",
+      }),
+    );
+    expect(fieldValueText(day, "last August", nl)).toBe("last August");
+  });
 });
 
 describe("searchText", () => {

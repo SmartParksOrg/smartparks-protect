@@ -7,6 +7,7 @@ import {
   getFacetedUniqueValues,
   getFilteredRowModel,
   getSortedRowModel,
+  type Row,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
@@ -116,6 +117,20 @@ const SEARCH_FROM_ROWS = 6;
 const NO_ROWS: never[] = [];
 
 /** Wide tables scroll inside this container; the page never scrolls horizontally. */
+/** The search box's own filter: the cell contains the term, whatever the case, and also when
+ * the spaces are left out on both sides. A code such as an ear tag is stored without spaces
+ * and typed with them (decision D406); the server finds it, so the table must not drop it. */
+function containsLoosely<T>(
+  row: Row<T>,
+  columnId: string,
+  term: unknown,
+): boolean {
+  const cell = String(row.getValue(columnId) ?? "").toLowerCase();
+  const wanted = String(term ?? "").toLowerCase();
+  const tight = (text: string) => text.replace(/\s+/g, "");
+  return cell.includes(wanted) || tight(cell).includes(tight(wanted));
+}
+
 export function DataTable<T>({
   columns,
   data,
@@ -228,7 +243,7 @@ export function DataTable<T>({
     },
     onSortingChange: setSorting,
     onGlobalFilterChange: setSearch,
-    globalFilterFn: "includesString",
+    globalFilterFn: containsLoosely,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),

@@ -3431,13 +3431,11 @@
   "Call sign": "Roepnaam",
   "Choice": "Keuze",
   "Choices": "Keuzes",
-  "Choices, separated by commas": "Keuzes, gescheiden door komma's",
   "Ear tag number": "Oormerknummer",
   "Female": "Vrouwelijk",
   "Field label": "Label van het veld",
   "Fields": "Velden",
   "Fleet number": "Vlootnummer",
-  "Found by the search": "Vindbaar met zoeken",
   "from the type above": "van het type erboven",
   "Give every field a label": "Geef elk veld een label",
   "ID number": "ID-nummer",
@@ -3462,7 +3460,6 @@
   "The frequency of a VHF tag on the animal": "De frequentie van een VHF-zender op het dier",
   "The number or code this animal has in your own records": "Het nummer of de code van dit dier in je eigen administratie",
   "The official number, 4 to 20 letters and digits, such as NL 123456789012": "Het officiële nummer, 4 tot 20 letters en cijfers, zoals NL 123456789012",
-  "Unit, for example cm (optional)": "Eenheid, bijvoorbeeld cm (optioneel)",
   "Unknown": "Onbekend",
   "VHF frequency": "VHF-frequentie",
   "Weight": "Gewicht",
@@ -3470,5 +3467,8 @@
   "Whole number": "Geheel getal",
   "Yes": "Ja",
   "Yes or no": "Ja of nee",
-  "Choose a field": "Kies een veld"
+  "Choose a field": "Kies een veld",
+  "for example cm (optional)": "bijvoorbeeld cm (optioneel)",
+  "In the search": "Doorzoekbaar",
+  "separated by commas": "gescheiden door komma's"
 }
