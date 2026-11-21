@@ -5,6 +5,7 @@ import {
   fieldLabel,
   fieldValueText,
   keyOf,
+  numericFields,
   searchText,
   splitAttributes,
   toAttributes,
@@ -81,6 +82,18 @@ describe("searchText", () => {
       }),
     ).toBe("N 123 W");
     expect(searchText(fields, null)).toBe("");
+  });
+});
+
+describe("numericFields", () => {
+  it("gives the number fields of every type, each key once", () => {
+    const type = (fields: EntityField[]) => ({ fields }) as never;
+    expect(
+      numericFields([type([sex, vhf, year]), type([vhf, plate])]).map(
+        (f) => f.key,
+      ),
+    ).toEqual(["vhf_frequency_mhz", "birth_year"]);
+    expect(numericFields(undefined)).toEqual([]);
   });
 });
 

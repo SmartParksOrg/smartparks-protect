@@ -74,24 +74,47 @@ def build_server(api: ProtectApi) -> MCPServer[None]:
         page = await api.get("/projects", tool="list_projects", params={"limit": 500})
         return list(page["items"])
 
-    async def entity_types() -> dict[str, str]:
+    async def entity_types() -> dict[str, dict[str, Any]]:
         page = await api.get("/entity-types", tool="get_entity", params={"limit": 500})
-        return {item["id"]: item["label"] for item in page["items"]}
+        return {item["id"]: item for item in page["items"]}
 
     async def device_types() -> dict[str, dict[str, Any]]:
         page = await api.get("/device-types", tool="get_device", params={"limit": 500})
         return {item["id"]: item for item in page["items"]}
 
+    def entity_fields(
+        entity: dict[str, Any], entity_type: dict[str, Any] | None
+    ) -> list[dict[str, Any]]:
+        """The entity's filled fields as a person reads them (decision D406): the label, the
+        value with a choice's label, and the unit, in the order of the type's form."""
+        attributes = entity.get("attributes") or {}
+        out: list[dict[str, Any]] = []
+        for field in (entity_type or {}).get("fields") or []:
+            value = attributes.get(field["key"])
+            if value is None or value == "":
+                continue
+            choices = {c["value"]: c["label"] for c in field.get("choices") or []}
+            out.append(
+                {
+                    "key": field["key"],
+                    "label": field["label"],
+                    "value": choices.get(value, value) if isinstance(value, str) else value,
+                    "unit": field.get("unit"),
+                }
+            )
+        return out
+
     def entity_summary(
-        project_id: str, entity: dict[str, Any], type_name: str | None
+        project_id: str, entity: dict[str, Any], entity_type: dict[str, Any] | None
     ) -> dict[str, Any]:
         return {
             "id": entity["id"],
             "uri": f"smartparks://projects/{project_id}/entities/{entity['id']}",
             "name": entity["name"],
-            "entity_type": type_name,
+            "entity_type": entity_type["label"] if entity_type else None,
             "entity_type_id": entity["entity_type_id"],
             "status": entity["status"],
+            "fields": entity_fields(entity, entity_type),
             "attributes": entity.get("attributes", {}),
             "url": _url(f"/projects/{project_id}/entities"),
         }

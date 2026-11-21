@@ -26,6 +26,13 @@ The **Details** card on the entity's Overview shows every field that has a value
 
 You need the permission to change entities (`entities:write`). A viewer reads the fields and cannot change them.
 
+## Where the fields are used
+
+- The search at the top and the search box of the Entities list find an entity by its ID number, ear tag number, licence plate, fleet number, call sign or asset number.
+- The grazing analysis can weight its animals by a number field, the weight first of all.
+- The Movebank reference export carries the sex, the ear tag, the age class, the birth year, the weight and the VHF frequency (see [Export](../analytics/export.md)).
+- An AI client reads the fields with their labels and units through `get_entity`.
+
 ## Other
 
 When an entity changes type, the values of fields the new type does not have are kept. They show under **Other**, in the dialog with a remove button each and on the Details card. Change the type back and the fields are there again. Values set through the API under a key no field defines show under Other as well.

@@ -111,6 +111,20 @@ export function splitAttributes(
   };
 }
 
+/** The number fields of every type, each key once: what the grazing analysis may weight
+ * its animals by (decision D406), a weight in kilograms first of all. */
+export function numericFields(types: EntityType[] | undefined): EntityField[] {
+  const byKey = new Map<string, EntityField>();
+  for (const type of types ?? [])
+    for (const field of type.fields ?? [])
+      if (
+        (field.kind === "number" || field.kind === "integer") &&
+        !byKey.has(field.key)
+      )
+        byKey.set(field.key, field);
+  return [...byKey.values()];
+}
+
 /** What the search finds beside the name (decision D406): the values of the fields marked
  * for it, such as a licence plate. The Entities list filters its rows on this text as well,
  * so a row the server found by its plate is not dropped by the table's own filter. */

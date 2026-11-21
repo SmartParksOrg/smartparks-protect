@@ -66,7 +66,18 @@ connector. Both are tabular (CSV, XLSX, JSON) and always use the effective (cura
   `location-error-numerical`, `study-name` (the project name) and `smart-parks-position-id`.
 - `movebank_reference`: one row per assignment of a device to an entity in the window:
   `animal-id`, `tag-id`, `deploy-on-date`, `deploy-off-date`, `animal-taxon`,
-  `animal-comments`, `tag-manufacturer-name`, `tag-model`, `tag-serial-no`, `study-name`.
+  `animal-comments`, `tag-manufacturer-name`, `tag-model`, `tag-serial-no`, `study-name`,
+  and from the [entity's fields](../administration/entity-fields.md): `animal-sex` (`m`, `f`
+  or `u`), `animal-marker-id` (the ear tag number), `animal-life-stage` (the age class),
+  `animal-birth-hatch-year`, `animal-mass` (the weight in grams, as Movebank wants it) and
+  `tag-beacon-frequency` (the VHF frequency in MHz).
+
+The names follow Movebank's attribute dictionary ("animal sex", "animal marker ID", "animal
+life stage", "animal birth hatch year", "animal mass", "tag beacon frequency"), read on
+2026-11-21, written with hyphens as the other columns are. Two things to know when mapping:
+the VHF frequency is noted on the animal in Protect, so leave `tag-beacon-frequency` out when
+the VHF tag is not part of the tag in that row; and the entity's own ID number has no column,
+since Movebank's `animal-id` is the entity's name here.
 
 Import in Movebank as "custom import" with the columns mapped by name; the reference data
 file matches Movebank's reference data terms.

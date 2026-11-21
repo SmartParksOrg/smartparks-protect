@@ -73,12 +73,23 @@ MOVEBANK_REFERENCE_COLUMNS = [
     "deploy-on-date",
     "deploy-off-date",
     "animal-taxon",
+    # from the entity's fields (decision D406), named after the dictionary's "animal sex",
+    # "animal marker ID" (which it names for ear tags), "animal life stage", "animal birth
+    # hatch year", "animal mass" (grams) and "tag beacon frequency" (MHz), read on 2026-11-21
+    "animal-sex",
+    "animal-marker-id",
+    "animal-life-stage",
+    "animal-birth-hatch-year",
+    "animal-mass",
     "animal-comments",
     "tag-manufacturer-name",
     "tag-model",
     "tag-serial-no",
+    "tag-beacon-frequency",
     "study-name",
 ]
+# Movebank's allowed values of "animal sex" for the choices of the standard field.
+_MOVEBANK_SEX = {"female": "f", "male": "m", "unknown": "u"}
 CURATION_COLUMNS = [
     "is_curated",
     "curated_fields",
@@ -693,6 +704,26 @@ async def _movebank_lookups(
     return (project.name if project else str(project_id)), entities, devices
 
 
+def _number(value: Any) -> float | None:
+    """A field's value as a number; anything else, which only an unchecked key holds, is none."""
+    return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
+
+
+def _movebank_animal(attributes: dict[str, Any]) -> dict[str, Any]:
+    """The entity's standard fields under Movebank's names (decision D406). The mass goes
+    from kilograms to Movebank's grams. The beacon frequency is the VHF frequency noted on
+    the animal (decision D402), which Movebank files under the tag."""
+    weight = _number(attributes.get("weight_kg"))
+    return {
+        "animal-sex": _MOVEBANK_SEX.get(str(attributes.get("sex"))),
+        "animal-marker-id": attributes.get("ear_tag"),
+        "animal-life-stage": attributes.get("age_class"),
+        "animal-birth-hatch-year": attributes.get("birth_year"),
+        "animal-mass": weight * 1000 if weight is not None else None,
+        "tag-beacon-frequency": _number(attributes.get("vhf_frequency_mhz")),
+    }
+
+
 def _taxon(entity_type_label: str, attributes: dict[str, Any]) -> str:
     for key in ("taxon", "species", "scientific_name"):
         if attributes.get(key):
@@ -771,6 +802,7 @@ async def _movebank_reference(
             "deploy-on-date": _movebank_time(lower),
             "deploy-off-date": _movebank_time(upper),
             "animal-taxon": _taxon(type_label, attributes),
+            **_movebank_animal(attributes),
             "animal-comments": attributes.get("notes") or attributes.get("comments"),
             "tag-manufacturer-name": device_type.manufacturer if device_type else None,
             "tag-model": device_type.label if device_type else None,

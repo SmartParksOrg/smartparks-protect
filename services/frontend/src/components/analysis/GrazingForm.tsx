@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useGroups } from "@/hooks/useGroups";
+import { fieldLabel, numericFields } from "@/lib/entityFields";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
 import {
@@ -93,6 +94,8 @@ export function GrazingForm({
         query: { limit: 500 },
       }),
   });
+  // the weighting reads a number field of the animals (decision D406)
+  const weightFields = numericFields(types.data?.items);
   const features = useQuery({
     queryKey: queryKeys.features(projectId),
     queryFn: () =>
@@ -339,7 +342,15 @@ export function GrazingForm({
           <Select
             value={state.grazing.weighting}
             onValueChange={(v) =>
-              grazing({ weighting: v as GrazingOptions["weighting"] })
+              grazing({
+                weighting: v as GrazingOptions["weighting"],
+                // the weight in kilograms is what most herds have
+                ...(v !== "equal" &&
+                !state.grazing.weight_key &&
+                weightFields.some((f) => f.key === "weight_kg")
+                  ? { weight_key: "weight_kg" }
+                  : {}),
+              })
             }
           >
             <SelectTrigger className="h-8 w-44" aria-label={t("Weighting")}>
@@ -357,17 +368,31 @@ export function GrazingForm({
           </Select>
         </div>
         {state.grazing.weighting !== "equal" && (
-          <Input
-            aria-label={t("Attribute key")}
-            placeholder={
-              state.grazing.weighting === "metabolic"
-                ? "body_mass_kg"
-                : "livestock_unit"
-            }
-            className="h-8 w-40"
+          <Select
             value={state.grazing.weight_key ?? ""}
-            onChange={(ev) => grazing({ weight_key: ev.target.value || null })}
-          />
+            onValueChange={(v) => grazing({ weight_key: v })}
+          >
+            <SelectTrigger className="h-8 w-48" aria-label={t("Field")}>
+              <SelectValue placeholder={t("Choose a field")} />
+            </SelectTrigger>
+            <SelectContent>
+              {weightFields.map((field) => (
+                <SelectItem key={field.key} value={field.key}>
+                  {fieldLabel(field, t)}
+                  {field.unit ? ` (${field.unit})` : ""}
+                </SelectItem>
+              ))}
+              {/* a key typed before the fields existed, from a stored run or a link */}
+              {state.grazing.weight_key &&
+                !weightFields.some(
+                  (f) => f.key === state.grazing.weight_key,
+                ) && (
+                  <SelectItem value={state.grazing.weight_key}>
+                    {state.grazing.weight_key}
+                  </SelectItem>
+                )}
+            </SelectContent>
+          </Select>
         )}
         {mayRun && !editing && (
           <Button

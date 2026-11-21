@@ -3469,5 +3469,6 @@
   "What can be filled in for an entity of this type. Removing a field leaves the values the entities hold.": "Wat voor een entiteit van dit type kan worden ingevuld. Een veld verwijderen laat de waarden van de entiteiten staan.",
   "Whole number": "Geheel getal",
   "Yes": "Ja",
-  "Yes or no": "Ja of nee"
+  "Yes or no": "Ja of nee",
+  "Choose a field": "Kies een veld"
 }

@@ -31,7 +31,7 @@ Tools, all read-only and bounded:
 | --- | --- |
 | `list_projects` | The user's projects and roles; the starting point |
 | `search_entities` | Entities of a project by name, type or status (at most 100) |
-| `get_entity` | One entity with its type, current device, assignment history and latest position |
+| `get_entity` | One entity with its type, its filled fields (`fields`: key, label, value and unit each, such as VHF frequency 148.32 MHz), current device, assignment history and latest position |
 | `get_device` | One device with type, assignments, external identities and deep links |
 | `get_device_assignments` | A device's whole assignment timeline: project and entity assignments in time order with the attribution job and the last change per row, and whether the user may move boundaries |
 | `get_latest_position` | The newest position of an entity or device |

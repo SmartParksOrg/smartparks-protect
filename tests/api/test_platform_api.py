@@ -241,12 +241,33 @@ async def test_movebank_exports(client, db):
         and "Rhino 14" in lines[1]
         and lines[1].startswith("2026-07-01 03:14:00.000")
     )
+    # the entity's fields under Movebank's names (decision D406): the sex as m, f or u, the
+    # ear tag as the marker, the mass in grams, the VHF frequency as the tag's beacon
+    described = await client.patch(
+        f"/api/v1/projects/{project.id}/entities/{entity['id']}",
+        json={
+            "attributes": {
+                "sex": "female",
+                "ear_tag": "NA12345678",
+                "age_class": "adult",
+                "birth_year": 2015,
+                "weight_kg": 1100.5,
+                "vhf_frequency_mhz": 148.32,
+            }
+        },
+        headers=h,
+    )
+    assert described.status_code == 200, described.text
     reference = await client.get(
         base, params={"dataset": "movebank_reference", "format": "csv", **window}, headers=h
     )
     assert reference.status_code == 200, reference.text
     rows = reference.text.strip().splitlines()
     assert rows[0].startswith("animal-id,tag-id,deploy-on-date,deploy-off-date,animal-taxon")
+    record = dict(zip(rows[0].split(","), rows[1].split(","), strict=True))
+    assert record["animal-sex"] == "f" and record["animal-marker-id"] == "NA12345678"
+    assert record["animal-life-stage"] == "adult" and record["animal-birth-hatch-year"] == "2015"
+    assert float(record["animal-mass"]) == 1100500 and record["tag-beacon-frequency"] == "148.32"
     assert (
         len(rows) == 2 and rows[1].startswith("Rhino 14,") and "2026-01-01 00:00:00.000" in rows[1]
     )

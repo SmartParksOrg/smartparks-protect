@@ -80,6 +80,18 @@ async def _fixture(client, db):
                 "label": "Animal",
                 "group_key": "tracked",
                 "icon_key": "wildlife.rhino",
+                "attribute_schema": {
+                    "fields": [
+                        {"key": "horn_cm", "label": "Horn length", "kind": "number", "unit": "cm"},
+                        {
+                            "key": "horn",
+                            "label": "Horn",
+                            "kind": "choice",
+                            "choices": [{"value": "long", "label": "Long"}],
+                        },
+                        {"key": "herd", "label": "Herd", "kind": "text"},
+                    ]
+                },
             },
             headers=admin.headers,
         )
@@ -87,7 +99,11 @@ async def _fixture(client, db):
     entity = (
         await client.post(
             f"/api/v1/projects/{project.id}/entities",
-            json={"entity_type_id": entity_type["id"], "name": "Rhino 14"},
+            json={
+                "entity_type_id": entity_type["id"],
+                "name": "Rhino 14",
+                "attributes": {"horn": "long", "horn_cm": 61.5, "species": "Diceros bicornis"},
+            },
             headers=admin.headers,
         )
     ).json()
@@ -207,6 +223,14 @@ async def test_tools_list_and_read_only_tools(db, client):
         )
         assert detail["current_devices"][0]["device_id"] == device["id"]
         assert detail["latest_position"] is None
+        # the filled fields with their labels and units, in the type's order (decision D406);
+        # the raw document stays beside them with the key no field defines
+        assert detail["entity_type"] == "Animal"
+        assert detail["fields"] == [
+            {"key": "horn_cm", "label": "Horn length", "value": 61.5, "unit": "cm"},
+            {"key": "horn", "label": "Horn", "value": "Long", "unit": None},
+        ]
+        assert detail["attributes"]["species"] == "Diceros bicornis"
 
         dev = structured(await call(mcp_client, token, "get_device", {"device_id": device["id"]}))
         assert dev["name"] == device["name"]
