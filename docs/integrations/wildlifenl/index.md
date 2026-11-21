@@ -26,9 +26,9 @@ An account on the server with two roles:
 - `herd-manager`, so Protect can register the animals and their sensors. Without it the
   readings arrive but belong to no animal, until a herd manager registers each sensor by hand.
 
-Get the token once: on the server's own API page, `POST /auth/` with your email address and a
-`displayNameApp` (any name, it is shown in the email), then `PUT /auth/` with the code from the
-email. The answer carries `token`. It stays valid.
+You never handle a token. Protect signs the integration in for you: you give the account's
+email address, WildlifeNL mails a code to it, you type the code into Protect, and Protect stores
+the sign-in (decision D414).
 
 ## Setting it up in a project
 
@@ -38,12 +38,19 @@ page, where its species and its history are chosen (decision D412).
 ### 1. The connection (a project admin, once)
 
 1. **Integrate, Integrations, New integration**, connector WildlifeNL.
-   - Config: `{"base_url": "<the server's address from the table above>"}`.
-   - Credentials: `{"token": "<your token>"}`.
+   - Config: the TEST server's address is filled in already,
+     `{"base_url": "https://test-api-wildlifenl.uu.nl"}`. Change it for another server.
    - Forwards: positions, and measurements when the temperature should go along.
-2. **Test the connection** (the paper plane on the row). The answer names the account, its
-   roles, whether it may register animals, the server's API version and which species field a
-   detection takes there.
+   - There is no credentials field: the sign-in fills them.
+2. **Save.** The sign-in opens by itself:
+   - type the account's email address (your own is filled in) and choose **Send me a code**;
+   - WildlifeNL mails a code to that address; type it and choose **Sign in**.
+   The dialog ends on who is signed in, the account's roles on WildlifeNL, and a warning when
+   the account may send data but not register entities.
+
+The integration's row has a key to sign in again, with the same or another account, and its
+detail says who is signed in. **Test the connection** (the paper plane) repeats the check at any
+time and also names the server's API version.
 
 Nothing is sent yet. A WildlifeNL integration forwards the entities somebody integrated and no
 others.
@@ -131,7 +138,9 @@ used for the readings and for the deployment.
 
 ## Troubleshooting
 
-- `lacks the data-system role`: the account can log in but may not send readings.
+- `did not accept the code`: the code was mistyped or has expired; choose Send a new code.
+- `is not signed in`: the integration has no sign-in yet; use the key on its row.
+- `lacks the data-system role`: the account can sign in but may not send readings.
 - `does not show its deployments to this account; it needs the herd-manager role`: the account
   may send readings but not register animals.
 - "On hold: N objects of its history failed": the history has holes, so Protect did not

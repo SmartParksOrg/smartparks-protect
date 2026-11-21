@@ -11,14 +11,17 @@ from sqlalchemy import select
 from shared.bus import RedisStreamsBus, Topic
 from shared.enums import Role
 from shared.integrations.base import (
+    LoginResult,
     PermanentFailure,
     SubjectChoice,
     SubjectOptions,
     SubjectStatus,
 )
+from shared.integrations.connectors.wildlifenl import WildlifeNlConnector
 from shared.integrations.deliveries import enqueue, event_ref
 from shared.integrations.registry import CONNECTORS
 from shared.models import Event, Integration, IntegrationDelivery
+from shared.secrets import decrypt_json
 from tests.api.conftest import actor, create_project, project_actor
 
 pytestmark = pytest.mark.asyncio
@@ -367,3 +370,80 @@ async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch
         f"{base}/{hook['id']}/subjects/{entity['id']}", json=chosen, headers=manager.headers
     )
     assert refused.status_code == 422 and "keeps no register" in refused.text
+
+
+async def test_an_integration_is_signed_in_with_a_code_from_the_email(client, db, monkeypatch):
+    """Decision D414: the address, then the code; Protect stores what the target gives and
+    shows the account, never the token."""
+    asked: list[str] = []
+
+    class _Login(WildlifeNlConnector):
+        async def request_code(self, integration, email):
+            asked.append(email)
+
+        async def exchange_code(self, integration, email, code):
+            if code != "123456":
+                raise PermanentFailure("the target did not accept the code")
+            return LoginResult({"token": "tok-secret"}, account=email, scopes=["data-system"])
+
+    monkeypatch.setitem(CONNECTORS, "wildlifenl", _Login())
+    await actor(client, db, superuser=True)
+    project = await create_project(db)
+    manager = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    base = f"/api/v1/projects/{project.id}/integrations"
+    connectors = {
+        c["key"]: c
+        for c in (await client.get(f"{base}/connectors", headers=manager.headers)).json()
+    }
+    assert connectors["wildlifenl"]["login"] == "email_code"
+    assert connectors["webhook"]["login"] is None
+
+    # made without credentials: the sign-in fills them
+    made = await client.post(
+        base,
+        json={
+            "name": "WildlifeNL test",
+            "connector_key": "wildlifenl",
+            "config": {"base_url": "https://wildlifenl.example"},
+            "object_types": ["position"],
+        },
+        headers=manager.headers,
+    )
+    assert made.status_code == 201 and made.json()["has_credentials"] is False
+    login = f"{base}/{made.json()['id']}/login"
+    email = {"email": "tim@example.org"}
+
+    refused = await client.post(f"{login}/code", json=email, headers=viewer.headers)
+    assert refused.status_code == 403
+    bad = await client.post(f"{login}/code", json={"email": "no address"}, headers=manager.headers)
+    assert bad.status_code == 422
+    sent = await client.post(f"{login}/code", json=email, headers=manager.headers)
+    assert sent.status_code == 204 and asked == ["tim@example.org"]
+
+    wrong = await client.post(login, json={**email, "code": "000000"}, headers=manager.headers)
+    assert wrong.status_code == 422 and "did not accept the code" in wrong.text
+    assert (
+        await client.post(login, json={**email, "code": "123456"}, headers=viewer.headers)
+    ).status_code == 403
+    done = await client.post(login, json={**email, "code": "123456"}, headers=manager.headers)
+    assert done.status_code == 200, done.text
+    assert done.json() == {"account": "tim@example.org", "scopes": ["data-system"]}
+
+    read = (await client.get(f"{base}/{made.json()['id']}", headers=manager.headers)).json()
+    assert read["has_credentials"] is True and read["config"]["account"] == "tim@example.org"
+    assert "tok-secret" not in str(read)  # the token is the server's own
+    stored = await db.get(Integration, uuid.UUID(made.json()["id"]))
+    await db.refresh(stored)
+    assert decrypt_json(stored.credentials_encrypted) == {"token": "tok-secret"}
+
+    # a connector without such a sign-in says so
+    hook = await client.post(
+        base,
+        json={"name": "Hook", "connector_key": "webhook", "config": {"url": "https://x.example"}},
+        headers=manager.headers,
+    )
+    none = await client.post(
+        f"{base}/{hook.json()['id']}/login/code", json=email, headers=manager.headers
+    )
+    assert none.status_code == 422 and "no sign-in" in none.text

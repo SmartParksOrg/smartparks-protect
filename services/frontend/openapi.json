@@ -21951,6 +21951,137 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/login/code": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Request Login Code",
+    "description": "Ask the target to mail a sign-in code to the account's address (decision D414).",
+    "operationId": "request_login_code_api_v1_projects__project_id__integrations__integration_id__login_code_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginCodeRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/login": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Login Integration",
+    "description": "Sign the integration in with the code from the email (decision D414): Protect trades\nit for the target's credentials and stores them encrypted. Nobody sees or copies a token;\nthe answer names the account and what it may do.",
+    "operationId": "login_integration_api_v1_projects__project_id__integrations__integration_id__login_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LoginRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/integrations/{integration_id}/backfill": {
    "post": {
     "tags": [
@@ -41333,6 +41464,66 @@
     ],
     "title": "LocationSource",
     "description": "Which positions decide an entity's or a device's current position (decision D164)."
+   },
+   "LoginCodeRequest": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email",
+      "description": "The address of the account on the target"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email"
+    ],
+    "title": "LoginCodeRequest"
+   },
+   "LoginRead": {
+    "properties": {
+     "account": {
+      "type": "string",
+      "title": "Account"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Scopes",
+      "description": "What the account may do on the target"
+     }
+    },
+    "type": "object",
+    "required": [
+     "account",
+     "scopes"
+    ],
+    "title": "LoginRead",
+    "description": "A sign-in that worked (D414). The credentials are stored and never returned."
+   },
+   "LoginRequest": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "code": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Code",
+      "description": "The code from the email"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "code"
+    ],
+    "title": "LoginRequest"
    },
    "Lp0CredentialsRead": {
     "properties": {

@@ -5325,6 +5325,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/login/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Login Code
+         * @description Ask the target to mail a sign-in code to the account's address (decision D414).
+         */
+        post: operations["request_login_code_api_v1_projects__project_id__integrations__integration_id__login_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Integration
+         * @description Sign the integration in with the code from the email (decision D414): Protect trades
+         *     it for the target's credentials and stores them encrypted. Nobody sees or copies a token;
+         *     the answer names the account and what it may do.
+         */
+        post: operations["login_integration_api_v1_projects__project_id__integrations__integration_id__login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/integrations/{integration_id}/backfill": {
         parameters: {
             query?: never;
@@ -12179,6 +12221,41 @@ export interface components {
          * @enum {string}
          */
         LocationSource: "device" | "network" | "device_else_network" | "static";
+        /** LoginCodeRequest */
+        LoginCodeRequest: {
+            /**
+             * Email
+             * Format: email
+             * @description The address of the account on the target
+             */
+            email: string;
+        };
+        /**
+         * LoginRead
+         * @description A sign-in that worked (D414). The credentials are stored and never returned.
+         */
+        LoginRead: {
+            /** Account */
+            account: string;
+            /**
+             * Scopes
+             * @description What the account may do on the target
+             */
+            scopes: string[];
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Code
+             * @description The code from the email
+             */
+            code: string;
+        };
         /** Lp0CredentialsRead */
         Lp0CredentialsRead: {
             /**
@@ -27338,6 +27415,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntegrationTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_login_code_api_v1_projects__project_id__integrations__integration_id__login_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_integration_api_v1_projects__project_id__integrations__integration_id__login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginRead"];
                 };
             };
             /** @description Validation Error */

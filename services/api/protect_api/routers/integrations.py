@@ -30,6 +30,9 @@ from protect_api.schemas.integrations import (
     IntegrationTestRequest,
     IntegrationTestResult,
     IntegrationUpdate,
+    LoginCodeRequest,
+    LoginRead,
+    LoginRequest,
     SubjectChoiceRead,
     TargetStatus,
 )
@@ -37,6 +40,7 @@ from shared.bus import RedisStreamsBus, Topic
 from shared.database import get_session
 from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus, SubjectState
 from shared.integrations.base import (
+    CodeLogin,
     PermanentFailure,
     Skipped,
     SubjectRegistrar,
@@ -405,6 +409,67 @@ async def test_integration(
     return IntegrationTestResult(
         ok=True, detail=f"{connector.label} accepted the test", response=response
     )
+
+
+def _login(integration: Integration) -> CodeLogin:
+    connector = CONNECTORS.get(integration.connector_key)
+    if not isinstance(connector, CodeLogin):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"{integration.connector_key} has no sign-in with a code",
+        )
+    return connector
+
+
+@router.post("/{integration_id}/login/code", status_code=status.HTTP_204_NO_CONTENT)
+async def request_login_code(
+    integration_id: uuid.UUID,
+    body: LoginCodeRequest,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Ask the target to mail a sign-in code to the account's address (decision D414)."""
+    integration = await _integration(session, context.project.id, integration_id)
+    connector = _login(integration)
+    try:
+        await connector.request_code(integration_context(integration), str(body.email))
+    except (PermanentFailure, TransientFailure) as exc:
+        raise _target_refused(exc) from None
+
+
+@router.post("/{integration_id}/login", response_model=LoginRead)
+async def login_integration(
+    integration_id: uuid.UUID,
+    body: LoginRequest,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> LoginRead:
+    """Sign the integration in with the code from the email (decision D414): Protect trades
+    it for the target's credentials and stores them encrypted. Nobody sees or copies a token;
+    the answer names the account and what it may do."""
+    integration = await _integration(session, context.project.id, integration_id)
+    connector = _login(integration)
+    try:
+        result = await connector.exchange_code(
+            integration_context(integration), str(body.email), body.code
+        )
+    except (PermanentFailure, TransientFailure) as exc:
+        raise _target_refused(exc) from None
+    integration.credentials_encrypted = encrypt_json(result.credentials)
+    # who is signed in is no secret and is shown on the integration
+    integration.config = {**(integration.config or {}), "account": result.account}
+    integration.last_error = None
+    await record_audit(
+        session,
+        user=context.user,
+        action="integration.signed_in",
+        object_type="integration",
+        object_id=str(integration.id),
+        project_id=context.project.id,
+        details={"account": result.account, "scopes": result.scopes},
+    )
+    await session.commit()
+    return LoginRead(account=result.account, scopes=result.scopes)
 
 
 @router.post("/{integration_id}/backfill", response_model=IntegrationRead)

@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 
 from protect_api.schemas.common import ORMModel
 from shared.enums import IntegrationObjectType, Severity
@@ -117,6 +117,22 @@ class IntegrationTestResult(BaseModel):
 class BackfillRequest(BaseModel):
     time_from: datetime
     time_to: datetime
+
+
+class LoginCodeRequest(BaseModel):
+    email: EmailStr = Field(description="The address of the account on the target")
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=1, max_length=64, description="The code from the email")
+
+
+class LoginRead(BaseModel):
+    """A sign-in that worked (D414). The credentials are stored and never returned."""
+
+    account: str
+    scopes: list[str] = Field(description="What the account may do on the target")
 
 
 SubjectStateName = Literal["history_requested", "sending_history", "registered", "held", "failed"]

@@ -16,9 +16,11 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 from shared.notifications.dispatch import PermanentFailure, Skipped, TransientFailure
 
 __all__ = [
+    "CodeLogin",
     "DeliveryItem",
     "DeliveryResult",
     "IntegrationContext",
+    "LoginResult",
     "OutboundConnector",
     "PartlyRegistered",
     "PermanentFailure",
@@ -202,6 +204,33 @@ class SubjectRegistrar(Protocol):
         """Register one subject as the user chose. `external_id` is what an earlier attempt
         made already. A refusal after something was made raises `PartlyRegistered` with its
         id, so the caller keeps it."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class LoginResult:
+    """What a login gave: the credentials to keep (encrypted, never shown) and the account
+    they belong to, with what it may do on the target."""
+
+    credentials: dict[str, Any]
+    account: str
+    scopes: list[str] = field(default_factory=list)
+
+
+@runtime_checkable
+class CodeLogin(Protocol):
+    """A connector whose target signs an account in with a code sent by email (decision
+    D414): the user never handles the token."""
+
+    async def request_code(self, integration: IntegrationContext, email: str) -> None:
+        """Ask the target to mail a code to the account's address."""
+        ...
+
+    async def exchange_code(
+        self, integration: IntegrationContext, email: str, code: str
+    ) -> LoginResult:
+        """Trade the code for the credentials. A wrong or expired code is a
+        `PermanentFailure` with what the target said."""
         ...
 
 

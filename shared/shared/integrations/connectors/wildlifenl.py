@@ -57,6 +57,7 @@ from shared.integrations.base import (
     DeliveryItem,
     DeliveryResult,
     IntegrationContext,
+    LoginResult,
     PartlyRegistered,
     PermanentFailure,
     Skipped,
@@ -80,6 +81,8 @@ SPECIES_CACHE_SECONDS = 600
 API_DOCUMENT_CACHE_SECONDS = 3600
 DATA_SYSTEM_ROLE = "data-system"
 HERD_MANAGER_ROLE = "herd-manager"
+# The name in the platform's login email ("displayNameApp").
+LOGIN_APP_NAME = "Smart Parks Protect"
 SPECIES_FIELDS = ("speciesName", "speciesID")
 # The keys of an entity's own document that name its species, as the Movebank export reads
 # them (decision D411).
@@ -289,15 +292,16 @@ def _retry_after(response: httpx.Response) -> float | None:
 
 
 class WildlifeNlClient:
-    def __init__(self, base_url: str, token: str) -> None:
-        if not token:
-            raise PermanentFailure("the WildlifeNL integration has no token credential")
+    def __init__(self, base_url: str, token: str | None) -> None:
+        """`token` is None only for the login itself, the two calls that need none."""
+        if token == "":
+            raise PermanentFailure(
+                "the WildlifeNL integration is not signed in: sign in on the integration"
+            )
         self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
+        self.headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        if token is not None:
+            self.headers["Authorization"] = f"Bearer {token}"
 
     async def request(
         self, method: str, path: str, payload: dict[str, Any] | None = None
@@ -319,8 +323,9 @@ class WildlifeNlClient:
         if response.status_code >= 500:
             raise TransientFailure(f"wildlifenl answered {response.status_code}")
         if response.status_code in (401, 403):
+            what = "the token" if "Authorization" in self.headers else "the request"
             raise PermanentFailure(
-                f"wildlifenl refused the token ({response.status_code}): {response.text[:300]}"
+                f"wildlifenl refused {what} ({response.status_code}): {response.text[:300]}"
             )
         if response.status_code >= 400:
             raise PermanentFailure(
@@ -375,24 +380,18 @@ class WildlifeNlConnector:
             },
         },
     }
-    config_example: ClassVar[dict[str, Any]] = {
-        "base_url": "https://api.wildlifenl.example",
-        "sensor_id_source": DEFAULT_SENSOR_ID_SOURCE,
-        "temperature_metrics": DEFAULT_TEMPERATURE_METRICS,
-        "sensor_type": DEFAULT_SENSOR_TYPE,
-        "species": {"wild_boar": "Sus scrofa", "red_deer": "Cervus elaphus"},
-    }
+    # the TEST server, where a first integration belongs; the rest has defaults
+    config_example: ClassVar[dict[str, Any]] = {"base_url": "https://test-api-wildlifenl.uu.nl"}
     credentials_schema: ClassVar[dict[str, str]] = {
-        "token": "Bearer token of a WildlifeNL account with the data-system role, and the "
-        "herd-manager role when Protect registers the animals, from the email code login "
-        "(POST /auth/ with the email and displayNameApp, then PUT /auth/ with the code)"
+        "token": "Filled by signing in on the integration: the account's email address, then "
+        "the code WildlifeNL mails to it. The account needs the data-system role, and the "
+        "herd-manager role so Protect can register the animals"
     }
     setup_hint: ClassVar[str] = (
         "Ask the WildlifeNL administrator for an account with the data-system role, and the "
-        "herd-manager role so Protect can register the animals. Log in once through the API's "
-        "own page to receive the token. Tick the entities to forward, test the connection, "
-        "then send their history and register them. Species names must exist on the platform "
-        "or be mapped."
+        "herd-manager role so Protect can register the animals. Save the integration with the "
+        "server's address, then sign in with the account's email address and the code "
+        "WildlifeNL mails to it. Integrate each entity from its own page."
     )
 
     def __init__(self) -> None:
@@ -438,6 +437,37 @@ class WildlifeNlConnector:
         catalogue = [s for s in body if isinstance(s, dict)] if isinstance(body, list) else []
         self._species[client.base_url] = (now, catalogue)
         return catalogue
+
+    async def request_code(self, integration: IntegrationContext, email: str) -> None:
+        """`POST /auth/`: the platform mails a code to the address (decision D414)."""
+        require_config(integration, "base_url")
+        client = WildlifeNlClient(str(integration.config["base_url"]), None)
+        await client.request("POST", "/auth/", {"displayNameApp": LOGIN_APP_NAME, "email": email})
+
+    async def exchange_code(
+        self, integration: IntegrationContext, email: str, code: str
+    ) -> LoginResult:
+        """`PUT /auth/` with the code from the email: the answer carries the bearer token and
+        the scopes of the account. A wrong or expired code is the platform's 403."""
+        require_config(integration, "base_url")
+        client = WildlifeNlClient(str(integration.config["base_url"]), None)
+        try:
+            answer = await client.request("PUT", "/auth/", {"email": email, "code": code.strip()})
+        except PermanentFailure as exc:
+            if "(403)" in str(exc):
+                raise PermanentFailure(
+                    "WildlifeNL did not accept the code. It may be mistyped or expired; ask "
+                    "for a new one."
+                ) from exc
+            raise
+        body = answer.get("body")
+        if not isinstance(body, dict) or not body.get("token"):
+            raise PermanentFailure("wildlifenl answered the login without a token")
+        return LoginResult(
+            credentials={"token": str(body["token"])},
+            account=str(body.get("email") or email),
+            scopes=[str(scope) for scope in body.get("scopes") or []],
+        )
 
     async def api_document(self, client: WildlifeNlClient) -> dict[str, Any]:
         """The server's own OpenAPI document, kept an hour: it says what this server takes."""

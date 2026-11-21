@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { History, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
+import { History, KeyRound, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useParams, useSearchParams } from "react-router";
@@ -24,6 +24,7 @@ import { Callout } from "@/components/common/Callout";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { JsonView } from "@/components/common/JsonView";
+import { SignInDialog } from "@/components/integrations/SignInDialog";
 import { SubjectsCard } from "@/components/integrations/SubjectsCard";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -51,6 +52,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
+import { useAuthStore } from "@/stores/auth";
 import { formatTime } from "@/lib/format";
 import { SEVERITIES } from "@/lib/rules";
 
@@ -65,6 +67,8 @@ interface ConnectorInfo {
   setup_hint: string;
   /** The target keeps a register of the entities, which Protect can fill (D408). */
   registers_subjects?: boolean;
+  /** How an account signs in when Protect does it for the user (D414). */
+  login?: "email_code" | null;
 }
 
 const OBJECT_TYPES = ["position", "event", "measurement"] as const;
@@ -143,7 +147,12 @@ function toValues(
       };
 }
 
-function toBody(v: Values, editing: boolean, ownEntities = false) {
+function toBody(
+  v: Values,
+  editing: boolean,
+  ownEntities = false,
+  signsIn = false,
+) {
   const list = (s: string) =>
     s
       .split(",")
@@ -161,7 +170,9 @@ function toBody(v: Values, editing: boolean, ownEntities = false) {
     min_severity: v.min_severity,
     max_object_age_seconds: Math.round(v.max_object_age_hours * 3600),
   };
-  if (v.credentials.trim()) body.credentials = JSON.parse(v.credentials);
+  // a connector that signs in by itself takes no credentials from the form (D414)
+  if (v.credentials.trim() && !signsIn)
+    body.credentials = JSON.parse(v.credentials);
   if (!editing) body.connector_key = v.connector_key;
   // a target that registers its entities keeps its own list, filled from the entity pages
   if (ownEntities) delete body.entity_ids;
@@ -228,6 +239,10 @@ export function IntegrationsPage() {
   const [removing, setRemoving] = useState<Integration | null>(null);
   const [inspecting, setInspecting] = useState<Integration | null>(null);
   const [backfilling, setBackfilling] = useState<Integration | null>(null);
+  const [signingIn, setSigningIn] = useState<Integration | null>(null);
+  const me = useAuthStore((state) => state.user?.email ?? "");
+  const signsIn = (i: Integration | null) =>
+    Boolean(i && CONNECTORS.find((c) => c.key === i.connector_key)?.login);
   const [backfillRange, setBackfillRange] = useState({
     from: dateLocal(new Date(Date.now() - 7 * 86_400_000)),
     to: dateLocal(new Date()),
@@ -281,12 +296,23 @@ export function IntegrationsPage() {
     mutationFn: (v: Values) =>
       editing
         ? api.patch<Integration>(`${base}/${editing.id}`, {
-            body: toBody(v, true, Boolean(connector?.registers_subjects)),
+            body: toBody(
+              v,
+              true,
+              Boolean(connector?.registers_subjects),
+              Boolean(connector?.login),
+            ),
           })
-        : api.post<Integration>(base, { body: toBody(v, false) }),
+        : api.post<Integration>(base, {
+            body: toBody(v, false, false, Boolean(connector?.login)),
+          }),
     invalidate,
     success: editing ? t("Integration saved") : t("Integration created"),
-    onSuccess: () => setOpen(false),
+    onSuccess: (saved) => {
+      setOpen(false);
+      // a new integration of a target that signs in by code goes straight to the sign-in
+      if (!editing && connector?.login) setSigningIn(saved);
+    },
     onError: (e) => form.setError("root", { message: e.message }),
   });
   const toggle = useMutationToast({
@@ -427,6 +453,16 @@ export function IntegrationsPage() {
       header: "",
       cell: ({ row }) => (
         <span className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          {signsIn(row.original) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t("Sign in")}
+              onClick={() => setSigningIn(row.original)}
+            >
+              <KeyRound className="size-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -893,25 +929,37 @@ export function IntegrationsPage() {
                 {...form.register("config")}
               />
             </Field>
-            <Field
-              label={t("Credentials (JSON)")}
-              htmlFor="in-credentials"
-              hint={
-                editing
-                  ? t("Leave empty to keep the stored credentials")
-                  : Object.entries(connector?.credentials_schema ?? {})
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join("; ")
-              }
-              error={form.formState.errors.credentials?.message}
-            >
-              <Textarea
-                id="in-credentials"
-                rows={3}
-                className="font-mono text-xs"
-                {...form.register("credentials")}
-              />
-            </Field>
+            {connector?.login ? (
+              <p className="text-sm text-muted-foreground">
+                {editing
+                  ? t(
+                      "The sign-in is kept. Sign in again from the key on the integration's row.",
+                    )
+                  : t(
+                      "After saving you sign in with the account's email address and the code that is mailed to it.",
+                    )}
+              </p>
+            ) : (
+              <Field
+                label={t("Credentials (JSON)")}
+                htmlFor="in-credentials"
+                hint={
+                  editing
+                    ? t("Leave empty to keep the stored credentials")
+                    : Object.entries(connector?.credentials_schema ?? {})
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join("; ")
+                }
+                error={form.formState.errors.credentials?.message}
+              >
+                <Textarea
+                  id="in-credentials"
+                  rows={3}
+                  className="font-mono text-xs"
+                  {...form.register("credentials")}
+                />
+              </Field>
+            )}
             <div className="flex items-center gap-2">
               <Switch
                 id="in-enabled"
@@ -970,6 +1018,33 @@ export function IntegrationsPage() {
                   </div>
                 ))}
               </div>
+              {inspecting && signsIn(inspecting) && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    {detail.data.has_credentials
+                      ? t("Signed in as {{account}}.", {
+                          account: String(detail.data.config.account ?? "?"),
+                        })
+                      : t("Not signed in yet: nothing can be sent.")}
+                  </span>
+                  {can("integrations:write") && (
+                    <Button
+                      size="sm"
+                      variant={
+                        detail.data.has_credentials ? "outline" : "default"
+                      }
+                      onClick={() => {
+                        setSigningIn(inspecting);
+                        setInspecting(null);
+                      }}
+                    >
+                      {detail.data.has_credentials
+                        ? t("Sign in again")
+                        : t("Sign in")}
+                    </Button>
+                  )}
+                </div>
+              )}
               {detail.data.last_error && (
                 <Callout kind="warning">
                   {t("Last error")} {formatTime(detail.data.last_error_at)}:{" "}
@@ -1094,6 +1169,21 @@ export function IntegrationsPage() {
         </DialogContent>
       </Dialog>
 
+      {signingIn && (
+        <SignInDialog
+          key={signingIn.id}
+          projectId={projectId}
+          integrationId={signingIn.id}
+          target={connectorLabel(signingIn.connector_key)}
+          defaultEmail={String(signingIn.config.account ?? me)}
+          invalidate={[
+            ...invalidate,
+            queryKeys.integration(projectId, signingIn.id),
+          ]}
+          open
+          onOpenChange={(o) => !o && setSigningIn(null)}
+        />
+      )}
       <Dialog
         open={backfilling !== null}
         onOpenChange={(o) => !o && setBackfilling(null)}

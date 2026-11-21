@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from shared.integrations.base import (
+    CodeLogin,
     DeliveryItem,
     IntegrationContext,
     PartlyRegistered,
@@ -426,3 +427,94 @@ async def test_an_account_without_the_herd_manager_role_is_told(monkeypatch):
     mock_platform(monkeypatch, handler)
     with pytest.raises(PermanentFailure, match="herd-manager"):
         await WildlifeNlConnector().statuses(integration(), [subject()])
+
+
+async def test_test_reports_a_missing_role_and_refused_tokens(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.headers.get("authorization") != "Bearer tok":
+            return httpx.Response(
+                401, json={"title": "Unauthorized", "detail": "Invalid bearer token."}
+            )
+        return httpx.Response(
+            200, json={"email": "someone@example.org", "roles": [{"ID": 3, "name": "researcher"}]}
+        )
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx, "AsyncClient", lambda *a, **k: real(*a, transport=httpx.MockTransport(handler), **k)
+    )
+    connector = WildlifeNlConnector()
+    with pytest.raises(PermanentFailure, match="data-system"):
+        await connector.test(integration(), None)
+    bad = IntegrationContext(
+        id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        name="x",
+        connector_key="wildlifenl",
+        config={"base_url": "https://wildlifenl.example/api"},
+        credentials={"token": "wrong"},
+    )
+    with pytest.raises(PermanentFailure, match="refused the token"):
+        await connector.test(bad, None)
+    with pytest.raises(PermanentFailure, match="not signed in"):
+        await connector.deliver(
+            IntegrationContext(
+                id=uuid.uuid4(),
+                project_id=uuid.uuid4(),
+                name="x",
+                connector_key="wildlifenl",
+                config={"base_url": "https://wildlifenl.example/api"},
+                credentials={},
+            ),
+            item(),
+            connector.render(integration(), item()),
+        )
+
+
+async def test_signing_in_with_the_code_from_the_email(monkeypatch):
+    """Decision D414: Protect asks for the code and trades it for the token; the user never
+    handles a token. Neither call carries one."""
+    calls: list[tuple[str, str, str | None, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = httpx.Response(200, content=request.content).json()
+        calls.append((request.method, request.url.path, request.headers.get("authorization"), body))
+        if request.method == "POST":
+            return httpx.Response(200, json="The authentication code has been sent")
+        if body["code"] != "123456":
+            return httpx.Response(403, json={"title": "Forbidden", "detail": "does not match"})
+        return httpx.Response(
+            200,
+            json={
+                "email": "tim@example.org",
+                "token": "tok-from-the-platform",
+                "userID": "u1",
+                "scopes": ["data-system", "herd-manager"],
+            },
+        )
+
+    mock_platform(monkeypatch, handler)
+    connector = WildlifeNlConnector()
+    assert isinstance(connector, CodeLogin)
+    signed_out = IntegrationContext(
+        id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        name="x",
+        connector_key="wildlifenl",
+        config={"base_url": "https://wildlifenl.example/api"},
+        credentials={},
+    )
+    await connector.request_code(signed_out, "tim@example.org")
+    assert calls[0] == (
+        "POST",
+        "/api/auth/",
+        None,
+        {"displayNameApp": "Smart Parks Protect", "email": "tim@example.org"},
+    )
+    with pytest.raises(PermanentFailure, match="did not accept the code"):
+        await connector.exchange_code(signed_out, "tim@example.org", "000000")
+    result = await connector.exchange_code(signed_out, "tim@example.org", " 123456 ")
+    assert calls[-1] == ("PUT", "/api/auth/", None, {"email": "tim@example.org", "code": "123456"})
+    assert result.credentials == {"token": "tok-from-the-platform"}
+    assert result.account == "tim@example.org"
+    assert result.scopes == ["data-system", "herd-manager"]

@@ -3511,5 +3511,20 @@
   "Stop forwarding to {{target}}?": "Stoppen met doorsturen naar {{target}}?",
   "The history is on its way; the registration follows it": "De historie is onderweg; de registratie volgt daarna",
   "The integration is switched off; nothing is sent.": "De integratie staat uit; er wordt niets gestuurd.",
-  "The old data goes first, oldest first, and the registration follows the last of it. Without it the entity is registered at once and only new data is sent.": "De oude data gaat eerst, de oudste eerst, en de registratie volgt op het laatste ervan. Zonder historie wordt de entiteit meteen geregistreerd en wordt alleen nieuwe data gestuurd."
+  "The old data goes first, oldest first, and the registration follows the last of it. Without it the entity is registered at once and only new data is sent.": "De oude data gaat eerst, de oudste eerst, en de registratie volgt op het laatste ervan. Zonder historie wordt de entiteit meteen geregistreerd en wordt alleen nieuwe data gestuurd.",
+  "{{target}} mails a code to the account's address. Type it here and Protect stores the sign-in for this integration.": "{{target}} mailt een code naar het adres van het account. Typ die hier en Protect bewaart de aanmelding voor deze integratie.",
+  "A code is on its way to {{email}}.": "Er is een code onderweg naar {{email}}.",
+  "After saving you sign in with the account's email address and the code that is mailed to it.": "Na het opslaan meld je je aan met het e-mailadres van het account en de code die ernaartoe wordt gemaild.",
+  "Code from the email": "Code uit de e-mail",
+  "Email address of the account": "E-mailadres van het account",
+  "Not signed in yet: nothing can be sent.": "Nog niet aangemeld: er kan niets worden gestuurd.",
+  "Other address": "Ander adres",
+  "Roles on {{target}}: {{roles}}": "Rollen bij {{target}}: {{roles}}",
+  "Send a new code": "Nieuwe code sturen",
+  "Send me a code": "Stuur mij een code",
+  "Sign in again": "Opnieuw aanmelden",
+  "Sign in to {{target}}": "Aanmelden bij {{target}}",
+  "Signed in as {{account}}.": "Aangemeld als {{account}}.",
+  "The sign-in is kept. Sign in again from the key on the integration's row.": "De aanmelding blijft bewaard. Meld je opnieuw aan via de sleutel op de rij van de integratie.",
+  "This account may send data but not register entities on {{target}}. Ask its administrator for the role that allows it.": "Dit account mag data sturen maar geen entiteiten registreren bij {{target}}. Vraag de beheerder daarvan om de rol die dat toestaat."
 }
