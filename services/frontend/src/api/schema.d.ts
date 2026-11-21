@@ -5825,8 +5825,9 @@ export interface paths {
         };
         /**
          * Search
-         * @description Entities, devices (by name, serial or external id), features, gateways, data sources
-         *     (server admins) and projects whose name contains `q`, inside what the caller may see.
+         * @description Entities (by name or a searchable field such as a licence plate, decision D406), devices
+         *     (by name, serial or external id), features, gateways, data sources (server admins) and
+         *     projects whose name contains `q`, inside what the caller may see.
          */
         get: operations["search_api_v1_search_get"];
         put?: never;
@@ -9390,6 +9391,52 @@ export interface components {
             new: string;
         };
         /**
+         * EffectiveField
+         * @description A field as a type has it: where it comes from beside what it is.
+         */
+        EffectiveField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            kind: components["schemas"]["FieldKind"];
+            /** Unit */
+            unit?: string | null;
+            /**
+             * Choices
+             * @default []
+             */
+            choices: components["schemas"]["FieldChoice"][];
+            /** Min */
+            min?: number | null;
+            /** Max */
+            max?: number | null;
+            /** Help */
+            help?: string | null;
+            /**
+             * Panel
+             * @description Shown on the live map's panel (D405)
+             * @default false
+             */
+            panel: boolean;
+            /**
+             * Search
+             * @description Found by the search (D406); text only
+             * @default false
+             */
+            search: boolean;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "standard" | "own";
+            /**
+             * Inherited
+             * @description Defined on the type this sub-type sits under
+             */
+            inherited: boolean;
+        };
+        /**
          * EntitiesMove
          * @description Move entities of this project to another one, whole, with their devices over the spans
          *     they tracked them (decision D293).
@@ -9920,10 +9967,18 @@ export interface components {
             icon_key: string;
             /** Parent Id */
             parent_id?: string | null;
-            /** Attribute Schema */
+            /**
+             * Attribute Schema
+             * @description The fields an admin added to the type, as `{"fields": [...]}` (D399)
+             */
             attribute_schema: {
                 [key: string]: unknown;
             };
+            /**
+             * Fields
+             * @description The fields an entity of this type has, in the order of the form: the standard ones, the type's own and those of the type it sits under (D399)
+             */
+            fields?: components["schemas"]["EffectiveField"][];
             /** Description */
             description: string | null;
             /**
@@ -10607,6 +10662,13 @@ export interface components {
              */
             checked_at: string;
         };
+        /** FieldChoice */
+        FieldChoice: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+        };
         /** FieldDevice */
         FieldDevice: {
             /**
@@ -10668,6 +10730,11 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * FieldKind
+         * @enum {string}
+         */
+        FieldKind: "text" | "number" | "integer" | "date" | "choice" | "boolean";
         /**
          * FieldLp0
          * @description A tracker's LP0 credentials: the address always, the keys for a caller who may set them
@@ -16925,7 +16992,7 @@ export interface operations {
             query?: {
                 entity_type_id?: string | null;
                 status_filter?: string | null;
-                /** @description Name contains, case-insensitive */
+                /** @description The name or a searchable field contains, case-insensitive (D406) */
                 q?: string | null;
                 /** @description In this group or one of its subgroups (decision D98) */
                 group_id?: string | null;

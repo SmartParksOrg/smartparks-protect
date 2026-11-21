@@ -13,6 +13,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from protect_api.auth.users import current_active_user
 from protect_api.deps import accessible_project_ids
+from protect_api.entity_search import name_or_field_contains
 from protect_api.visibility import resolve_visibility, scope_is_empty
 from shared.database import get_session
 from shared.models import (
@@ -71,8 +72,9 @@ async def search(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> SearchResponse:
-    """Entities, devices (by name, serial or external id), features, gateways, data sources
-    (server admins) and projects whose name contains `q`, inside what the caller may see."""
+    """Entities (by name or a searchable field such as a licence plate, decision D406), devices
+    (by name, serial or external id), features, gateways, data sources (server admins) and
+    projects whose name contains `q`, inside what the caller may see."""
     pattern = f"%{q.strip()}%"
     projects = await accessible_project_ids(user, session)
     now = utc_now()
@@ -92,7 +94,7 @@ async def search(
         await session.execute(
             _in_projects(
                 select(Entity.id, Entity.name, Entity.project_id)
-                .where(Entity.name.ilike(pattern))
+                .where(await name_or_field_contains(session, q))
                 .order_by(Entity.name),
                 Entity.project_id,
                 projects,

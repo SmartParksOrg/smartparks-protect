@@ -43,6 +43,7 @@ import { HealthCard } from "@/components/devices/HealthCard";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
+import { EntityDetailsCard } from "@/components/entities/EntityDetailsCard";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { Icon } from "@/components/icons/Icon";
@@ -81,6 +82,7 @@ import { groupPath, useGroups } from "@/hooks/useGroups";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 import { courseText, speedText } from "@/lib/speed";
+import { fieldsOfType } from "@/lib/entityFields";
 import { typePath } from "@/lib/entityTypes";
 
 /** One entity: what it is, the device tracking it now with its health, and the history of the
@@ -623,6 +625,11 @@ export function EntityPage() {
                   </dl>
                 </CardContent>
               </Card>
+              <EntityDetailsCard
+                fields={fieldsOfType(types.data?.items, e.entity_type_id)}
+                attributes={e.attributes}
+                onEdit={admin ? () => setEditing(true) : undefined}
+              />
               {/* what matters first (Tim, 2026-09-27): the device's health beside the entity,
                   the map and the picture under them, the device and the location source below */}
               {current && (

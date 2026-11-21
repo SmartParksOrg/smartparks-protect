@@ -2082,10 +2082,10 @@
          "type": "null"
         }
        ],
-       "description": "Name contains, case-insensitive",
+       "description": "The name or a searchable field contains, case-insensitive (D406)",
        "title": "Q"
       },
-      "description": "Name contains, case-insensitive"
+      "description": "The name or a searchable field contains, case-insensitive (D406)"
      },
      {
       "name": "group_id",
@@ -24040,7 +24040,7 @@
      "search"
     ],
     "summary": "Search",
-    "description": "Entities, devices (by name, serial or external id), features, gateways, data sources\n(server admins) and projects whose name contains `q`, inside what the caller may see.",
+    "description": "Entities (by name or a searchable field such as a licence plate, decision D406), devices\n(by name, serial or external id), features, gateways, data sources (server admins) and\nprojects whose name contains `q`, inside what the caller may see.",
     "operationId": "search_api_v1_search_get",
     "security": [
      {
@@ -33720,6 +33720,117 @@
     ],
     "title": "EdgeChangeRead"
    },
+   "EffectiveField": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "kind": {
+      "$ref": "#/components/schemas/FieldKind"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 16,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "choices": {
+      "items": {
+       "$ref": "#/components/schemas/FieldChoice"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Choices",
+      "default": []
+     },
+     "min": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Min"
+     },
+     "max": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max"
+     },
+     "help": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Help"
+     },
+     "panel": {
+      "type": "boolean",
+      "title": "Panel",
+      "description": "Shown on the live map's panel (D405)",
+      "default": false
+     },
+     "search": {
+      "type": "boolean",
+      "title": "Search",
+      "description": "Found by the search (D406); text only",
+      "default": false
+     },
+     "origin": {
+      "type": "string",
+      "enum": [
+       "standard",
+       "own"
+      ],
+      "title": "Origin"
+     },
+     "inherited": {
+      "type": "boolean",
+      "title": "Inherited",
+      "description": "Defined on the type this sub-type sits under"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "kind",
+     "origin",
+     "inherited"
+    ],
+    "title": "EffectiveField",
+    "description": "A field as a type has it: where it comes from beside what it is."
+   },
    "EntitiesMove": {
     "properties": {
      "entity_ids": {
@@ -35054,7 +35165,16 @@
      "attribute_schema": {
       "additionalProperties": true,
       "type": "object",
-      "title": "Attribute Schema"
+      "title": "Attribute Schema",
+      "description": "The fields an admin added to the type, as `{\"fields\": [...]}` (D399)"
+     },
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/EffectiveField"
+      },
+      "type": "array",
+      "title": "Fields",
+      "description": "The fields an entity of this type has, in the order of the form: the standard ones, the type's own and those of the type it sits under (D399)"
      },
      "description": {
       "anyOf": [
@@ -36948,6 +37068,28 @@
     "title": "FieldBundleRevision",
     "description": "The bundle's fingerprint alone, cheap to ask for often (decision D344)."
    },
+   "FieldChoice": {
+    "properties": {
+     "value": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Value"
+     },
+     "label": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Label"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "value",
+     "label"
+    ],
+    "title": "FieldChoice"
+   },
    "FieldDevice": {
     "properties": {
      "id": {
@@ -37115,6 +37257,18 @@
      "icon_key"
     ],
     "title": "FieldEntity"
+   },
+   "FieldKind": {
+    "type": "string",
+    "enum": [
+     "text",
+     "number",
+     "integer",
+     "date",
+     "choice",
+     "boolean"
+    ],
+    "title": "FieldKind"
    },
    "FieldLp0": {
     "properties": {

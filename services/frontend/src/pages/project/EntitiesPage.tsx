@@ -27,6 +27,7 @@ import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
 import { Ago } from "@/components/common/Ago";
 import { positionKindExplanation, positionKindLabel } from "@/lib/positionKind";
+import { searchText } from "@/lib/entityFields";
 
 // the order of the health levels, worst last, as the API judges them (decision D286)
 const LEVEL_RANK: Record<string, number> = { ok: 0, warn: 1, critical: 2 };
@@ -93,7 +94,11 @@ export function EntitiesPage() {
       : []),
     {
       header: t("Name"),
-      accessorKey: "name",
+      id: "name",
+      // the name, then what the search also reads (decision D406): the server finds an
+      // entity by its plate or ear tag, and the table's own filter must keep that row
+      accessorFn: (e) =>
+        `${e.name} ${searchText(typeById.get(e.entity_type_id)?.fields ?? [], e.attributes)}`.trimEnd(),
       cell: ({ row }) => (
         <span className="inline-flex items-center gap-2">
           <Icon

@@ -5,6 +5,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,13 @@ from protect_api.schemas.domain import (
     MetricUpdate,
 )
 from protect_api.schemas.log_files import DriverCatalog
+from shared.catalog.entity_fields import (
+    STANDARD_FIELDS,
+    FieldError,
+    check_own,
+    fields_of,
+    own_fields,
+)
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.models import DeviceType, EntityType, Metric, User
@@ -54,13 +62,60 @@ async def _delete(session: AsyncSession, obj: Any, user: User, what: str, object
 # Entity types
 
 
-async def _check_parent(session: AsyncSession, parent_id: uuid.UUID) -> None:
+async def _check_parent(session: AsyncSession, parent_id: uuid.UUID) -> EntityType:
     """A sub-type sits under a type, never under another sub-type (decision D166)."""
     parent = await get_or_404(session, EntityType, parent_id, "Parent entity type")
     if parent.parent_id is not None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Sub-types go one level deep: pick a type"
         )
+    return parent
+
+
+def entity_type_read(row: EntityType, parent: EntityType | None) -> EntityTypeRead:
+    """A type with the fields its entities have (decision D399)."""
+    read = EntityTypeRead.model_validate(row)
+    read.fields = fields_of(
+        row.key, row.attribute_schema, (parent.key, parent.attribute_schema) if parent else None
+    )
+    return read
+
+
+async def _entity_type_read(session: AsyncSession, row: EntityType) -> EntityTypeRead:
+    parent = await session.get(EntityType, row.parent_id) if row.parent_id else None
+    return entity_type_read(row, parent)
+
+
+async def _check_fields(
+    session: AsyncSession,
+    key: str,
+    attribute_schema: dict[str, Any],
+    parent: EntityType | None,
+    type_id: uuid.UUID | None,
+) -> None:
+    """The own fields of a type are a valid list under keys the type has from nowhere else
+    (decision D399): not a standard field, not a field of the type above it, not a field of a
+    sub-type below it."""
+    try:
+        own = own_fields(attribute_schema)
+        taken = {f.key for f in STANDARD_FIELDS.get(key, ())}
+        if parent is not None:
+            taken |= {f.key for f in fields_of(parent.key, parent.attribute_schema)}
+        if type_id is not None:
+            children = await session.scalars(
+                select(EntityType).where(EntityType.parent_id == type_id)
+            )
+            for child in children:
+                taken |= {f.key for f in fields_of(child.key, child.attribute_schema)}
+        check_own(own, taken)
+    except ValidationError as exc:
+        message = "; ".join(
+            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+            for error in exc.errors()
+        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message) from None
+    except FieldError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
 
 
 @router.get("/entity-types", response_model=PageResponse[EntityTypeRead])
@@ -70,8 +125,18 @@ async def list_entity_types(
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityTypeRead]:
     rows, next_cursor = await paginate(session, EntityType.id, select(EntityType), page)
+    parent_ids = {r.parent_id for r in rows if r.parent_id is not None}
+    parents = (
+        {
+            p.id: p
+            for p in await session.scalars(select(EntityType).where(EntityType.id.in_(parent_ids)))
+        }
+        if parent_ids
+        else {}
+    )
     return PageResponse(
-        items=[EntityTypeRead.model_validate(r) for r in rows], next_cursor=next_cursor
+        items=[entity_type_read(r, parents.get(r.parent_id)) for r in rows],
+        next_cursor=next_cursor,
     )
 
 
@@ -80,9 +145,9 @@ async def create_entity_type(
     body: EntityTypeCreate,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
-) -> EntityType:
-    if body.parent_id is not None:
-        await _check_parent(session, body.parent_id)
+) -> EntityTypeRead:
+    parent = await _check_parent(session, body.parent_id) if body.parent_id else None
+    await _check_fields(session, body.key, body.attribute_schema, parent, None)
     row = EntityType(**body.model_dump())
     session.add(row)
     await flush_or_409(session, "Entity type")
@@ -95,7 +160,7 @@ async def create_entity_type(
         details={"key": row.key},
     )
     await session.commit()
-    return row
+    return entity_type_read(row, parent)
 
 
 @router.get("/entity-types/{entity_type_id}", response_model=EntityTypeRead)
@@ -103,8 +168,9 @@ async def get_entity_type(
     entity_type_id: uuid.UUID,
     _: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
-) -> EntityType:
-    return await get_or_404(session, EntityType, entity_type_id, "Entity type")
+) -> EntityTypeRead:
+    row = await get_or_404(session, EntityType, entity_type_id, "Entity type")
+    return await _entity_type_read(session, row)
 
 
 @router.patch("/entity-types/{entity_type_id}", response_model=EntityTypeRead)
@@ -113,7 +179,7 @@ async def update_entity_type(
     body: EntityTypeUpdate,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
-) -> EntityType:
+) -> EntityTypeRead:
     row = await get_or_404(session, EntityType, entity_type_id, "Entity type")
     if body.parent_id is not None:
         if body.parent_id == row.id:
@@ -130,6 +196,9 @@ async def update_entity_type(
                 "A type with sub-types cannot become a sub-type itself",
             )
     changed = apply_patch(row, body)
+    parent = await session.get(EntityType, row.parent_id) if row.parent_id else None
+    if changed.keys() & {"attribute_schema", "parent_id"}:
+        await _check_fields(session, row.key, row.attribute_schema, parent, row.id)
     await record_audit(
         session,
         user=user,
@@ -139,7 +208,7 @@ async def update_entity_type(
         details=changed,
     )
     await session.commit()
-    return row
+    return entity_type_read(row, parent)
 
 
 @router.delete("/entity-types/{entity_type_id}", status_code=status.HTTP_204_NO_CONTENT)

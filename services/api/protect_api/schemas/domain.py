@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from protect_api.schemas.common import GeoJSONGeometry, ORMModel
+from shared.catalog.entity_fields import EffectiveField
 from shared.domain.health import DeviceHealth
 from shared.enums import (
     DeviceStatus,
@@ -48,7 +49,14 @@ class EntityTypeRead(ORMModel):
     group_key: str
     icon_key: str
     parent_id: uuid.UUID | None = None
-    attribute_schema: dict[str, Any]
+    attribute_schema: dict[str, Any] = Field(
+        description='The fields an admin added to the type, as `{"fields": [...]}` (D399)'
+    )
+    fields: list[EffectiveField] = Field(
+        default_factory=list,
+        description="The fields an entity of this type has, in the order of the form: the "
+        "standard ones, the type's own and those of the type it sits under (D399)",
+    )
     description: str | None
     created_at: datetime
 

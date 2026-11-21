@@ -12,6 +12,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { type ReactNode, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
+import { api } from "@/api/client";
+import { queryKeys } from "@/api/queryKeys";
+import type { Entity, EntityType, Page } from "@/api/types";
+import {
+  fieldLabel,
+  fieldsOfType,
+  fieldValueText,
+  splitAttributes,
+} from "@/lib/entityFields";
 import { Link } from "react-router";
 
 import { Icon } from "@/components/icons/Icon";
@@ -988,6 +999,42 @@ export function CopyPositionButton({
   );
 }
 
+/** The entity's fields marked for the panel, when they have a value (decision D405): a VHF
+ * frequency, a licence plate, an ear tag. Read for the selected entity alone, never per
+ * marker, with the entity page's own query so the two share one answer. */
+function EntityFieldRows({
+  projectId,
+  entityId,
+}: {
+  projectId: string;
+  entityId: string;
+}) {
+  const { t } = useTranslation();
+  const entity = useQuery({
+    queryKey: queryKeys.entity(projectId, entityId),
+    queryFn: () =>
+      api.get<Entity>(`/api/v1/projects/${projectId}/entities/${entityId}`),
+  });
+  const types = useQuery({
+    queryKey: queryKeys.entityTypes,
+    queryFn: () =>
+      api.get<Page<EntityType>>("/api/v1/entity-types", {
+        query: { limit: 500 },
+      }),
+  });
+  const fields = fieldsOfType(
+    types.data?.items,
+    entity.data?.entity_type_id,
+  ).filter((field) => field.panel);
+  return splitAttributes(fields, entity.data?.attributes).filled.map(
+    ({ field, value }) => (
+      <PanelRow key={field.key} label={fieldLabel(field, t)}>
+        {fieldValueText(field, value, t)}
+      </PanelRow>
+    ),
+  );
+}
+
 export function EntityPanel({
   onOpenPosition,
   onOpenState,
@@ -1160,6 +1207,7 @@ export function EntityPanel({
           now={now}
         />
       )}
+      <EntityFieldRows projectId={project} entityId={props.entity_id} />
       <PanelRow label={t("Device")}>
         {props.device_id ? (
           <Link

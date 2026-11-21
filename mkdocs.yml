@@ -130,6 +130,7 @@ nav:
       - Icons: administration/icons.md
       - Organizations: administration/organizations.md
       - Features: administration/features.md
+      - Entity fields: administration/entity-fields.md
       - Pages per role: administration/pages.md
   - Operations:
       - operations/index.md

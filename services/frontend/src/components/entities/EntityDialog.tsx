@@ -1,15 +1,17 @@
 import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { Entity } from "@/api/types";
+import type { Entity, EntityType, Page } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { EntityFieldInputs } from "@/components/entities/EntityFieldInputs";
 import { EntityTypeSelect } from "@/components/entities/EntityTypeSelect";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { IconPicker } from "@/components/icons/IconPicker";
@@ -31,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { fieldLabel, fieldsOfType, toAttributes } from "@/lib/entityFields";
 
 const schema = z.object({
   name: z.string().min(1, t("Give the entity a name")).max(200),
@@ -41,6 +44,8 @@ const schema = z.object({
   latitude: z.string().optional(),
   longitude: z.string().optional(),
   notes: z.string().optional(),
+  // the whole document, the fields of the type and the rest (decision D401)
+  attributes: z.record(z.string(), z.unknown()),
 });
 type Values = z.infer<typeof schema>;
 
@@ -67,8 +72,18 @@ export function EntityDialog({
       latitude: "",
       longitude: "",
       notes: "",
+      attributes: {},
     },
   });
+  // the same read the type select makes, so the fields follow the chosen type
+  const types = useQuery({
+    queryKey: queryKeys.entityTypes,
+    queryFn: () =>
+      api.get<Page<EntityType>>("/api/v1/entity-types", {
+        query: { limit: 500 },
+      }),
+  });
+  const fields = fieldsOfType(types.data?.items, form.watch("entity_type_id"));
 
   useEffect(() => {
     if (!open) return;
@@ -85,11 +100,17 @@ export function EntityDialog({
       latitude: point ? String(point[1]) : "",
       longitude: point ? String(point[0]) : "",
       notes: entity?.notes ?? "",
+      attributes: entity?.attributes ?? {},
     });
   }, [open, entity, form]);
 
   const save = useMutationToast({
     mutationFn: (values: Values) => {
+      const { attributes, invalid } = toAttributes(fields, values.attributes);
+      if (invalid)
+        throw new Error(
+          t("{{field}}: type a number", { field: fieldLabel(invalid, t) }),
+        );
       const geometry =
         values.latitude && values.longitude
           ? {
@@ -104,6 +125,7 @@ export function EntityDialog({
         status: values.status,
         group_id: values.group_id || null,
         notes: values.notes || null,
+        attributes,
         geometry,
       };
       return entity
@@ -185,6 +207,11 @@ export function EntityDialog({
               )}
             </div>
           </Field>
+          <EntityFieldInputs
+            fields={fields}
+            draft={form.watch("attributes")}
+            onChange={(draft) => form.setValue("attributes", draft)}
+          />
           <Field label={t("Status")} htmlFor="status">
             <Select
               value={form.watch("status")}

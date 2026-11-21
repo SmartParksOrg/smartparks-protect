@@ -30,6 +30,7 @@ from protect_api.deps import (
     require_scope_permission,
 )
 from protect_api.device_reads import with_state
+from protect_api.entity_search import name_or_field_contains
 from protect_api.moves import audit_plan, move_result, require_admin_of_every_project
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
@@ -70,6 +71,7 @@ from protect_api.schemas.domain import (
 )
 from protect_api.visibility import group_and_subgroups
 from shared.bus import RedisStreamsBus
+from shared.catalog.entity_fields import FieldError, fields_of, validate_attributes
 from shared.config import get_settings
 from shared.curation.apply import recompute_current_state
 from shared.database import get_session
@@ -318,7 +320,11 @@ async def list_entities(
     page: Page = Depends(page),
     entity_type_id: uuid.UUID | None = None,
     status_filter: str | None = None,
-    q: str | None = Query(None, max_length=200, description="Name contains, case-insensitive"),
+    q: str | None = Query(
+        None,
+        max_length=200,
+        description="The name or a searchable field contains, case-insensitive (D406)",
+    ),
     group_id: uuid.UUID | None = Query(
         None, description="In this group or one of its subgroups (decision D98)"
     ),
@@ -338,7 +344,7 @@ async def list_entities(
     if status_filter is not None:
         statement = statement.where(Entity.status == status_filter)
     if q:
-        statement = statement.where(Entity.name.ilike(f"%{q}%"))
+        statement = statement.where(await name_or_field_contains(session, q))
     rows, next_cursor = await paginate(session, Entity.id, statement, page)
     return PageResponse(items=await with_tracking(session, rows), next_cursor=next_cursor)
 
@@ -354,15 +360,33 @@ async def create_entity(
     return entity_read(entity)
 
 
+async def _checked_attributes(
+    session: AsyncSession, entity_type_id: uuid.UUID, attributes: dict[str, Any]
+) -> dict[str, Any]:
+    """The entity's fields as they are stored (decision D401): the values of the fields its
+    type defines checked, the rest kept. A wrong value answers 422 naming the field."""
+    entity_type = await get_or_404(session, EntityType, entity_type_id, "Entity type")
+    parent = await session.get(EntityType, entity_type.parent_id) if entity_type.parent_id else None
+    fields = fields_of(
+        entity_type.key,
+        entity_type.attribute_schema,
+        (parent.key, parent.attribute_schema) if parent else None,
+    )
+    try:
+        return validate_attributes(fields, attributes)
+    except FieldError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+
+
 async def _new_entity(session: AsyncSession, context: ProjectContext, body: EntityCreate) -> Entity:
     """The entity row with its audit entry, flushed and not committed: `create_entity` and the
     assignment that makes an entity on the spot (decision D170) share it."""
-    await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
     await check_group(session, context, body.group_id)
     entity = Entity(
         project_id=context.project.id,
         geom=geojson_to_geom(body.geometry.as_dict() if body.geometry else None),
-        **body.model_dump(exclude={"geometry"}),
+        **body.model_dump(exclude={"geometry", "attributes"}),
+        attributes=await _checked_attributes(session, body.entity_type_id, body.attributes),
     )
     session.add(entity)
     await flush_or_409(session, "Entity")
@@ -477,6 +501,14 @@ async def update_entity(
     entity = await _project_entity(session, context, entity_id)
     if "group_id" in body.model_fields_set:
         await check_group(session, context, body.group_id)
+    if body.attributes is not None:
+        # the document is replaced as a whole and read against the type the entity has after
+        # this change (decision D401)
+        body.attributes = await _checked_attributes(
+            session, body.entity_type_id or entity.entity_type_id, body.attributes
+        )
+    elif body.entity_type_id is not None:
+        await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
     changed = apply_patch(entity, body, exclude={"geometry"})
     if changed.keys() & {"location_source", "location_fallback_hours"}:
         # the setting decides which positions become current (decision D164): rebuild the

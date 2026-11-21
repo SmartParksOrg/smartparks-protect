@@ -48,3 +48,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0040 An offload station's card is read by Protect, frame by frame, with keys held per device](0040-offload-station-cards-as-deliveries-keyed-per-device.md)
 - [0041 An assignment boundary moves after the fact, with its neighbour, under audit](0041-assignment-boundaries-moved-after-the-fact.md)
 - [0042 Motion that explains, never decorates](0042-motion-that-explains.md)
+- [0043 An entity's fields are defined by its type, as an ordered list](0043-entity-fields-by-type.md)

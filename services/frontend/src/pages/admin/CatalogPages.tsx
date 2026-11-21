@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   type DefaultValues,
   type FieldValues,
@@ -22,6 +22,7 @@ import type {
   Metric,
   Page as PageType,
 } from "@/api/types";
+import { EntityFieldsEditor } from "@/components/admin/EntityFieldsEditor";
 import { Callout } from "@/components/common/Callout";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
@@ -47,13 +48,24 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import {
+  type OwnFieldDraft,
+  toDefinitions,
+  toDraft,
+} from "@/lib/entityFields";
 
 const KEY = /^[a-z][a-z0-9_]{1,62}$/;
 
 interface FieldSpec<T extends FieldValues, R = unknown> {
   name: Path<T>;
   label: string;
-  kind?: "text" | "textarea" | "select" | "icon";
+  kind?: "text" | "textarea" | "select" | "icon" | "custom";
+  /** A control of the catalogue's own for `custom`, given the row being edited. */
+  render?: (
+    value: unknown,
+    onChange: (value: unknown) => void,
+    editing: R | null,
+  ) => ReactNode;
   options?: { value: string; label: string }[];
   /** Options read from the catalogue's own rows (a parent type), given the row being edited. */
   optionsFrom?: (
@@ -238,6 +250,12 @@ function CatalogPage<T extends FieldValues, R>({
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : f.kind === "custom" ? (
+                    f.render?.(
+                      form.watch(f.name),
+                      (v) => form.setValue(f.name, v as never),
+                      editing,
+                    )
                   ) : f.kind === "icon" ? (
                     <IconPicker
                       id={id}
@@ -303,6 +321,12 @@ const entityTypeSchema = zod.object({
   ]),
   icon_key: zod.string().min(1, t("Choose an icon")),
   description: zod.string().optional(),
+  // checked on the list, so the message shows under the editor
+  own_fields: zod
+    .array(zod.custom<OwnFieldDraft>())
+    .refine((list) => list.every((d) => d.label.trim().length > 0), {
+      message: t("Give every field a label"),
+    }),
 });
 const entityTypeDefaults: DefaultValues<zod.infer<typeof entityTypeSchema>> = {
   key: "",
@@ -311,6 +335,7 @@ const entityTypeDefaults: DefaultValues<zod.infer<typeof entityTypeSchema>> = {
   group_key: "tracked",
   icon_key: "wildlife.generic",
   description: "",
+  own_fields: [],
 };
 /** Types with sub-types one level deep (decision D166): the standard catalogue seeds
  * Wildlife, People, Vehicles, Infrastructure, Environmental sensors and Equipment with a
@@ -391,6 +416,23 @@ export function EntityTypesPage() {
         },
         { name: "icon_key", label: t("Icon"), kind: "icon" },
         { name: "description", label: t("Description"), kind: "textarea" },
+        {
+          name: "own_fields",
+          label: t("Fields"),
+          kind: "custom",
+          hint: t(
+            "What can be filled in for an entity of this type. Removing a field leaves the values the entities hold.",
+          ),
+          render: (value, onChange, editing) => (
+            <EntityFieldsEditor
+              given={(editing?.fields ?? []).filter(
+                (f) => f.inherited || f.origin === "standard",
+              )}
+              value={(value as OwnFieldDraft[] | undefined) ?? []}
+              onChange={onChange}
+            />
+          ),
+        },
       ]}
       defaults={entityTypeDefaults}
       toForm={(r) => ({
@@ -400,10 +442,14 @@ export function EntityTypesPage() {
         group_key: r.group_key as never,
         icon_key: r.icon_key,
         description: r.description ?? "",
+        own_fields: (r.fields ?? [])
+          .filter((f) => f.origin === "own" && !f.inherited)
+          .map(toDraft),
       })}
-      toBody={(v) => ({
+      toBody={({ own_fields, ...v }) => ({
         ...v,
         parent_id: v.parent_id === NO_PARENT ? null : v.parent_id,
+        attribute_schema: { fields: toDefinitions(own_fields) },
       })}
     />
   );

@@ -13,6 +13,7 @@ export type InvitationMembership = Schemas["InvitationMembership"];
 export type ServerInvitationResult = Schemas["ServerInvitationResult"];
 export type EntityType = Schemas["EntityTypeRead"];
 export type Entity = Schemas["EntityRead"];
+export type EntityField = Schemas["EffectiveField"];
 export type EntityAssignment = Schemas["EntityAssignmentRead"];
 export type EntityAssignmentExtended = Schemas["EntityAssignmentExtended"];
 export type ProjectAssignmentExtended = Schemas["ProjectAssignmentExtended"];
