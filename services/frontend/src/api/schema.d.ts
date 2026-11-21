@@ -5342,6 +5342,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Subjects
+         * @description The entities ticked on the integration and what the target has for each (decision
+         *     D408), read from the target with the integration's credentials, which is why reading it
+         *     takes the right to change integrations. At most 200 entities.
+         */
+        get: operations["list_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Integration Subjects
+         * @description Register the entities the target lacks, now (decision D408). An entity that cannot be
+         *     registered says why and does not stop the others. To send the history first, ask for a
+         *     backfill with `then_register`.
+         */
+        post: operations["register_integration_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/gateways": {
         parameters: {
             query?: never;
@@ -6849,6 +6893,12 @@ export interface components {
              * Format: date-time
              */
             time_to: string;
+            /**
+             * Then Register
+             * @description Register the integration's entities on the target once every object of the backfill is delivered (D409); for a connector that registers subjects
+             * @default false
+             */
+            then_register: boolean;
         };
         /** BackupItem */
         BackupItem: {
@@ -11527,6 +11577,57 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * IntegrationSubjectRead
+         * @description An entity the integration forwards and what the target has for it (D408).
+         */
+        IntegrationSubjectRead: {
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string;
+            /** Device Id */
+            device_id?: string | null;
+            /** Device Name */
+            device_name?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "not_registered" | "blocked";
+            /**
+             * Detail
+             * @description Why it cannot be registered
+             */
+            detail?: string | null;
+            /**
+             * Sensor Id
+             * @description What the target knows the device by
+             */
+            sensor_id?: string | null;
+            /** Species */
+            species?: string | null;
+            /**
+             * External Id
+             * @description The target's id of the animal
+             */
+            external_id?: string | null;
+            /** External Name */
+            external_name?: string | null;
+            /**
+             * Since
+             * @description The start of the registration
+             */
+            since?: string | null;
+        };
+        /** IntegrationSubjects */
+        IntegrationSubjects: {
+            /** Items */
+            items: components["schemas"]["IntegrationSubjectRead"][];
         };
         /** IntegrationTestRequest */
         IntegrationTestRequest: {
@@ -27112,6 +27213,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationSubjects"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_integration_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationSubjects"];
                 };
             };
             /** @description Validation Error */

@@ -24,6 +24,7 @@ import { Callout } from "@/components/common/Callout";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { JsonView } from "@/components/common/JsonView";
+import { SubjectsCard } from "@/components/integrations/SubjectsCard";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
@@ -49,6 +50,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { usePermissions } from "@/hooks/useProjects";
 import { formatTime } from "@/lib/format";
 import { SEVERITIES } from "@/lib/rules";
 
@@ -61,6 +63,8 @@ interface ConnectorInfo {
   config_example: Record<string, unknown>;
   credentials_schema: Record<string, string>;
   setup_hint: string;
+  /** The target keeps a register of the entities, which Protect can fill (D408). */
+  registers_subjects?: boolean;
 }
 
 const OBJECT_TYPES = ["position", "event", "measurement"] as const;
@@ -181,6 +185,11 @@ export function IntegrationsPage() {
     queryFn: () => api.get<ConnectorInfo[]>(`${base}/connectors`),
   });
   const CONNECTORS = connectors.data ?? [];
+  const registers = (i: Integration | null) =>
+    Boolean(
+      i &&
+      CONNECTORS.find((c) => c.key === i.connector_key)?.registers_subjects,
+    );
   const integrations = useQuery({
     queryKey: queryKeys.integrations(projectId),
     queryFn: () =>
@@ -217,6 +226,9 @@ export function IntegrationsPage() {
   const [removing, setRemoving] = useState<Integration | null>(null);
   const [inspecting, setInspecting] = useState<Integration | null>(null);
   const [backfilling, setBackfilling] = useState<Integration | null>(null);
+  // "then register": the entities are registered on the target after their history (D409)
+  const [thenRegister, setThenRegister] = useState(false);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
   const [backfillRange, setBackfillRange] = useState({
     from: dateLocal(new Date(Date.now() - 7 * 86_400_000)),
     to: dateLocal(new Date()),
@@ -312,13 +324,18 @@ export function IntegrationsPage() {
         body: {
           time_from: new Date(backfillRange.from).toISOString(),
           time_to: new Date(backfillRange.to).toISOString(),
+          then_register: thenRegister && registers(i),
         },
       }),
     invalidate,
     success: t(
       "Backfill queued; the integration service works through the range in batches",
     ),
-    onSuccess: () => setBackfilling(null),
+    onSuccess: () => {
+      setBackfilling(null);
+      setThenRegister(false);
+    },
+    onError: (error) => setBackfillError(error.message),
   });
   const retry = useMutationToast({
     mutationFn: (d: IntegrationDelivery) =>
@@ -344,6 +361,24 @@ export function IntegrationsPage() {
     success: t("Corrected object queued for delivery"),
     onSuccess: () => setDeliveryDetail(null),
   });
+  const { can } = usePermissions(projectId);
+  /** What became of the registration a backfill asked for (decision D409). */
+  const registrationText = (registration: unknown): string => {
+    const r = registration as
+      | {
+          status?: string;
+          registered?: number;
+          failed?: number;
+          error?: string;
+        }
+      | undefined;
+    if (!r?.status) return "";
+    if (r.status === "done")
+      return `. ${t("Registered after it: {{count}}.", { count: r.registered ?? 0 })}`;
+    if (r.status === "held")
+      return `. ${t("Not registered: {{count}} objects of the backfill failed. Look at the deliveries, then register by hand.", { count: r.failed ?? 0 })}`;
+    return `. ${t("The registration failed: {{error}}", { error: r.error ?? "" })}`;
+  };
   const connectorLabel = (key: string) =>
     CONNECTORS.find((c) => c.key === key)?.label ?? key;
   const integrationName = (id: string) =>
@@ -430,7 +465,11 @@ export function IntegrationsPage() {
             variant="ghost"
             size="sm"
             aria-label={t("Backfill")}
-            onClick={() => setBackfilling(row.original)}
+            onClick={() => {
+              setThenRegister(false);
+              setBackfillError(null);
+              setBackfilling(row.original);
+            }}
           >
             <History className="size-4" />
           </Button>
@@ -969,8 +1008,28 @@ export function IntegrationsPage() {
                   {detail.data.backfill.error
                     ? `; ${String(detail.data.backfill.error)}`
                     : ""}
+                  {detail.data.backfill.then_register
+                    ? `. ${t("The entities are registered when every object of it is delivered.")}`
+                    : ""}
+                  {registrationText(detail.data.backfill.registration)}
                 </Callout>
               )}
+              {inspecting &&
+                registers(inspecting) &&
+                can("integrations:write") && (
+                  <SubjectsCard
+                    projectId={projectId}
+                    integrationId={inspecting.id}
+                    target={connectorLabel(inspecting.connector_key)}
+                    hasEntities={detail.data.entity_ids.length > 0}
+                    onHistory={() => {
+                      setThenRegister(true);
+                      setBackfillError(null);
+                      setBackfilling(inspecting);
+                      setInspecting(null);
+                    }}
+                  />
+                )}
               <JsonView value={detail.data.config} />
             </div>
           )}
@@ -1100,6 +1159,28 @@ export function IntegrationsPage() {
               />
             </Field>
           </div>
+          {registers(backfilling) && (
+            <label className="flex items-start gap-2 text-sm">
+              <Switch
+                className="mt-0.5"
+                checked={thenRegister}
+                onCheckedChange={setThenRegister}
+              />
+              <span>
+                {t("Then register the entities on {{target}}", {
+                  target: backfilling
+                    ? connectorLabel(backfilling.connector_key)
+                    : "",
+                })}
+                <span className="block text-xs text-muted-foreground">
+                  {t(
+                    "The history goes first, oldest first. When every object of it is delivered, the ticked entities are registered and their readings belong to them from then on.",
+                  )}
+                </span>
+              </span>
+            </label>
+          )}
+          {backfillError && <Callout kind="error">{backfillError}</Callout>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setBackfilling(null)}>
               {t("Cancel")}

@@ -69,6 +69,8 @@ class FakeConnector:
     async def deliver(self, integration, item, payload) -> DeliveryResult:
         if self.mode == "transient":
             raise TransientFailure("target down")
+        if self.mode == "throttled":
+            raise TransientFailure("slow down", retry_after=300)
         if self.mode == "permanent":
             raise PermanentFailure("target refused")
         if self.mode == "crash":

@@ -22,6 +22,9 @@ __all__ = [
     "OutboundConnector",
     "PermanentFailure",
     "Skipped",
+    "Subject",
+    "SubjectRegistrar",
+    "SubjectStatus",
     "TransientFailure",
 ]
 
@@ -116,6 +119,60 @@ class OutboundConnector(Protocol):
     ) -> dict[str, Any]:
         """Send something visible on the target, or check the connection when the target has
         no harmless test object. Returns what the target answered."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class Subject:
+    """An entity an integration forwards, with the device it has now: what a target that
+    keeps a register of its own (an animal with its sensor) needs to know (decision D408)."""
+
+    entity_id: uuid.UUID
+    entity_name: str
+    entity_type_key: str | None = None
+    entity_type_label: str | None = None
+    entity_type_parent_key: str | None = None
+    attributes: dict[str, Any] = field(default_factory=dict)
+    device_id: uuid.UUID | None = None
+    device_name: str | None = None
+    device_serial: str | None = None
+    device_identity: str | None = None
+    assigned_from: datetime | None = field(
+        default=None, metadata={"doc": "Since when the device has been on the entity"}
+    )
+
+
+@dataclass(slots=True)
+class SubjectStatus:
+    """What the target has for one subject. `state` is `registered`, `not_registered` or
+    `blocked` (it cannot be registered as it is, and `detail` says why)."""
+
+    entity_id: uuid.UUID
+    state: str
+    detail: str | None = None
+    sensor_id: str | None = None
+    species: str | None = None
+    external_id: str | None = None
+    external_name: str | None = None
+    since: datetime | None = None
+
+
+@runtime_checkable
+class SubjectRegistrar(Protocol):
+    """A connector whose target keeps a register of the subjects (decision D408). `state` is
+    the integration's `connector_state`, the connector's own memory between calls."""
+
+    async def subjects(
+        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
+    ) -> list[SubjectStatus]:
+        """What the target has for each subject, read from the target."""
+        ...
+
+    async def register(
+        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
+    ) -> tuple[list[SubjectStatus], dict[str, Any]]:
+        """Register the subjects the target lacks. Returns every subject's status afterwards
+        and the state to keep. One subject's failure does not stop the others."""
         ...
 
 

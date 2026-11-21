@@ -1,0 +1,113 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "WildlifeNL",
+  "version": "20260826"
+ },
+ "paths": {
+  "/detection/": {
+   "post": {
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DetectionRecord"
+       }
+      }
+     },
+     "required": true
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "DetectionRecord": {
+    "additionalProperties": false,
+    "properties": {
+     "$schema": {
+      "description": "A URL to the JSON Schema for this object.",
+      "examples": [
+       "https://example.com/schemas/DetectionRecord.json"
+      ],
+      "format": "uri",
+      "readOnly": true,
+      "type": "string"
+     },
+     "ID": {
+      "description": "The ID of this detection.",
+      "format": "uuid",
+      "readOnly": true,
+      "type": "string"
+     },
+     "animals": {
+      "description": "Information on the animals involved in this detection.",
+      "items": {
+       "$ref": "#/components/schemas/DetectionAnimal"
+      },
+      "type": [
+       "array",
+       "null"
+      ]
+     },
+     "deploymentID": {
+      "description": "The deployment identification for the sensor that made this detection.",
+      "minLength": 2,
+      "type": "string"
+     },
+     "end": {
+      "description": "The moment the detection ended.",
+      "format": "date-time",
+      "type": "string"
+     },
+     "location": {
+      "$ref": "#/components/schemas/Point",
+      "description": "The location that the detection happened at."
+     },
+     "sensorType": {
+      "description": "The type of the sensor that made this detection.",
+      "enum": [
+       "visual",
+       "acoustic",
+       "motion",
+       "radio",
+       "chemical",
+       "other"
+      ],
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "speciesID": {
+      "description": "The ID of the species of the detected animal(s).",
+      "format": "uuid",
+      "type": "string",
+      "writeOnly": true
+     },
+     "start": {
+      "description": "The moment the detection started.",
+      "format": "date-time",
+      "type": "string"
+     },
+     "uri": {
+      "description": "The URI to view this detection in a publicly available external system.",
+      "format": "uri",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ID",
+     "speciesID",
+     "deploymentID",
+     "sensorType",
+     "location",
+     "start",
+     "end",
+     "animals"
+    ],
+    "type": "object"
+   }
+  }
+ }
+}

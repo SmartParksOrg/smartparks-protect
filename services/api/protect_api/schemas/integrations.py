@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -117,6 +117,31 @@ class IntegrationTestResult(BaseModel):
 class BackfillRequest(BaseModel):
     time_from: datetime
     time_to: datetime
+    then_register: bool = Field(
+        default=False,
+        description="Register the integration's entities on the target once every object "
+        "of the backfill is delivered (D409); for a connector that registers subjects",
+    )
+
+
+class IntegrationSubjectRead(BaseModel):
+    """An entity the integration forwards and what the target has for it (D408)."""
+
+    entity_id: uuid.UUID
+    entity_name: str
+    device_id: uuid.UUID | None = None
+    device_name: str | None = None
+    state: Literal["registered", "not_registered", "blocked"]
+    detail: str | None = Field(default=None, description="Why it cannot be registered")
+    sensor_id: str | None = Field(default=None, description="What the target knows the device by")
+    species: str | None = None
+    external_id: str | None = Field(default=None, description="The target's id of the animal")
+    external_name: str | None = None
+    since: datetime | None = Field(default=None, description="The start of the registration")
+
+
+class IntegrationSubjects(BaseModel):
+    items: list[IntegrationSubjectRead]
 
 
 class GatewayRead(ORMModel):

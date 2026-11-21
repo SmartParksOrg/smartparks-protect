@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from shared.integrations.base import OutboundConnector
+from shared.integrations.base import OutboundConnector, SubjectRegistrar
 from shared.integrations.connectors.earthranger import EarthRangerConnector
 from shared.integrations.connectors.ferustracker import FerusTrackerConnector
 from shared.integrations.connectors.gundi import GundiConnector
@@ -33,6 +33,8 @@ def describe_connector(connector: OutboundConnector) -> dict[str, Any]:
         "config_example": dict(connector.config_example),
         "credentials_schema": dict(connector.credentials_schema),
         "setup_hint": connector.setup_hint,
+        # the target keeps a register of the entities, which Protect can fill (D408)
+        "registers_subjects": isinstance(connector, SubjectRegistrar),
     }
 
 

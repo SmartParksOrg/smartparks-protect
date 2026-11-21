@@ -21,6 +21,8 @@ from protect_api.schemas.integrations import (
     IntegrationDeliveryRead,
     IntegrationDetail,
     IntegrationRead,
+    IntegrationSubjectRead,
+    IntegrationSubjects,
     IntegrationTestRequest,
     IntegrationTestResult,
     IntegrationUpdate,
@@ -28,7 +30,13 @@ from protect_api.schemas.integrations import (
 from shared.bus import RedisStreamsBus, Topic
 from shared.database import get_session
 from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus
-from shared.integrations.base import PermanentFailure, Skipped, TransientFailure
+from shared.integrations.base import (
+    PermanentFailure,
+    Skipped,
+    Subject,
+    SubjectStatus,
+    TransientFailure,
+)
 from shared.integrations.deliveries import (
     curated_ref,
     delivery_counts,
@@ -37,6 +45,12 @@ from shared.integrations.deliveries import (
     requeue,
 )
 from shared.integrations.registry import CONNECTORS, describe_connector
+from shared.integrations.subjects import (
+    load_subjects,
+    register_subjects,
+    registrar_of,
+    subject_statuses,
+)
 from shared.models import EntityCurrentState, Integration, IntegrationDelivery
 from shared.permissions import Permission
 from shared.secrets import encrypt_json
@@ -400,6 +414,14 @@ async def request_backfill(
         )
     if integration.backfill.get("status") in (BackfillStatus.QUEUED, BackfillStatus.RUNNING):
         raise HTTPException(status.HTTP_409_CONFLICT, "a backfill is running already")
+    if body.then_register:
+        # refused now rather than after a day of sending: the connector must keep a register
+        # and the integration must name its entities (decision D409)
+        try:
+            registrar_of(integration)
+            await load_subjects(session, integration)
+        except PermanentFailure as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     integration.backfill = {
         "status": BackfillStatus.QUEUED,
         "from": body.time_from.isoformat(),
@@ -408,6 +430,7 @@ async def request_backfill(
         "scanned": 0,
         "requested_at": utc_now().isoformat(),
         "requested_by": str(context.user.id),
+        "then_register": body.then_register,
     }
     await record_audit(
         session,
@@ -416,7 +439,11 @@ async def request_backfill(
         object_type="integration",
         object_id=str(integration.id),
         project_id=context.project.id,
-        details={"from": body.time_from.isoformat(), "to": body.time_to.isoformat()},
+        details={
+            "from": body.time_from.isoformat(),
+            "to": body.time_to.isoformat(),
+            "then_register": body.then_register,
+        },
     )
     await session.commit()
     await bus.publish(
@@ -428,3 +455,80 @@ async def request_backfill(
         },
     )
     return _read(integration)
+
+
+def _subjects(pairs: list[tuple[Subject, SubjectStatus]]) -> IntegrationSubjects:
+    return IntegrationSubjects(
+        items=[
+            IntegrationSubjectRead(
+                entity_id=subject.entity_id,
+                entity_name=subject.entity_name,
+                device_id=subject.device_id,
+                device_name=subject.device_name,
+                state=status.state,
+                detail=status.detail,
+                sensor_id=status.sensor_id,
+                species=status.species,
+                external_id=status.external_id,
+                external_name=status.external_name,
+                since=status.since,
+            )
+            for subject, status in pairs
+        ]
+    )
+
+
+def _target_refused(exc: Exception) -> HTTPException:
+    """A target that refuses or cannot be reached is not our caller's malformed request."""
+    code = (
+        status.HTTP_422_UNPROCESSABLE_CONTENT
+        if isinstance(exc, PermanentFailure)
+        else status.HTTP_502_BAD_GATEWAY
+    )
+    return HTTPException(code, str(exc))
+
+
+@router.get("/{integration_id}/subjects", response_model=IntegrationSubjects)
+async def list_subjects(
+    integration_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> IntegrationSubjects:
+    """The entities ticked on the integration and what the target has for each (decision
+    D408), read from the target with the integration's credentials, which is why reading it
+    takes the right to change integrations. At most 200 entities."""
+    integration = await _integration(session, context.project.id, integration_id)
+    try:
+        return _subjects(await subject_statuses(session, integration))
+    except (PermanentFailure, TransientFailure) as exc:
+        raise _target_refused(exc) from None
+
+
+@router.post("/{integration_id}/subjects/register", response_model=IntegrationSubjects)
+async def register_integration_subjects(
+    integration_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> IntegrationSubjects:
+    """Register the entities the target lacks, now (decision D408). An entity that cannot be
+    registered says why and does not stop the others. To send the history first, ask for a
+    backfill with `then_register`."""
+    integration = await _integration(session, context.project.id, integration_id)
+    try:
+        pairs = await register_subjects(session, integration)
+    except (PermanentFailure, TransientFailure) as exc:
+        raise _target_refused(exc) from None
+    await record_audit(
+        session,
+        user=context.user,
+        action="integration.subjects_registered",
+        object_type="integration",
+        object_id=str(integration.id),
+        project_id=context.project.id,
+        details={
+            "registered": [str(s.entity_id) for s, st in pairs if st.state == "registered"],
+            "blocked": [str(s.entity_id) for s, st in pairs if st.state == "blocked"],
+        },
+    )
+    await session.commit()
+    return _subjects(pairs)

@@ -26,8 +26,25 @@ the API's root):
 Mapping: positions and temperature measurements are borne sensor readings under the device's
 identity (configurable); `SPECIES_DETECTION` events (camera traps) are detections, with the
 species resolved by name against the platform's list. Other events are skipped: WildlifeNL
-has no free-form events, its interactions are people's reports. Live verification waits for
-the platform's URL and a data-system account.
+has no free-form events, its interactions are people's reports.
+
+Read again on 2026-11-21 (phase 49, decisions D407 to D411), the source at its push of
+2026-11-16 and the OpenAPI documents of the TEST server (version 20261116) and the LIVE
+server (20260826):
+
+- A detection takes `speciesName` (the Latin name, matched exactly) on TEST and `speciesID`
+  on LIVE. The connector reads the server's own `/openapi.json` and sends what it asks for.
+- Requests are limited per token with a growing cooldown; a 429 carries `Retry-After`.
+- A reading reaches an animal only through a deployment with the same `sensorID`:
+  `POST /animal/` (`name`, `speciesID`) and `POST /borne-sensor-deployment/` (`animalID`,
+  `sensorID`, `contactHardwareAddress` or null, `start`), both under the `herd-manager` role;
+  `GET /borne-sensor-deployment/active/` lists the deployments without an end. A new
+  deployment of a sensor ends the one before it.
+- A reading with a location for an animal with a deployment sets the animal's location
+  whatever the reading's age and, as the code reads, raises zone alarms when the reading is
+  older than an hour. A reading without a deployment is stored and does neither. So old data
+  goes first and the deployment after it (decision D409).
+- Readings are kept per sensor and timestamp, so a reading sent twice overwrites itself.
 """
 
 from datetime import UTC, datetime
@@ -41,6 +58,8 @@ from shared.integrations.base import (
     IntegrationContext,
     PermanentFailure,
     Skipped,
+    Subject,
+    SubjectStatus,
     TransientFailure,
     iso,
     require_config,
@@ -54,19 +73,33 @@ DEFAULT_SENSOR_TYPE = "visual"
 SENSOR_TYPES = ("visual", "acoustic", "motion", "radio", "chemical", "other")
 REQUEST_TIMEOUT_SECONDS = 30
 SPECIES_CACHE_SECONDS = 600
+API_DOCUMENT_CACHE_SECONDS = 3600
 DATA_SYSTEM_ROLE = "data-system"
+HERD_MANAGER_ROLE = "herd-manager"
+SPECIES_FIELDS = ("speciesName", "speciesID")
+# The keys of an entity's own document that name its species, as the Movebank export reads
+# them (decision D411).
+SPECIES_ATTRIBUTES = ("taxon", "species", "scientific_name")
+
+
+def sensor_id(integration: IntegrationContext, source: DeliveryItem | Subject) -> str | None:
+    """What WildlifeNL sees as `sensorID`, the same for a reading and for the deployment that
+    links it to an animal; at least two characters, as the platform asks."""
+    kind = str(integration.config.get("sensor_id_source") or DEFAULT_SENSOR_ID_SOURCE)
+    if kind == "device_name":
+        value = source.device_name
+    elif kind == "entity_id":
+        value = str(source.entity_id) if source.entity_id else None
+    else:
+        value = source.device_identity or source.device_serial or source.device_name
+    return value if value and len(value) >= 2 else None
 
 
 def sensor_id_for(integration: IntegrationContext, item: DeliveryItem) -> str:
-    source = str(integration.config.get("sensor_id_source") or DEFAULT_SENSOR_ID_SOURCE)
-    if source == "device_name":
-        value = item.device_name
-    elif source == "entity_id":
-        value = str(item.entity_id) if item.entity_id else None
-    else:
-        value = item.device_identity or item.device_serial or item.device_name
-    if not value or len(value) < 2:
-        raise Skipped(f"no sensor id for {item.object_type} {item.object_id} ({source})")
+    value = sensor_id(integration, item)
+    if value is None:
+        kind = str(integration.config.get("sensor_id_source") or DEFAULT_SENSOR_ID_SOURCE)
+        raise Skipped(f"no sensor id for {item.object_type} {item.object_id} ({kind})")
     return value
 
 
@@ -174,23 +207,81 @@ def _is_uuid(value: str) -> bool:
     return len(value) == 36 and [len(p) for p in parts] == [8, 4, 4, 4, 12]
 
 
-def resolve_species(
+def find_species(
     name: str, catalogue: list[dict[str, Any]], mapping: dict[str, str]
-) -> str | None:
-    """The WildlifeNL species id for a Smart Parks species name: the integration's own
-    mapping first (to a name or an id), then the Latin or common name, case-insensitive."""
+) -> dict[str, Any] | None:
+    """The platform's species for a Smart Parks name: the integration's own mapping first (to
+    a name or an id), then the Latin or common name, case-insensitive. An id the mapping names
+    that the list does not hold is believed, with the id alone."""
     wanted = mapping.get(name) or mapping.get(name.lower()) or name
-    if _is_uuid(wanted):
-        return wanted
     lowered = wanted.strip().lower().replace("_", " ")
     for species in catalogue:
+        if not species.get("ID"):
+            continue
         candidates = {
+            str(species["ID"]).lower(),
             str(species.get("name") or "").lower(),
             str(species.get("commonName") or "").lower(),
         }
-        if lowered in candidates and species.get("ID"):
-            return str(species["ID"])
+        if lowered in candidates:
+            return species
+    return {"ID": wanted} if _is_uuid(wanted) else None
+
+
+def resolve_species(
+    name: str, catalogue: list[dict[str, Any]], mapping: dict[str, str]
+) -> str | None:
+    """The WildlifeNL species id for a Smart Parks species name."""
+    species = find_species(name, catalogue, mapping)
+    return str(species["ID"]) if species else None
+
+
+def species_of(
+    subject: Subject, catalogue: list[dict[str, Any]], mapping: dict[str, str]
+) -> dict[str, Any] | None:
+    """The platform's species of an entity (decision D411): what the entity says of itself,
+    else the integration's mapping by the type's key, else the type's label. None when the
+    platform knows none of them; an animal is never registered under a guess."""
+    candidates = [
+        str(subject.attributes[key]) for key in SPECIES_ATTRIBUTES if subject.attributes.get(key)
+    ]
+    candidates += [c for c in (subject.entity_type_key, subject.entity_type_label) if c]
+    for candidate in candidates:
+        species = find_species(candidate, catalogue, mapping)
+        if species is not None and species.get("name"):
+            return species
     return None
+
+
+def detection_species_field(document: dict[str, Any]) -> str:
+    """Which field names the species in `POST /detection/` on this server (decision D407),
+    from its OpenAPI document: `speciesName` since the source of 2026-11, `speciesID` before."""
+    try:
+        schema = document["paths"]["/detection/"]["post"]["requestBody"]["content"][
+            "application/json"
+        ]["schema"]
+        if "$ref" in schema:
+            schema = document["components"]["schemas"][str(schema["$ref"]).rsplit("/", 1)[-1]]
+        properties = schema["properties"]
+    except (KeyError, TypeError):
+        raise PermanentFailure(
+            "the WildlifeNL server's API document does not describe POST /detection/"
+        ) from None
+    for field in SPECIES_FIELDS:
+        if field in properties:
+            return field
+    raise PermanentFailure(
+        "the WildlifeNL server's API document names no species field for a detection "
+        f"(looked for {', '.join(SPECIES_FIELDS)})"
+    )
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    try:
+        seconds = float(response.headers.get("Retry-After", ""))
+    except ValueError:
+        return None
+    return seconds if seconds > 0 else None
 
 
 class WildlifeNlClient:
@@ -214,7 +305,14 @@ class WildlifeNlClient:
                 )
         except httpx.HTTPError as exc:
             raise TransientFailure(f"wildlifenl: {type(exc).__name__}: {exc}") from exc
-        if response.status_code >= 500 or response.status_code == 429:
+        if response.status_code == 429:
+            # the platform limits per token with a growing cooldown and says how long to wait
+            wait = _retry_after(response)
+            raise TransientFailure(
+                "wildlifenl answered 429" + (f", asking for {wait:g} s" if wait else ""),
+                retry_after=wait,
+            )
+        if response.status_code >= 500:
             raise TransientFailure(f"wildlifenl answered {response.status_code}")
         if response.status_code in (401, 403):
             raise PermanentFailure(
@@ -281,18 +379,21 @@ class WildlifeNlConnector:
         "species": {"wild_boar": "Sus scrofa", "red_deer": "Cervus elaphus"},
     }
     credentials_schema: ClassVar[dict[str, str]] = {
-        "token": "Bearer token of a WildlifeNL account with the data-system role, from the "
-        "email code login (POST /auth/, then PUT /auth/ with the code)"
+        "token": "Bearer token of a WildlifeNL account with the data-system role, and the "
+        "herd-manager role when Protect registers the animals, from the email code login "
+        "(POST /auth/ with the email and displayNameApp, then PUT /auth/ with the code)"
     }
     setup_hint: ClassVar[str] = (
-        "Ask the WildlifeNL administrator for an account with the data-system role, log in "
-        "once through the API's own page to receive the token, and let a herd manager register "
-        "each device's identity as a borne sensor deployment on its animal. Species names must "
-        "exist on the platform or be mapped. Test the connection first."
+        "Ask the WildlifeNL administrator for an account with the data-system role, and the "
+        "herd-manager role so Protect can register the animals. Log in once through the API's "
+        "own page to receive the token. Tick the entities to forward, test the connection, "
+        "then send their history and register them. Species names must exist on the platform "
+        "or be mapped."
     )
 
     def __init__(self) -> None:
         self._species: dict[str, tuple[datetime, list[dict[str, Any]]]] = {}
+        self._documents: dict[str, tuple[datetime, dict[str, Any]]] = {}
 
     def _client(self, integration: IntegrationContext) -> WildlifeNlClient:
         require_config(integration, "base_url")
@@ -334,6 +435,19 @@ class WildlifeNlConnector:
         self._species[client.base_url] = (now, catalogue)
         return catalogue
 
+    async def api_document(self, client: WildlifeNlClient) -> dict[str, Any]:
+        """The server's own OpenAPI document, kept an hour: it says what this server takes."""
+        cached = self._documents.get(client.base_url)
+        now = datetime.now(UTC)
+        if cached and (now - cached[0]).total_seconds() < API_DOCUMENT_CACHE_SECONDS:
+            return cached[1]
+        answer = await client.request("GET", "/openapi.json")
+        body = answer.get("body")
+        if not isinstance(body, dict) or "paths" not in body:
+            raise TransientFailure("wildlifenl served no API document at /openapi.json")
+        self._documents[client.base_url] = (now, body)
+        return body
+
     async def deliver(
         self, integration: IntegrationContext, item: DeliveryItem, payload: dict[str, Any]
     ) -> DeliveryResult:
@@ -344,18 +458,20 @@ class WildlifeNlConnector:
             return DeliveryResult(external_id=None, response=response)
         mapping = {str(k): str(v) for k, v in (integration.config.get("species") or {}).items()}
         catalogue = await self.species_catalogue(integration, client)
+        field = detection_species_field(await self.api_document(client))
         ids: list[str] = []
         responses: list[dict[str, Any]] = []
         for detection in payload["detections"]:
             body = dict(detection)
             name = str(body.pop("species"))
-            species_id = resolve_species(name, catalogue, mapping)
-            if species_id is None:
+            species = find_species(name, catalogue, mapping)
+            if species is None or (field == "speciesName" and not species.get("name")):
                 raise PermanentFailure(
                     f"WildlifeNL has no species named {name!r}: add it on the platform or map "
                     "it in the integration's species setting"
                 )
-            body["speciesID"] = species_id
+            # the Latin name on a server that asks for it, the id on one that does not (D407)
+            body[field] = str(species["name"] if field == "speciesName" else species["ID"])
             response = await client.request("POST", endpoint, body)
             answer = response.get("body")
             if isinstance(answer, dict) and answer.get("ID"):
@@ -380,9 +496,128 @@ class WildlifeNlConnector:
                 f"role (roles: {', '.join(roles) or 'none'}); readings would be refused"
             )
         catalogue = await self.species_catalogue(integration, client)
+        document = await self.api_document(client)
         return {
             "status": profile["status"],
             "account": body.get("email"),
             "roles": roles,
+            "can_register_animals": HERD_MANAGER_ROLE in roles,
             "species_count": len(catalogue),
+            "api_version": (document.get("info") or {}).get("version"),
+            "detection_species_field": detection_species_field(document),
         }
+
+    async def _active_deployments(self, client: WildlifeNlClient) -> dict[str, dict[str, Any]]:
+        """The platform's deployments without an end, by sensor id."""
+        try:
+            answer = await client.request("GET", "/borne-sensor-deployment/active/")
+        except PermanentFailure as exc:
+            raise PermanentFailure(
+                f"WildlifeNL does not show its deployments to this account; it needs the "
+                f"{HERD_MANAGER_ROLE} role ({exc})"
+            ) from exc
+        body = answer.get("body")
+        rows = [d for d in body if isinstance(d, dict)] if isinstance(body, list) else []
+        return {str(d["sensorID"]): d for d in rows if d.get("sensorID")}
+
+    def _status(
+        self,
+        integration: IntegrationContext,
+        subject: Subject,
+        active: dict[str, dict[str, Any]],
+        catalogue: list[dict[str, Any]],
+    ) -> tuple[SubjectStatus, dict[str, Any] | None]:
+        """What the platform has for one entity, and its species there when it can be
+        registered."""
+        status = SubjectStatus(entity_id=subject.entity_id, state="blocked")
+        mapping = {str(k): str(v) for k, v in (integration.config.get("species") or {}).items()}
+        species = species_of(subject, catalogue, mapping)
+        status.species = str(species["name"]) if species else None
+        status.sensor_id = sensor_id(integration, subject)
+        if status.sensor_id is None:
+            status.detail = "No device is on this entity, so there is no sensor to register"
+            return status, None
+        deployment = active.get(status.sensor_id)
+        if deployment is not None:
+            found = deployment.get("animal")
+            animal: dict[str, Any] = found if isinstance(found, dict) else {}
+            status.state = "registered"
+            status.external_id = str(animal.get("ID") or deployment.get("animalID") or "") or None
+            status.external_name = str(animal.get("name") or "") or None
+            status.since = _moment(deployment.get("start"))
+            return status, species
+        if len(subject.entity_name) < 2:
+            status.detail = "WildlifeNL asks for a name of at least two characters"
+            return status, None
+        if species is None:
+            status.detail = (
+                "WildlifeNL knows no species for this entity: give the entity a species, or "
+                "map its type in the integration's species setting"
+            )
+            return status, None
+        status.state = "not_registered"
+        return status, species
+
+    async def subjects(
+        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
+    ) -> list[SubjectStatus]:
+        client = self._client(integration)
+        active = await self._active_deployments(client)
+        catalogue = await self.species_catalogue(integration, client)
+        return [self._status(integration, s, active, catalogue)[0] for s in subjects]
+
+    async def register(
+        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
+    ) -> tuple[list[SubjectStatus], dict[str, Any]]:
+        """An animal and a deployment for every entity the platform has none for (decision
+        D408). The animal's id is kept in the state before the deployment is asked, so a run
+        that stops between the two makes no second animal."""
+        client = self._client(integration)
+        active = await self._active_deployments(client)
+        catalogue = await self.species_catalogue(integration, client)
+        animals = {str(k): str(v) for k, v in (state.get("animals") or {}).items()}
+        out: list[SubjectStatus] = []
+        for subject in subjects:
+            status, species = self._status(integration, subject, active, catalogue)
+            out.append(status)
+            if status.state != "not_registered" or species is None:
+                continue
+            key = str(subject.entity_id)
+            try:
+                if key not in animals:
+                    made = await client.request(
+                        "POST",
+                        "/animal/",
+                        {"name": subject.entity_name, "speciesID": str(species["ID"])},
+                    )
+                    body = made.get("body")
+                    if not isinstance(body, dict) or not body.get("ID"):
+                        raise PermanentFailure("wildlifenl made an animal without an ID")
+                    animals[key] = str(body["ID"])
+                start = subject.assigned_from or datetime.now(UTC)
+                await client.request(
+                    "POST",
+                    "/borne-sensor-deployment/",
+                    {
+                        "animalID": animals[key],
+                        "sensorID": status.sensor_id,
+                        "contactHardwareAddress": None,
+                        "start": iso(start),
+                    },
+                )
+            except (PermanentFailure, TransientFailure) as exc:
+                status.state = "blocked"
+                status.detail = str(exc)
+                continue
+            status.state = "registered"
+            status.external_id = animals[key]
+            status.external_name = subject.entity_name
+            status.since = start
+        return out, {**state, "animals": animals}
+
+
+def _moment(value: Any) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None
+    except ValueError:
+        return None

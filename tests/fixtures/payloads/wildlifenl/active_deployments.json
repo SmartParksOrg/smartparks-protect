@@ -1,0 +1,18 @@
+[
+ {
+  "animalID": "aaaaaaaa-0000-4000-8000-000000000001",
+  "sensorID": "70B3D57ED0001234",
+  "contactHardwareAddress": null,
+  "start": "2026-05-01T08:00:00Z",
+  "animal": {
+   "ID": "aaaaaaaa-0000-4000-8000-000000000001",
+   "name": "Konik 3",
+   "speciesID": "33333333-3333-3333-3333-333333333333",
+   "species": {
+    "ID": "33333333-3333-3333-3333-333333333333",
+    "name": "Equus ferus caballus",
+    "commonName": "Konik"
+   }
+  }
+ }
+]

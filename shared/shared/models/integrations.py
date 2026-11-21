@@ -84,6 +84,14 @@ class Integration(UuidPrimaryKeyMixin, TimestampMixin, Base):
         server_default=text("'{}'::jsonb"),
         comment="Progress of the last backfill: status, from, to, queued, started_at, finished_at",
     )
+    connector_state: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        default=dict,
+        comment="The connector's own memory between calls, such as what it registered on "
+        "the target (D408); never a credential",
+    )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL")
     )

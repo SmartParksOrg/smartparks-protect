@@ -1,5 +1,6 @@
 """Delivery rows: filters, idempotent enqueue, attempts on the retry schedule, backfill."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -12,6 +13,7 @@ from shared.integrations.deliveries import (
     backfill,
     backoff_seconds,
     delivery_counts,
+    due_deliveries,
     enqueue,
     event_ref,
     load_item,
@@ -222,3 +224,35 @@ async def test_backfill_queues_range_once(db, world):
         .where(IntegrationDelivery.integration_id == world.integration.id)
     )
     assert total == 2
+
+
+async def test_attempt_waits_as_long_as_the_target_asks(db, world, fake_connector):
+    """Decision D410: a target that names its waiting time is believed over the schedule."""
+    delivery = await _one(db, world, event_ref(world.event))
+    now = datetime.now(UTC)
+    fake_connector.mode = "throttled"
+    assert await attempt(db, delivery, world.integration, now=now) == DeliveryStatus.QUEUED
+    assert delivery.next_attempt_at == now + timedelta(seconds=300)
+    assert "retry in 300 s" in (delivery.error_message or "")
+    await db.rollback()
+
+
+async def test_what_is_due_goes_oldest_first(db, world):
+    """Decision D410: a backfill queues its rows in one moment; the oldest object goes first,
+    so a target that keeps the newest location ends on the newest."""
+    newest = position_ref(world.position)
+    refs = [
+        replace(newest, object_id=str(900_000_000 + days), time=newest.time - timedelta(days=days))
+        for days in (1, 3, 2)
+    ]
+    now = datetime.now(UTC)
+    await enqueue(db, [world.integration], [newest, *refs], now=now, honour_age=False)
+    await db.flush()
+    due = [
+        d
+        for d in await due_deliveries(db, now, limit=1000)
+        if d.integration_id == world.integration.id
+    ]
+    assert [d.object_time for d in due] == sorted(d.object_time for d in due)
+    assert len(due) == 4
+    await db.rollback()

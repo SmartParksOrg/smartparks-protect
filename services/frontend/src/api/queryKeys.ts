@@ -209,6 +209,8 @@ export const queryKeys = {
     ["projects", projectId, "integration-deliveries", params] as const,
   integrationDelivery: (projectId: string, id: string) =>
     ["projects", projectId, "integration-deliveries", id] as const,
+  integrationSubjects: (projectId: string, id: string) =>
+    ["projects", projectId, "integrations", id, "subjects"] as const,
   gateways: (projectId: string, hours: number) =>
     ["projects", projectId, "gateways", hours] as const,
   gateway: (projectId: string, id: string, hours: number) =>

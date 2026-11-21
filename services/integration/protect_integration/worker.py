@@ -23,6 +23,7 @@ from shared.integrations.deliveries import (
     event_ref,
     measurement_ref,
 )
+from shared.integrations.subjects import register_after_backfill
 from shared.logger import get_logger
 from shared.models import Event, Integration, Measurement
 from shared.timeutil import require_aware, utc_now
@@ -167,6 +168,26 @@ async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> 
     return outcome
 
 
+async def register_pending(session: AsyncSession) -> dict[str, str]:
+    """The backfills that asked for a registration afterwards (decision D409): each is
+    registered once its readings are all delivered. Few rows carry the flag, so the read is
+    cheap enough for every cycle."""
+    pending = (
+        await session.scalars(
+            select(Integration).where(
+                Integration.backfill["then_register"].as_boolean().is_(True),
+                Integration.enabled.is_(True),
+            )
+        )
+    ).all()
+    outcome: dict[str, str] = {}
+    for integration in pending:
+        result = await register_after_backfill(session, integration)
+        if result and result != "waiting":
+            outcome[integration.name] = result
+    return outcome
+
+
 async def delivery_loop(bus: RedisStreamsBus) -> None:
     while True:
         try:
@@ -174,6 +195,10 @@ async def delivery_loop(bus: RedisStreamsBus) -> None:
                 outcome = await deliver_due(session)
             if outcome:
                 log.info("deliveries", outcome=outcome)
+            async with session_scope() as session:
+                registered = await register_pending(session)
+            if registered:
+                log.info("registered after backfill", outcome=registered)
             await bus.heartbeat("integration")
         except asyncio.CancelledError:
             raise

@@ -13,7 +13,12 @@ from shared.notifications.render import Rendered
 
 
 class TransientFailure(Exception):
-    """Worth a retry: SMTP or HTTP trouble that may pass."""
+    """Worth a retry: SMTP or HTTP trouble that may pass. `retry_after` is the number of
+    seconds the target asked to be left alone (its `Retry-After`), when it named one."""
+
+    def __init__(self, message: str, *, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class PermanentFailure(Exception):

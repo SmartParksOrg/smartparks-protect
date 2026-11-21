@@ -5,6 +5,7 @@ Shared by the integration service (live path, backfill, retries) and the API (ma
 test sends), so both write the same rows the same way.
 """
 
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -450,6 +451,10 @@ async def attempt(
             )
         else:
             delay = backoff_seconds(delivery.attempts)
+            # a target that names its own waiting time is believed (decision D410)
+            asked = getattr(exc, "retry_after", None)
+            if asked:
+                delay = min(max(delay, math.ceil(asked)), BACKOFF_MAX_SECONDS)
             delivery.status = DeliveryStatus.QUEUED
             delivery.next_attempt_at = now + timedelta(seconds=delay)
             delivery.error_code = ErrorCode.INTEGRATION_DELIVERY_FAILED
@@ -477,7 +482,14 @@ async def due_deliveries(
                     IntegrationDelivery.status == DeliveryStatus.QUEUED,
                     IntegrationDelivery.next_attempt_at <= now,
                 )
-                .order_by(IntegrationDelivery.next_attempt_at, IntegrationDelivery.created_at)
+                # what is due goes oldest first (decision D410): a backfill queues a thousand
+                # rows in one moment, and a target that keeps "the newest location" must get
+                # the newest one last
+                .order_by(
+                    IntegrationDelivery.next_attempt_at,
+                    IntegrationDelivery.created_at,
+                    IntegrationDelivery.object_time,
+                )
                 .limit(limit)
             )
         ).all()

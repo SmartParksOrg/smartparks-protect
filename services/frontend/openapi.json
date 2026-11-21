@@ -22019,6 +22019,124 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "List Subjects",
+    "description": "The entities ticked on the integration and what the target has for each (decision\nD408), read from the target with the integration's credentials, which is why reading it\ntakes the right to change integrations. At most 200 entities.",
+    "operationId": "list_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationSubjects"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects/register": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Register Integration Subjects",
+    "description": "Register the entities the target lacks, now (decision D408). An entity that cannot be\nregistered says why and does not stop the others. To send the history first, ask for a\nbackfill with `then_register`.",
+    "operationId": "register_integration_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_register_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationSubjects"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/gateways": {
    "get": {
     "tags": [
@@ -27029,6 +27147,12 @@
       "type": "string",
       "format": "date-time",
       "title": "Time To"
+     },
+     "then_register": {
+      "type": "boolean",
+      "title": "Then Register",
+      "description": "Register the integration's entities on the target once every object of the backfill is delivered (D409); for a connector that registers subjects",
+      "default": false
      }
     },
     "type": "object",
@@ -39474,6 +39598,146 @@
      "updated_at"
     ],
     "title": "IntegrationRead"
+   },
+   "IntegrationSubjectRead": {
+    "properties": {
+     "entity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "type": "string",
+      "title": "Entity Name"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "registered",
+       "not_registered",
+       "blocked"
+      ],
+      "title": "State"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail",
+      "description": "Why it cannot be registered"
+     },
+     "sensor_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sensor Id",
+      "description": "What the target knows the device by"
+     },
+     "species": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Species"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id",
+      "description": "The target's id of the animal"
+     },
+     "external_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Name"
+     },
+     "since": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Since",
+      "description": "The start of the registration"
+     }
+    },
+    "type": "object",
+    "required": [
+     "entity_id",
+     "entity_name",
+     "state"
+    ],
+    "title": "IntegrationSubjectRead",
+    "description": "An entity the integration forwards and what the target has for it (D408)."
+   },
+   "IntegrationSubjects": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/IntegrationSubjectRead"
+      },
+      "type": "array",
+      "title": "Items"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "IntegrationSubjects"
    },
    "IntegrationTestRequest": {
     "properties": {
