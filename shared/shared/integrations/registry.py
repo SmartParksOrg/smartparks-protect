@@ -37,6 +37,10 @@ def describe_connector(connector: OutboundConnector) -> dict[str, Any]:
         "registers_subjects": isinstance(connector, SubjectRegistrar),
         # how an account signs in, when Protect does it for the user (D414)
         "login": "email_code" if isinstance(connector, CodeLogin) else None,
+        # the servers a person chooses from, for a target that has a fixed few; with a
+        # sign-in this makes the whole setup a name and a choice (decision D415)
+        "servers": [dict(server) for server in getattr(connector, "servers", ())],
+        "intro": getattr(connector, "intro", None),
     }
 
 

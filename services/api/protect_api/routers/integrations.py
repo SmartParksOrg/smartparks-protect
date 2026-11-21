@@ -307,6 +307,35 @@ async def get_integration(
     return data
 
 
+async def _config_of_signed_in(
+    session: AsyncSession, integration: Integration, wanted: dict[str, Any]
+) -> dict[str, Any]:
+    """The configuration of an integration that signs in by itself (decisions D414 and D415).
+    Who is signed in is the sign-in's to write, never a form's. Another server knows nothing
+    of this sign-in, so a changed address signs the integration out; and it knows nothing of
+    the entities registered on the first one, so the change is refused while any is
+    integrated: a second server is a second integration."""
+    current = dict(integration.config or {})
+    config = {k: v for k, v in wanted.items() if k != "account"}
+    if config.get("base_url") == current.get("base_url"):
+        if current.get("account"):
+            config["account"] = current["account"]
+        return config
+    integrated = await session.scalar(
+        select(func.count())
+        .select_from(IntegrationSubject)
+        .where(IntegrationSubject.integration_id == integration.id)
+    )
+    if integrated:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{integrated} entities are integrated with this server. Stop them first, or "
+            "make a second integration for the other server.",
+        )
+    integration.credentials_encrypted = None
+    return config
+
+
 @router.patch("/{integration_id}", response_model=IntegrationRead)
 async def update_integration(
     integration_id: uuid.UUID,
@@ -325,6 +354,10 @@ async def update_integration(
             patch[key] = [str(i) for i in patch[key]]
     if patch.get("event_types") is not None:
         patch["event_types"] = [t.upper() for t in patch["event_types"]]
+    if patch.get("config") is not None and isinstance(
+        CONNECTORS.get(integration.connector_key), CodeLogin
+    ):
+        patch["config"] = await _config_of_signed_in(session, integration, patch["config"])
     for key, value in patch.items():
         setattr(integration, key, value)
     if credentials:

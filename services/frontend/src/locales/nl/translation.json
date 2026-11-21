@@ -3526,5 +3526,8 @@
   "Sign in to {{target}}": "Aanmelden bij {{target}}",
   "Signed in as {{account}}.": "Aangemeld als {{account}}.",
   "The sign-in is kept. Sign in again from the key on the integration's row.": "De aanmelding blijft bewaard. Meld je opnieuw aan via de sleutel op de rij van de integratie.",
-  "This account may send data but not register entities on {{target}}. Ask its administrator for the role that allows it.": "Dit account mag data sturen maar geen entiteiten registreren bij {{target}}. Vraag de beheerder daarvan om de rol die dat toestaat."
+  "This account may send data but not register entities on {{target}}. Ask its administrator for the role that allows it.": "Dit account mag data sturen maar geen entiteiten registreren bij {{target}}. Vraag de beheerder daarvan om de rol die dat toestaat.",
+  "Choose a server": "Kies een server",
+  "Server": "Server",
+  "Choose the server, then sign in.": "Kies de server en meld je daarna aan."
 }

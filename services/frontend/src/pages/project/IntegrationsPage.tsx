@@ -69,6 +69,25 @@ interface ConnectorInfo {
   registers_subjects?: boolean;
   /** How an account signs in when Protect does it for the user (D414). */
   login?: "email_code" | null;
+  /** The servers to choose from, for a target that has a fixed few (D415). */
+  servers?: { key: string; label: string; base_url: string }[];
+  /** What the integration does, in a sentence for people. */
+  intro?: string | null;
+}
+
+/** A target set up with a name and a choice of server, then its own sign-in (D415). */
+const isSimple = (c: ConnectorInfo | undefined) =>
+  Boolean(c?.login && c.servers && c.servers.length > 0);
+
+function parsed(json: string): Record<string, unknown> {
+  try {
+    const value: unknown = JSON.parse(json);
+    return value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 const OBJECT_TYPES = ["position", "event", "measurement"] as const;
@@ -243,6 +262,15 @@ export function IntegrationsPage() {
   const me = useAuthStore((state) => state.user?.email ?? "");
   const signsIn = (i: Integration | null) =>
     Boolean(i && CONNECTORS.find((c) => c.key === i.connector_key)?.login);
+  const simpleOf = (i: Integration) =>
+    isSimple(CONNECTORS.find((c) => c.key === i.connector_key));
+  const serverLabel = (i: Integration, config: Record<string, unknown>) => {
+    const url = String(config.base_url ?? "");
+    const server = CONNECTORS.find(
+      (c) => c.key === i.connector_key,
+    )?.servers?.find((x) => x.base_url === url);
+    return server ? `${server.label} (${url})` : url;
+  };
   const [backfillRange, setBackfillRange] = useState({
     from: dateLocal(new Date(Date.now() - 7 * 86_400_000)),
     to: dateLocal(new Date()),
@@ -263,6 +291,10 @@ export function IntegrationsPage() {
   });
   const connectorKey = form.watch("connector_key");
   const connector = CONNECTORS.find((c) => c.key === connectorKey);
+  const simple = isSimple(connector);
+  const configNow = parsed(form.watch("config"));
+  const serverUrl =
+    typeof configNow.base_url === "string" ? configNow.base_url : "";
   useEffect(() => {
     if (open)
       form.reset(
@@ -707,9 +739,11 @@ export function IntegrationsPage() {
               {editing ? t("Edit integration") : t("New integration")}
             </DialogTitle>
             <DialogDescription>
-              {t(
-                "Every matching object becomes one delivery, sent once and retried on failure. Credentials are encrypted and never shown again.",
-              )}
+              {simple
+                ? t("Choose the server, then sign in.")
+                : t(
+                    "Every matching object becomes one delivery, sent once and retried on failure. Credentials are encrypted and never shown again.",
+                  )}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -733,6 +767,9 @@ export function IntegrationsPage() {
                     form.setValue("connector_key", v);
                     const c = CONNECTORS.find((x) => x.key === v);
                     if (c && !editing) {
+                      // a simple target is named after itself until somebody types a name
+                      if (isSimple(c) && !form.getValues("name").trim())
+                        form.setValue("name", c.label);
                       form.setValue(
                         "config",
                         JSON.stringify(c.config_example, null, 2),
@@ -743,9 +780,13 @@ export function IntegrationsPage() {
                       );
                       form.setValue(
                         "object_types",
-                        c.supports.filter(
-                          (s) => s !== "measurement",
-                        ) as Values["object_types"],
+                        // the simple setup forwards positions; the rest is the technical
+                        // form's to choose
+                        (isSimple(c)
+                          ? ["position"]
+                          : c.supports.filter(
+                              (s) => s !== "measurement",
+                            )) as Values["object_types"],
                       );
                     }
                   }}
@@ -763,202 +804,259 @@ export function IntegrationsPage() {
                 </Select>
               </Field>
             </div>
-            {connector && (
-              <Callout kind="info">
-                <div>{connector.description}.</div>
-                {connector.setup_hint && (
-                  <div className="mt-1 text-xs">{connector.setup_hint}</div>
+            {simple && connector ? (
+              <>
+                {/* a target with a fixed few servers and its own sign-in needs a name and a
+                    choice, nothing typed (decision D415) */}
+                {connector.intro && (
+                  <p className="text-sm text-muted-foreground">
+                    {connector.intro}
+                  </p>
                 )}
-              </Callout>
-            )}
-            <Field label={t("Description")} htmlFor="in-description">
-              <Input id="in-description" {...form.register("description")} />
-            </Field>
-            <Field
-              label={t("Forward")}
-              htmlFor="in-types"
-              error={form.formState.errors.object_types?.message}
-            >
-              <div className="flex flex-wrap gap-2" id="in-types">
-                {OBJECT_TYPES.map((t) => {
-                  const supported = connector?.supports.includes(t) ?? true;
-                  const on = form.watch("object_types").includes(t);
-                  return (
-                    <Button
-                      key={t}
-                      type="button"
-                      size="sm"
-                      variant={on ? "default" : "outline"}
-                      disabled={!supported}
-                      title={
-                        supported
-                          ? undefined
-                          : translate(
-                              "{{connector}} cannot receive {{type}}s",
-                              { connector: connector?.label, type: t },
+                <Field label={t("Server")} htmlFor="in-server">
+                  <Select
+                    value={serverUrl}
+                    onValueChange={(url) =>
+                      form.setValue(
+                        "config",
+                        JSON.stringify({ ...configNow, base_url: url }),
+                      )
+                    }
+                  >
+                    <SelectTrigger id="in-server">
+                      <SelectValue placeholder={t("Choose a server")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(connector.servers ?? []).map((server) => (
+                        <SelectItem key={server.key} value={server.base_url}>
+                          {server.label}
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {server.base_url.replace(/^https?:\/\//, "")}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <p className="text-sm text-muted-foreground">
+                  {editing
+                    ? t(
+                        "The sign-in is kept. Sign in again from the key on the integration's row.",
+                      )
+                    : t(
+                        "After saving you sign in with the account's email address and the code that is mailed to it.",
+                      )}
+                </p>
+              </>
+            ) : (
+              <>
+                {connector && (
+                  <Callout kind="info">
+                    <div>{connector.description}.</div>
+                    {connector.setup_hint && (
+                      <div className="mt-1 text-xs">{connector.setup_hint}</div>
+                    )}
+                  </Callout>
+                )}
+                <Field label={t("Description")} htmlFor="in-description">
+                  <Input
+                    id="in-description"
+                    {...form.register("description")}
+                  />
+                </Field>
+                <Field
+                  label={t("Forward")}
+                  htmlFor="in-types"
+                  error={form.formState.errors.object_types?.message}
+                >
+                  <div className="flex flex-wrap gap-2" id="in-types">
+                    {OBJECT_TYPES.map((t) => {
+                      const supported = connector?.supports.includes(t) ?? true;
+                      const on = form.watch("object_types").includes(t);
+                      return (
+                        <Button
+                          key={t}
+                          type="button"
+                          size="sm"
+                          variant={on ? "default" : "outline"}
+                          disabled={!supported}
+                          title={
+                            supported
+                              ? undefined
+                              : translate(
+                                  "{{connector}} cannot receive {{type}}s",
+                                  { connector: connector?.label, type: t },
+                                )
+                          }
+                          onClick={() =>
+                            form.setValue(
+                              "object_types",
+                              on
+                                ? form
+                                    .getValues("object_types")
+                                    .filter((x) => x !== t)
+                                : [...form.getValues("object_types"), t],
                             )
-                      }
-                      onClick={() =>
+                          }
+                        >
+                          {translate("{{type}}s", { type: t })}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label={t("Event types")}
+                    htmlFor="in-events"
+                    hint={t("Comma separated; empty means every type")}
+                  >
+                    <Input
+                      id="in-events"
+                      placeholder={t("GEOFENCE_EXIT, SPECIES_DETECTION")}
+                      {...form.register("event_types")}
+                    />
+                  </Field>
+                  <Field
+                    label={t("Minimum event severity")}
+                    htmlFor="in-severity"
+                  >
+                    <Select
+                      value={form.watch("min_severity")}
+                      onValueChange={(v) =>
                         form.setValue(
-                          "object_types",
-                          on
-                            ? form
-                                .getValues("object_types")
-                                .filter((x) => x !== t)
-                            : [...form.getValues("object_types"), t],
+                          "min_severity",
+                          v as Values["min_severity"],
                         )
                       }
                     >
-                      {translate("{{type}}s", { type: t })}
-                    </Button>
-                  );
-                })}
-              </div>
-            </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label={t("Event types")}
-                htmlFor="in-events"
-                hint={t("Comma separated; empty means every type")}
-              >
-                <Input
-                  id="in-events"
-                  placeholder={t("GEOFENCE_EXIT, SPECIES_DETECTION")}
-                  {...form.register("event_types")}
-                />
-              </Field>
-              <Field label={t("Minimum event severity")} htmlFor="in-severity">
-                <Select
-                  value={form.watch("min_severity")}
-                  onValueChange={(v) =>
-                    form.setValue("min_severity", v as Values["min_severity"])
-                  }
-                >
-                  <SelectTrigger id="in-severity">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SEVERITIES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field
-                label={t("Metric keys")}
-                htmlFor="in-metrics"
-                hint={t("For measurements; empty means every metric")}
-              >
-                <Input
-                  id="in-metrics"
-                  placeholder={t("battery_voltage, temperature")}
-                  {...form.register("metric_keys")}
-                />
-              </Field>
-              <Field
-                label={t("Skip live objects older than (hours)")}
-                htmlFor="in-age"
-                hint={t("Backfill ignores this bound")}
-                error={form.formState.errors.max_object_age_hours?.message}
-              >
-                <Input
-                  id="in-age"
-                  type="number"
-                  step="any"
-                  {...form.register("max_object_age_hours", {
-                    valueAsNumber: true,
-                  })}
-                />
-              </Field>
-            </div>
-            {connector?.registers_subjects ? (
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  "Entities are integrated one by one, each from its own page, where its species and history are chosen.",
-                )}
-              </p>
-            ) : (
-              <Field
-                label={t("Entities")}
-                htmlFor="in-entities"
-                hint={t(
-                  "Optional. Leave empty for every entity of the project.",
-                )}
-              >
-                <div
-                  className="flex max-h-32 flex-wrap gap-2 overflow-y-auto"
-                  id="in-entities"
-                >
-                  {entities.data?.items.map((e) => {
-                    const on = form.watch("entity_ids").includes(e.id);
-                    return (
-                      <Button
-                        key={e.id}
-                        type="button"
-                        size="sm"
-                        variant={on ? "default" : "outline"}
-                        onClick={() =>
-                          form.setValue(
-                            "entity_ids",
-                            on
-                              ? form
-                                  .getValues("entity_ids")
-                                  .filter((x) => x !== e.id)
-                              : [...form.getValues("entity_ids"), e.id],
-                          )
-                        }
-                      >
-                        {e.name}
-                      </Button>
-                    );
-                  })}
+                      <SelectTrigger id="in-severity">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SEVERITIES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field
+                    label={t("Metric keys")}
+                    htmlFor="in-metrics"
+                    hint={t("For measurements; empty means every metric")}
+                  >
+                    <Input
+                      id="in-metrics"
+                      placeholder={t("battery_voltage, temperature")}
+                      {...form.register("metric_keys")}
+                    />
+                  </Field>
+                  <Field
+                    label={t("Skip live objects older than (hours)")}
+                    htmlFor="in-age"
+                    hint={t("Backfill ignores this bound")}
+                    error={form.formState.errors.max_object_age_hours?.message}
+                  >
+                    <Input
+                      id="in-age"
+                      type="number"
+                      step="any"
+                      {...form.register("max_object_age_hours", {
+                        valueAsNumber: true,
+                      })}
+                    />
+                  </Field>
                 </div>
-              </Field>
-            )}
-            <Field
-              label={t("Configuration (JSON)")}
-              htmlFor="in-config"
-              error={form.formState.errors.config?.message}
-            >
-              <Textarea
-                id="in-config"
-                rows={6}
-                className="font-mono text-xs"
-                {...form.register("config")}
-              />
-            </Field>
-            {connector?.login ? (
-              <p className="text-sm text-muted-foreground">
-                {editing
-                  ? t(
-                      "The sign-in is kept. Sign in again from the key on the integration's row.",
-                    )
-                  : t(
-                      "After saving you sign in with the account's email address and the code that is mailed to it.",
+                {connector?.registers_subjects ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      "Entities are integrated one by one, each from its own page, where its species and history are chosen.",
                     )}
-              </p>
-            ) : (
-              <Field
-                label={t("Credentials (JSON)")}
-                htmlFor="in-credentials"
-                hint={
-                  editing
-                    ? t("Leave empty to keep the stored credentials")
-                    : Object.entries(connector?.credentials_schema ?? {})
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join("; ")
-                }
-                error={form.formState.errors.credentials?.message}
-              >
-                <Textarea
-                  id="in-credentials"
-                  rows={3}
-                  className="font-mono text-xs"
-                  {...form.register("credentials")}
-                />
-              </Field>
+                  </p>
+                ) : (
+                  <Field
+                    label={t("Entities")}
+                    htmlFor="in-entities"
+                    hint={t(
+                      "Optional. Leave empty for every entity of the project.",
+                    )}
+                  >
+                    <div
+                      className="flex max-h-32 flex-wrap gap-2 overflow-y-auto"
+                      id="in-entities"
+                    >
+                      {entities.data?.items.map((e) => {
+                        const on = form.watch("entity_ids").includes(e.id);
+                        return (
+                          <Button
+                            key={e.id}
+                            type="button"
+                            size="sm"
+                            variant={on ? "default" : "outline"}
+                            onClick={() =>
+                              form.setValue(
+                                "entity_ids",
+                                on
+                                  ? form
+                                      .getValues("entity_ids")
+                                      .filter((x) => x !== e.id)
+                                  : [...form.getValues("entity_ids"), e.id],
+                              )
+                            }
+                          >
+                            {e.name}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+                )}
+                <Field
+                  label={t("Configuration (JSON)")}
+                  htmlFor="in-config"
+                  error={form.formState.errors.config?.message}
+                >
+                  <Textarea
+                    id="in-config"
+                    rows={6}
+                    className="font-mono text-xs"
+                    {...form.register("config")}
+                  />
+                </Field>
+                {connector?.login ? (
+                  <p className="text-sm text-muted-foreground">
+                    {editing
+                      ? t(
+                          "The sign-in is kept. Sign in again from the key on the integration's row.",
+                        )
+                      : t(
+                          "After saving you sign in with the account's email address and the code that is mailed to it.",
+                        )}
+                  </p>
+                ) : (
+                  <Field
+                    label={t("Credentials (JSON)")}
+                    htmlFor="in-credentials"
+                    hint={
+                      editing
+                        ? t("Leave empty to keep the stored credentials")
+                        : Object.entries(connector?.credentials_schema ?? {})
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join("; ")
+                    }
+                    error={form.formState.errors.credentials?.message}
+                  >
+                    <Textarea
+                      id="in-credentials"
+                      rows={3}
+                      className="font-mono text-xs"
+                      {...form.register("credentials")}
+                    />
+                  </Field>
+                )}
+              </>
             )}
             <div className="flex items-center gap-2">
               <Switch
@@ -1077,7 +1175,13 @@ export function IntegrationsPage() {
                     target={connectorLabel(inspecting.connector_key)}
                   />
                 )}
-              <JsonView value={detail.data.config} />
+              {inspecting && simpleOf(inspecting) ? (
+                <p>
+                  {t("Server")}: {serverLabel(inspecting, detail.data.config)}
+                </p>
+              ) : (
+                <JsonView value={detail.data.config} />
+              )}
             </div>
           )}
           <DialogFooter>

@@ -380,8 +380,17 @@ class WildlifeNlConnector:
             },
         },
     }
-    # the TEST server, where a first integration belongs; the rest has defaults
-    config_example: ClassVar[dict[str, Any]] = {"base_url": "https://test-api-wildlifenl.uu.nl"}
+    # The platform's two servers (decision D415). A first integration belongs on Test.
+    servers: ClassVar[tuple[dict[str, str], ...]] = (
+        {"key": "test", "label": "Test", "base_url": "https://test-api-wildlifenl.uu.nl"},
+        {"key": "live", "label": "Live", "base_url": "https://live-api-wildlifenl.uu.nl"},
+    )
+    intro: ClassVar[str] = (
+        "Sends the positions of the entities you integrate to WildlifeNL and registers them "
+        "there as animals with their sensor. Entities are integrated one by one, each from "
+        "its own page."
+    )
+    config_example: ClassVar[dict[str, Any]] = {"base_url": servers[0]["base_url"]}
     credentials_schema: ClassVar[dict[str, str]] = {
         "token": "Filled by signing in on the integration: the account's email address, then "
         "the code WildlifeNL mails to it. The account needs the data-system role, and the "

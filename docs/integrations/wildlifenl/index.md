@@ -10,10 +10,10 @@ Built from the platform's [open source API](https://github.com/UtrechtUniversity
 (MPL-2.0), read at its push of 2026-11-16, and from the API documents the two servers serve
 themselves:
 
-| Server | Address | API version read on 2026-11-21 |
+| Server (as the form names it) | Address | API version read on 2026-11-21 |
 | --- | --- | --- |
-| TEST | `https://test-api-wildlifenl.uu.nl` | 20261116 |
-| LIVE | `https://live-api-wildlifenl.uu.nl` | 20260826 |
+| Test | `https://test-api-wildlifenl.uu.nl` | 20261116 |
+| Live | `https://live-api-wildlifenl.uu.nl` | 20260826 |
 
 Start on TEST. The connector has been run end to end against a stand-in server built from
 these documents; a run against the real TEST server is recorded here when it is done.
@@ -37,11 +37,10 @@ page, where its species and its history are chosen (decision D412).
 
 ### 1. The connection (a project admin, once)
 
-1. **Integrate, Integrations, New integration**, connector WildlifeNL.
-   - Config: the TEST server's address is filled in already,
-     `{"base_url": "https://test-api-wildlifenl.uu.nl"}`. Change it for another server.
-   - Forwards: positions, and measurements when the temperature should go along.
-   - There is no credentials field: the sign-in fills them.
+1. **Integrate, Integrations, New integration**, target WildlifeNL. The form asks for two
+   things and nothing is typed in as text or JSON:
+   - **Name**: "WildlifeNL" is filled in; change it when a project has both servers.
+   - **Server**: Test or Live. Start on Test.
 2. **Save.** The sign-in opens by itself:
    - type the account's email address (your own is filled in) and choose **Send me a code**;
    - WildlifeNL mails a code to that address; type it and choose **Sign in**.
@@ -133,6 +132,11 @@ used for the readings and for the deployment.
   reported to its developers.
 - **The rate limit.** The platform limits requests per account and answers 429 with the time to
   wait. Protect waits that long and goes on; a long history takes the time the platform allows.
+- **Positions only.** The form sets the integration to forward positions. Temperatures and
+  camera trap detections are built in the connector and not offered in the form; say so when
+  a project needs them.
+- **Another server is another integration.** The server of an integration cannot change while
+  entities are integrated with it, and changing it signs the integration out.
 - **Accelerometer values** are not sent.
 - Protect never ends or deletes an animal or a deployment on the platform.
 

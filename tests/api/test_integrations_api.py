@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from shared.bus import RedisStreamsBus, Topic
 from shared.enums import Role
@@ -20,7 +20,7 @@ from shared.integrations.base import (
 from shared.integrations.connectors.wildlifenl import WildlifeNlConnector
 from shared.integrations.deliveries import enqueue, event_ref
 from shared.integrations.registry import CONNECTORS
-from shared.models import Event, Integration, IntegrationDelivery
+from shared.models import Event, Integration, IntegrationDelivery, IntegrationSubject
 from shared.secrets import decrypt_json
 from tests.api.conftest import actor, create_project, project_actor
 
@@ -436,6 +436,53 @@ async def test_an_integration_is_signed_in_with_a_code_from_the_email(client, db
     stored = await db.get(Integration, uuid.UUID(made.json()["id"]))
     await db.refresh(stored)
     assert decrypt_json(stored.credentials_encrypted) == {"token": "tok-secret"}
+
+    # the platform's two servers are offered by name, with a plain sentence for people (D415)
+    assert [(s["label"], s["base_url"]) for s in connectors["wildlifenl"]["servers"]] == [
+        ("Test", "https://test-api-wildlifenl.uu.nl"),
+        ("Live", "https://live-api-wildlifenl.uu.nl"),
+    ]
+    assert connectors["wildlifenl"]["intro"] and connectors["webhook"]["servers"] == []
+
+    # a form cannot write who is signed in, and saving the same server keeps the sign-in
+    one = f"{base}/{made.json()['id']}"
+    same = await client.patch(
+        one,
+        json={"config": {"base_url": "https://wildlifenl.example", "account": "someone@else.org"}},
+        headers=manager.headers,
+    )
+    assert same.status_code == 200, same.text
+    assert same.json()["config"]["account"] == "tim@example.org" and same.json()["has_credentials"]
+
+    # another server is refused while an entity is integrated with this one
+    admin = await actor(client, db, superuser=True)
+    types = (
+        await client.get("/api/v1/entity-types", params={"limit": 500}, headers=admin.headers)
+    ).json()["items"]
+    entity = (
+        await client.post(
+            f"/api/v1/projects/{project.id}/entities",
+            json={"entity_type_id": next(t for t in types if t["key"] == "cow")["id"], "name": "C"},
+            headers=manager.headers,
+        )
+    ).json()
+    db.add(
+        IntegrationSubject(
+            integration_id=uuid.UUID(made.json()["id"]),
+            entity_id=uuid.UUID(entity["id"]),
+            state="registered",
+        )
+    )
+    await db.commit()
+    live = {"config": {"base_url": "https://live.example"}}
+    held = await client.patch(one, json=live, headers=manager.headers)
+    assert held.status_code == 409 and "second integration" in held.text
+    await db.execute(delete(IntegrationSubject))
+    await db.commit()
+    # and with none integrated it signs the integration out: the other server never saw it
+    moved = await client.patch(one, json=live, headers=manager.headers)
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["has_credentials"] is False and "account" not in moved.json()["config"]
 
     # a connector without such a sign-in says so
     hook = await client.post(
