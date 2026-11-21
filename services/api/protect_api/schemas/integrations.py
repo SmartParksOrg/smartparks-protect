@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 from protect_api.schemas.common import ORMModel
 from shared.enums import IntegrationObjectType, Severity
@@ -117,31 +117,94 @@ class IntegrationTestResult(BaseModel):
 class BackfillRequest(BaseModel):
     time_from: datetime
     time_to: datetime
-    then_register: bool = Field(
-        default=False,
-        description="Register the integration's entities on the target once every object "
-        "of the backfill is delivered (D409); for a connector that registers subjects",
-    )
+
+
+SubjectStateName = Literal["history_requested", "sending_history", "registered", "held", "failed"]
+
+
+class TargetStatus(BaseModel):
+    """What the target has for an entity, read from the target."""
+
+    registered: bool
+    sensor_id: str | None = Field(default=None, description="What the target knows the device by")
+    external_id: str | None = None
+    external_name: str | None = None
+    since: datetime | None = None
 
 
 class IntegrationSubjectRead(BaseModel):
-    """An entity the integration forwards and what the target has for it (D408)."""
+    """An entity integrated with a target that registers its entities (D412): what was chosen
+    for it, how far its history is, and what Protect registered."""
 
+    integration_id: uuid.UUID
     entity_id: uuid.UUID
     entity_name: str
-    device_id: uuid.UUID | None = None
-    device_name: str | None = None
-    state: Literal["registered", "not_registered", "blocked"]
-    detail: str | None = Field(default=None, description="Why it cannot be registered")
-    sensor_id: str | None = Field(default=None, description="What the target knows the device by")
-    species: str | None = None
+    state: SubjectStateName
+    detail: str | None = Field(default=None, description="Why it is held or failed")
+    species_id: str | None = None
+    species_name: str | None = None
+    history_from: datetime | None = None
+    history_queued: int = 0
+    history_waiting: int = Field(default=0, description="Objects of its history not yet sent")
     external_id: str | None = Field(default=None, description="The target's id of the animal")
-    external_name: str | None = None
-    since: datetime | None = Field(default=None, description="The start of the registration")
+    registered_at: datetime | None = None
+    created_at: datetime
+    target: TargetStatus | None = Field(
+        default=None, description="Only where the target was asked: the integration's overview"
+    )
 
 
 class IntegrationSubjects(BaseModel):
     items: list[IntegrationSubjectRead]
+    target_error: str | None = Field(
+        default=None, description="Why the target could not be asked; the rows are Protect's own"
+    )
+
+
+class SubjectChoiceRead(BaseModel):
+    id: str
+    name: str
+    common_name: str | None = None
+
+
+class IntegrationSubjectOptions(BaseModel):
+    """What a user sees before integrating one entity (D413)."""
+
+    entity_id: uuid.UUID
+    entity_name: str
+    device_name: str | None = None
+    assigned_from: datetime | None = Field(
+        default=None, description="Since when the device is on the entity: the earliest history"
+    )
+    sensor_id: str | None = None
+    target: TargetStatus
+    species: list[SubjectChoiceRead]
+    proposed_species_id: str | None = None
+    blocked: str | None = Field(default=None, description="Why it cannot be integrated as it is")
+    subject: IntegrationSubjectRead | None = Field(
+        default=None, description="What was chosen before, when the entity is integrated"
+    )
+
+
+class IntegrationSubjectWrite(BaseModel):
+    species_id: uuid.UUID
+    species_name: str | None = Field(default=None, max_length=200)
+    history_from: AwareDatetime | None = Field(
+        default=None,
+        description="Send the entity's data from this moment first, then register it (D409); "
+        "none registers at once",
+    )
+
+
+class EntityIntegrationRead(BaseModel):
+    """An integration of the project that registers its entities, as one entity sees it."""
+
+    integration_id: uuid.UUID
+    name: str
+    connector_key: str
+    connector_label: str
+    enabled: bool
+    subject: IntegrationSubjectRead | None = None
 
 
 class GatewayRead(ORMModel):

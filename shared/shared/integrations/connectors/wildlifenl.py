@@ -47,6 +47,7 @@ server (20260826):
 - Readings are kept per sensor and timestamp, so a reading sent twice overwrites itself.
 """
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
@@ -56,9 +57,12 @@ from shared.integrations.base import (
     DeliveryItem,
     DeliveryResult,
     IntegrationContext,
+    PartlyRegistered,
     PermanentFailure,
     Skipped,
     Subject,
+    SubjectChoice,
+    SubjectOptions,
     SubjectStatus,
     TransientFailure,
     iso,
@@ -520,100 +524,116 @@ class WildlifeNlConnector:
         rows = [d for d in body if isinstance(d, dict)] if isinstance(body, list) else []
         return {str(d["sensorID"]): d for d in rows if d.get("sensorID")}
 
-    def _status(
+    @staticmethod
+    def _deployed(deployment: dict[str, Any] | None, sensor: str | None) -> SubjectStatus:
+        if deployment is None:
+            return SubjectStatus(registered=False, sensor_id=sensor)
+        found = deployment.get("animal")
+        animal: dict[str, Any] = found if isinstance(found, dict) else {}
+        return SubjectStatus(
+            registered=True,
+            sensor_id=sensor,
+            external_id=str(animal.get("ID") or deployment.get("animalID") or "") or None,
+            external_name=str(animal.get("name") or "") or None,
+            since=_moment(deployment.get("start")),
+        )
+
+    async def statuses(
+        self, integration: IntegrationContext, subjects: list[Subject]
+    ) -> dict[uuid.UUID, SubjectStatus]:
+        client = self._client(integration)
+        active = await self._active_deployments(client)
+        out: dict[uuid.UUID, SubjectStatus] = {}
+        for subject in subjects:
+            sensor = sensor_id(integration, subject)
+            out[subject.entity_id] = self._deployed(active.get(sensor or ""), sensor)
+        return out
+
+    async def options(self, integration: IntegrationContext, subject: Subject) -> SubjectOptions:
+        """The platform's species to choose from with Protect's proposal (decisions D411 and
+        D413), the sensor id the entity will be known by, and what the platform has for it."""
+        client = self._client(integration)
+        active = await self._active_deployments(client)
+        catalogue = await self.species_catalogue(integration, client)
+        sensor = sensor_id(integration, subject)
+        mapping = {str(k): str(v) for k, v in (integration.config.get("species") or {}).items()}
+        proposal = species_of(subject, catalogue, mapping)
+        options = SubjectOptions(
+            sensor_id=sensor,
+            status=self._deployed(active.get(sensor or ""), sensor),
+            species=sorted(
+                (
+                    SubjectChoice(
+                        id=str(s["ID"]),
+                        name=str(s.get("name") or ""),
+                        common_name=str(s.get("commonName") or "") or None,
+                    )
+                    for s in catalogue
+                    if s.get("ID") and s.get("name")
+                ),
+                key=lambda choice: (choice.common_name or choice.name).lower(),
+            ),
+            proposed_species_id=str(proposal["ID"]) if proposal else None,
+        )
+        if sensor is None:
+            options.blocked = "No device is on this entity, so there is no sensor to register"
+        elif len(subject.entity_name) < 2:
+            options.blocked = "WildlifeNL asks for a name of at least two characters"
+        return options
+
+    async def register(
         self,
         integration: IntegrationContext,
         subject: Subject,
-        active: dict[str, dict[str, Any]],
-        catalogue: list[dict[str, Any]],
-    ) -> tuple[SubjectStatus, dict[str, Any] | None]:
-        """What the platform has for one entity, and its species there when it can be
-        registered."""
-        status = SubjectStatus(entity_id=subject.entity_id, state="blocked")
-        mapping = {str(k): str(v) for k, v in (integration.config.get("species") or {}).items()}
-        species = species_of(subject, catalogue, mapping)
-        status.species = str(species["name"]) if species else None
-        status.sensor_id = sensor_id(integration, subject)
-        if status.sensor_id is None:
-            status.detail = "No device is on this entity, so there is no sensor to register"
-            return status, None
-        deployment = active.get(status.sensor_id)
-        if deployment is not None:
-            found = deployment.get("animal")
-            animal: dict[str, Any] = found if isinstance(found, dict) else {}
-            status.state = "registered"
-            status.external_id = str(animal.get("ID") or deployment.get("animalID") or "") or None
-            status.external_name = str(animal.get("name") or "") or None
-            status.since = _moment(deployment.get("start"))
-            return status, species
-        if len(subject.entity_name) < 2:
-            status.detail = "WildlifeNL asks for a name of at least two characters"
-            return status, None
-        if species is None:
-            status.detail = (
-                "WildlifeNL knows no species for this entity: give the entity a species, or "
-                "map its type in the integration's species setting"
+        settings: dict[str, Any],
+        external_id: str | None,
+    ) -> SubjectStatus:
+        """An animal and a deployment of its sensor (decision D408), unless the platform has
+        a deployment of the sensor already. The animal's id travels in `PartlyRegistered`
+        when the deployment is refused after the animal was made, so no second one follows."""
+        client = self._client(integration)
+        sensor = sensor_id(integration, subject)
+        if sensor is None:
+            raise PermanentFailure("No device is on this entity, so there is no sensor to register")
+        active = await self._active_deployments(client)
+        status = self._deployed(active.get(sensor), sensor)
+        if status.registered:
+            return status
+        species = str(settings.get("species_id") or "")
+        if not _is_uuid(species):
+            raise PermanentFailure("Choose the entity's species on WildlifeNL first")
+        animal = external_id
+        if animal is None:
+            made = await client.request(
+                "POST", "/animal/", {"name": subject.entity_name, "speciesID": species}
             )
-            return status, None
-        status.state = "not_registered"
-        return status, species
-
-    async def subjects(
-        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
-    ) -> list[SubjectStatus]:
-        client = self._client(integration)
-        active = await self._active_deployments(client)
-        catalogue = await self.species_catalogue(integration, client)
-        return [self._status(integration, s, active, catalogue)[0] for s in subjects]
-
-    async def register(
-        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
-    ) -> tuple[list[SubjectStatus], dict[str, Any]]:
-        """An animal and a deployment for every entity the platform has none for (decision
-        D408). The animal's id is kept in the state before the deployment is asked, so a run
-        that stops between the two makes no second animal."""
-        client = self._client(integration)
-        active = await self._active_deployments(client)
-        catalogue = await self.species_catalogue(integration, client)
-        animals = {str(k): str(v) for k, v in (state.get("animals") or {}).items()}
-        out: list[SubjectStatus] = []
-        for subject in subjects:
-            status, species = self._status(integration, subject, active, catalogue)
-            out.append(status)
-            if status.state != "not_registered" or species is None:
-                continue
-            key = str(subject.entity_id)
-            try:
-                if key not in animals:
-                    made = await client.request(
-                        "POST",
-                        "/animal/",
-                        {"name": subject.entity_name, "speciesID": str(species["ID"])},
-                    )
-                    body = made.get("body")
-                    if not isinstance(body, dict) or not body.get("ID"):
-                        raise PermanentFailure("wildlifenl made an animal without an ID")
-                    animals[key] = str(body["ID"])
-                start = subject.assigned_from or datetime.now(UTC)
-                await client.request(
-                    "POST",
-                    "/borne-sensor-deployment/",
-                    {
-                        "animalID": animals[key],
-                        "sensorID": status.sensor_id,
-                        "contactHardwareAddress": None,
-                        "start": iso(start),
-                    },
-                )
-            except (PermanentFailure, TransientFailure) as exc:
-                status.state = "blocked"
-                status.detail = str(exc)
-                continue
-            status.state = "registered"
-            status.external_id = animals[key]
-            status.external_name = subject.entity_name
-            status.since = start
-        return out, {**state, "animals": animals}
+            body = made.get("body")
+            if not isinstance(body, dict) or not body.get("ID"):
+                raise PermanentFailure("wildlifenl made an animal without an ID")
+            animal = str(body["ID"])
+        start = subject.assigned_from or datetime.now(UTC)
+        try:
+            await client.request(
+                "POST",
+                "/borne-sensor-deployment/",
+                {
+                    "animalID": animal,
+                    "sensorID": sensor,
+                    "contactHardwareAddress": None,
+                    "start": iso(start),
+                },
+            )
+        except (PermanentFailure, TransientFailure) as exc:
+            raise PartlyRegistered(
+                f"WildlifeNL made the animal and refused its sensor: {exc}", external_id=animal
+            ) from exc
+        return SubjectStatus(
+            registered=True,
+            sensor_id=sensor,
+            external_id=animal,
+            external_name=subject.entity_name,
+            since=start,
+        )
 
 
 def _moment(value: Any) -> datetime | None:

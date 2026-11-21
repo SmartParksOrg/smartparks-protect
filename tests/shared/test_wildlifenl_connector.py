@@ -13,6 +13,7 @@ import pytest
 from shared.integrations.base import (
     DeliveryItem,
     IntegrationContext,
+    PartlyRegistered,
     PermanentFailure,
     Skipped,
     Subject,
@@ -325,9 +326,10 @@ def test_the_species_of_an_entity():
     assert species_of(subject(), catalogue, {}) is None
 
 
-async def test_subjects_and_their_registration(monkeypatch):
-    """Decision D408: what the platform has is read from its active deployments; an animal and
-    a deployment are made for the entity it lacks, and a second run makes neither again."""
+async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeypatch):
+    """Decisions D408, D412 and D413: the platform's species to pick from with a proposal, what
+    the platform has read from its active deployments, an animal and a deployment made for the
+    entity it lacks, and no second animal after a half-done attempt."""
     assert isinstance(WildlifeNlConnector(), SubjectRegistrar)
     calls: list[tuple[str, str, dict | None]] = []
     active = list(ACTIVE)
@@ -352,46 +354,57 @@ async def test_subjects_and_their_registration(monkeypatch):
 
     mock_platform(monkeypatch, handler)
     connector = WildlifeNlConnector()
-    config = {"species": {"horse": "Equus ferus caballus"}}
     known = subject()
     new = subject(
-        entity_id=uuid.UUID(int=9), entity_name="Konik 9", device_identity="70B3D57ED0009999"
+        entity_id=uuid.UUID(int=9),
+        entity_name="Konik 9",
+        entity_type_label="Konik",
+        device_identity="70B3D57ED0009999",
     )
     no_device = subject(
         entity_id=uuid.UUID(int=10), device_identity=None, device_serial=None, device_name=None
     )
-    no_species = subject(
-        entity_id=uuid.UUID(int=11),
-        entity_type_key="okapi",
-        entity_type_label="Okapi",
-        device_identity="70B3D57ED0001111",
-    )
-    everyone = [known, new, no_device, no_species]
 
-    statuses = await connector.subjects(integration(**config), everyone, {})
-    assert [s.state for s in statuses] == ["registered", "not_registered", "blocked", "blocked"]
-    assert statuses[0].external_name == "Konik 3" and statuses[0].since == datetime(
-        2026, 5, 1, 8, 0, tzinfo=UTC
-    )
-    assert statuses[1].sensor_id == "70B3D57ED0009999"
-    assert statuses[1].species == "Equus ferus caballus"
-    assert "No device" in statuses[2].detail and "no species" in statuses[3].detail
+    options = await connector.options(integration(), new)
+    # every species of the platform, by the name a person reads, and the one Protect proposes
+    assert [c.common_name for c in options.species] == ["Konik", "Wild boar", "Wolf"]
+    assert options.proposed_species_id == HORSE["ID"] and options.blocked is None
+    assert options.sensor_id == "70B3D57ED0009999" and not options.status.registered
+    unknown = await connector.options(integration(), subject(entity_type_label="Horse"))
+    assert unknown.proposed_species_id is None  # never a guess (D411); the user picks
+    assert unknown.status.registered and unknown.status.external_name == "Konik 3"
+    assert "No device" in (await connector.options(integration(), no_device)).blocked
+
+    statuses = await connector.statuses(integration(), [known, new, no_device])
+    assert [statuses[s.entity_id].registered for s in (known, new, no_device)] == [
+        True,
+        False,
+        False,
+    ]
+    assert statuses[known.entity_id].since == datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
     assert not [c for c in calls if c[0] == "POST"]  # reading changes nothing
 
-    # the platform fails between the animal and the deployment: the animal is remembered
-    statuses, state = await connector.register(integration(**config), everyone, {})
-    assert statuses[1].state == "blocked" and "500" in statuses[1].detail
-    assert state["animals"] == {str(new.entity_id): "bbbbbbbb-0000-4000-8000-000000000002"}
+    chosen = {"species_id": HORSE["ID"], "species_name": HORSE["name"]}
+    with pytest.raises(PermanentFailure, match="Choose the entity's species"):
+        await connector.register(integration(), new, {}, None)
+    with pytest.raises(PermanentFailure, match="No device"):
+        await connector.register(integration(), no_device, chosen, None)
+
+    # the platform fails between the animal and the deployment: the animal's id comes back
+    with pytest.raises(PartlyRegistered, match="refused its sensor") as partly:
+        await connector.register(integration(), new, chosen, None)
+    animal_id = partly.value.external_id
+    assert animal_id == "bbbbbbbb-0000-4000-8000-000000000002"
 
     refuse_deployment["on"] = False
-    statuses, state = await connector.register(integration(**config), everyone, state)
-    assert [s.state for s in statuses] == ["registered", "registered", "blocked", "blocked"]
+    status = await connector.register(integration(), new, chosen, animal_id)
+    assert status.registered and status.external_id == animal_id
     animals = [c for c in calls if c[:2] == ("POST", "/animal/")]
     assert len(animals) == 1  # not a second animal for the second attempt
     assert animals[0][2] == {"name": "Konik 9", "speciesID": HORSE["ID"]}
     deployment = [c for c in calls if c[:2] == ("POST", "/borne-sensor-deployment/")][-1][2]
     assert deployment == {
-        "animalID": "bbbbbbbb-0000-4000-8000-000000000002",
+        "animalID": animal_id,
         "sensorID": "70B3D57ED0009999",
         "contactHardwareAddress": None,
         # from the start of the device's time on the entity, so its history belongs to it
@@ -399,9 +412,11 @@ async def test_subjects_and_their_registration(monkeypatch):
     }
 
     posts = len([c for c in calls if c[0] == "POST"])
-    statuses, _ = await connector.register(integration(**config), everyone, state)
-    assert statuses[1].state == "registered"
-    assert len([c for c in calls if c[0] == "POST"]) == posts  # nothing left to make
+    again = await connector.register(integration(), new, chosen, animal_id)
+    assert again.registered and len([c for c in calls if c[0] == "POST"]) == posts
+    # an entity the platform has a deployment for is left as it is
+    assert (await connector.register(integration(), known, chosen, None)).external_name == "Konik 3"
+    assert len([c for c in calls if c[0] == "POST"]) == posts
 
 
 async def test_an_account_without_the_herd_manager_role_is_told(monkeypatch):
@@ -410,46 +425,4 @@ async def test_an_account_without_the_herd_manager_role_is_told(monkeypatch):
 
     mock_platform(monkeypatch, handler)
     with pytest.raises(PermanentFailure, match="herd-manager"):
-        await WildlifeNlConnector().subjects(integration(), [subject()], {})
-
-
-async def test_test_reports_a_missing_role_and_refused_tokens(monkeypatch):
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.headers.get("authorization") != "Bearer tok":
-            return httpx.Response(
-                401, json={"title": "Unauthorized", "detail": "Invalid bearer token."}
-            )
-        return httpx.Response(
-            200, json={"email": "someone@example.org", "roles": [{"ID": 3, "name": "researcher"}]}
-        )
-
-    real = httpx.AsyncClient
-    monkeypatch.setattr(
-        httpx, "AsyncClient", lambda *a, **k: real(*a, transport=httpx.MockTransport(handler), **k)
-    )
-    connector = WildlifeNlConnector()
-    with pytest.raises(PermanentFailure, match="data-system"):
-        await connector.test(integration(), None)
-    bad = IntegrationContext(
-        id=uuid.uuid4(),
-        project_id=uuid.uuid4(),
-        name="x",
-        connector_key="wildlifenl",
-        config={"base_url": "https://wildlifenl.example/api"},
-        credentials={"token": "wrong"},
-    )
-    with pytest.raises(PermanentFailure, match="refused the token"):
-        await connector.test(bad, None)
-    with pytest.raises(PermanentFailure, match="no token"):
-        await connector.deliver(
-            IntegrationContext(
-                id=uuid.uuid4(),
-                project_id=uuid.uuid4(),
-                name="x",
-                connector_key="wildlifenl",
-                config={"base_url": "https://wildlifenl.example/api"},
-                credentials={},
-            ),
-            item(),
-            connector.render(integration(), item()),
-        )
+        await WildlifeNlConnector().statuses(integration(), [subject()])

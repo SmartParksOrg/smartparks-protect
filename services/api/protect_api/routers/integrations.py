@@ -2,11 +2,12 @@
 log with request and response inspection, retry, test sends and backfill requests."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
@@ -16,24 +17,29 @@ from protect_api.deps import ProjectContext, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.integrations import (
     BackfillRequest,
+    EntityIntegrationRead,
     IntegrationCreate,
     IntegrationDeliveryDetail,
     IntegrationDeliveryRead,
     IntegrationDetail,
     IntegrationRead,
+    IntegrationSubjectOptions,
     IntegrationSubjectRead,
     IntegrationSubjects,
+    IntegrationSubjectWrite,
     IntegrationTestRequest,
     IntegrationTestResult,
     IntegrationUpdate,
+    SubjectChoiceRead,
+    TargetStatus,
 )
 from shared.bus import RedisStreamsBus, Topic
 from shared.database import get_session
-from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus
+from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus, SubjectState
 from shared.integrations.base import (
     PermanentFailure,
     Skipped,
-    Subject,
+    SubjectRegistrar,
     SubjectStatus,
     TransientFailure,
 )
@@ -46,12 +52,19 @@ from shared.integrations.deliveries import (
 )
 from shared.integrations.registry import CONNECTORS, describe_connector
 from shared.integrations.subjects import (
+    integrate,
+    load_subject,
     load_subjects,
-    register_subjects,
     registrar_of,
-    subject_statuses,
+    stop,
 )
-from shared.models import EntityCurrentState, Integration, IntegrationDelivery
+from shared.models import (
+    Entity,
+    EntityCurrentState,
+    Integration,
+    IntegrationDelivery,
+    IntegrationSubject,
+)
 from shared.permissions import Permission
 from shared.secrets import encrypt_json
 from shared.timeutil import utc_now
@@ -414,14 +427,6 @@ async def request_backfill(
         )
     if integration.backfill.get("status") in (BackfillStatus.QUEUED, BackfillStatus.RUNNING):
         raise HTTPException(status.HTTP_409_CONFLICT, "a backfill is running already")
-    if body.then_register:
-        # refused now rather than after a day of sending: the connector must keep a register
-        # and the integration must name its entities (decision D409)
-        try:
-            registrar_of(integration)
-            await load_subjects(session, integration)
-        except PermanentFailure as exc:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     integration.backfill = {
         "status": BackfillStatus.QUEUED,
         "from": body.time_from.isoformat(),
@@ -430,7 +435,6 @@ async def request_backfill(
         "scanned": 0,
         "requested_at": utc_now().isoformat(),
         "requested_by": str(context.user.id),
-        "then_register": body.then_register,
     }
     await record_audit(
         session,
@@ -439,11 +443,7 @@ async def request_backfill(
         object_type="integration",
         object_id=str(integration.id),
         project_id=context.project.id,
-        details={
-            "from": body.time_from.isoformat(),
-            "to": body.time_to.isoformat(),
-            "then_register": body.then_register,
-        },
+        details={"from": body.time_from.isoformat(), "to": body.time_to.isoformat()},
     )
     await session.commit()
     await bus.publish(
@@ -457,25 +457,70 @@ async def request_backfill(
     return _read(integration)
 
 
-def _subjects(pairs: list[tuple[Subject, SubjectStatus]]) -> IntegrationSubjects:
-    return IntegrationSubjects(
-        items=[
-            IntegrationSubjectRead(
-                entity_id=subject.entity_id,
-                entity_name=subject.entity_name,
-                device_id=subject.device_id,
-                device_name=subject.device_name,
-                state=status.state,
-                detail=status.detail,
-                sensor_id=status.sensor_id,
-                species=status.species,
-                external_id=status.external_id,
-                external_name=status.external_name,
-                since=status.since,
-            )
-            for subject, status in pairs
-        ]
+def _target(status: SubjectStatus | None) -> TargetStatus | None:
+    if status is None:
+        return None
+    return TargetStatus(
+        registered=status.registered,
+        sensor_id=status.sensor_id,
+        external_id=status.external_id,
+        external_name=status.external_name,
+        since=status.since,
     )
+
+
+async def _subject_reads(
+    session: AsyncSession, rows: Sequence[IntegrationSubject]
+) -> list[IntegrationSubjectRead]:
+    """The rows with their entities' names and what still waits of each history."""
+    if not rows:
+        return []
+    names: dict[uuid.UUID, str] = {
+        entity_id: name
+        for entity_id, name in (
+            await session.execute(
+                select(Entity.id, Entity.name).where(Entity.id.in_({r.entity_id for r in rows}))
+            )
+        ).all()
+    }
+    waiting: dict[tuple[uuid.UUID, uuid.UUID | None], int] = {}
+    sending = [r for r in rows if r.state == SubjectState.SENDING_HISTORY]
+    if sending:
+        for integration_id, entity_id, count in (
+            await session.execute(
+                select(
+                    IntegrationDelivery.integration_id,
+                    IntegrationDelivery.entity_id,
+                    func.count(),
+                )
+                .where(
+                    IntegrationDelivery.integration_id.in_({r.integration_id for r in sending}),
+                    IntegrationDelivery.entity_id.in_({r.entity_id for r in sending}),
+                    IntegrationDelivery.origin == DeliveryOrigin.BACKFILL,
+                    IntegrationDelivery.status == DeliveryStatus.QUEUED,
+                )
+                .group_by(IntegrationDelivery.integration_id, IntegrationDelivery.entity_id)
+            )
+        ).all():
+            waiting[(integration_id, entity_id)] = int(count)
+    return [
+        IntegrationSubjectRead(
+            integration_id=row.integration_id,
+            entity_id=row.entity_id,
+            entity_name=str(names.get(row.entity_id, "")),
+            state=row.state,
+            detail=row.detail,
+            species_id=(row.settings or {}).get("species_id"),
+            species_name=(row.settings or {}).get("species_name"),
+            history_from=row.history_from,
+            history_queued=row.history_queued,
+            history_waiting=waiting.get((row.integration_id, row.entity_id), 0),
+            external_id=row.external_id,
+            registered_at=row.registered_at,
+            created_at=row.created_at,
+        )
+        for row in sorted(rows, key=lambda r: str(names.get(r.entity_id, "")).lower())
+    ]
 
 
 def _target_refused(exc: Exception) -> HTTPException:
@@ -488,47 +533,217 @@ def _target_refused(exc: Exception) -> HTTPException:
     return HTTPException(code, str(exc))
 
 
+def _registrar(integration: Integration) -> SubjectRegistrar:
+    try:
+        return registrar_of(integration)
+    except PermanentFailure as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+
+
+@router.get("/by-entity/{entity_id}", response_model=list[EntityIntegrationRead])
+async def entity_integrations(
+    entity_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[EntityIntegrationRead]:
+    """The project's integrations that register their entities, as this entity stands with
+    each (decision D412): the card on the entity page. Protect's own account, the target is
+    not asked. Bounded by the project's integrations."""
+    entity = await session.get(Entity, entity_id)
+    if (
+        entity is None
+        or entity.project_id != context.project.id
+        or not context.visibility.entity_visible(entity.id)
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entity not found")
+    integrations = [
+        i
+        for i in await session.scalars(
+            select(Integration)
+            .where(Integration.project_id == context.project.id)
+            .order_by(Integration.name)
+        )
+        if isinstance(CONNECTORS.get(i.connector_key), SubjectRegistrar)
+    ]
+    rows = (
+        list(
+            await session.scalars(
+                select(IntegrationSubject).where(
+                    IntegrationSubject.entity_id == entity_id,
+                    IntegrationSubject.integration_id.in_([i.id for i in integrations]),
+                )
+            )
+        )
+        if integrations
+        else []
+    )
+    reads = {r.integration_id: r for r in await _subject_reads(session, rows)}
+    return [
+        EntityIntegrationRead(
+            integration_id=i.id,
+            name=i.name,
+            connector_key=i.connector_key,
+            connector_label=CONNECTORS[i.connector_key].label,
+            enabled=i.enabled,
+            subject=reads.get(i.id),
+        )
+        for i in integrations
+    ]
+
+
 @router.get("/{integration_id}/subjects", response_model=IntegrationSubjects)
 async def list_subjects(
     integration_id: uuid.UUID,
     context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> IntegrationSubjects:
-    """The entities ticked on the integration and what the target has for each (decision
-    D408), read from the target with the integration's credentials, which is why reading it
-    takes the right to change integrations. At most 200 entities."""
+    """The entities integrated with this integration and what the target has for each
+    (decisions D408 and D412): the overview on the integration. The target is asked with the
+    integration's credentials, which is why this takes the right to change integrations.
+    At most 200 entities."""
     integration = await _integration(session, context.project.id, integration_id)
+    registrar = _registrar(integration)
+    rows = list(
+        await session.scalars(
+            select(IntegrationSubject).where(IntegrationSubject.integration_id == integration.id)
+        )
+    )
+    reads = await _subject_reads(session, rows)
+    if not reads:
+        return IntegrationSubjects(items=[])
+    subjects = await load_subjects(session, integration.project_id, [r.entity_id for r in rows])
     try:
-        return _subjects(await subject_statuses(session, integration))
+        statuses = await registrar.statuses(integration_context(integration), subjects)
     except (PermanentFailure, TransientFailure) as exc:
-        raise _target_refused(exc) from None
+        return IntegrationSubjects(items=reads, target_error=str(exc))
+    for read in reads:
+        read.target = _target(statuses.get(read.entity_id))
+    return IntegrationSubjects(items=reads)
 
 
-@router.post("/{integration_id}/subjects/register", response_model=IntegrationSubjects)
-async def register_integration_subjects(
+@router.get(
+    "/{integration_id}/subjects/{entity_id}/options", response_model=IntegrationSubjectOptions
+)
+async def subject_options(
     integration_id: uuid.UUID,
+    entity_id: uuid.UUID,
     context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
     session: AsyncSession = Depends(get_session),
-) -> IntegrationSubjects:
-    """Register the entities the target lacks, now (decision D408). An entity that cannot be
-    registered says why and does not stop the others. To send the history first, ask for a
-    backfill with `then_register`."""
+) -> IntegrationSubjectOptions:
+    """What a user chooses from to integrate one entity (decision D413): the target's species
+    with Protect's proposal, the sensor id the entity will be known by, what the target has
+    for it, and why it cannot be integrated when it cannot. Read from the target."""
     integration = await _integration(session, context.project.id, integration_id)
+    registrar = _registrar(integration)
     try:
-        pairs = await register_subjects(session, integration)
+        subject = await load_subject(session, integration, entity_id)
+        options = await registrar.options(integration_context(integration), subject)
     except (PermanentFailure, TransientFailure) as exc:
         raise _target_refused(exc) from None
+    row = await session.scalar(
+        select(IntegrationSubject).where(
+            IntegrationSubject.integration_id == integration.id,
+            IntegrationSubject.entity_id == entity_id,
+        )
+    )
+    reads = await _subject_reads(session, [row] if row is not None else [])
+    target = _target(options.status)
+    assert target is not None
+    return IntegrationSubjectOptions(
+        entity_id=subject.entity_id,
+        entity_name=subject.entity_name,
+        device_name=subject.device_name,
+        assigned_from=subject.assigned_from,
+        sensor_id=options.sensor_id,
+        target=target,
+        species=[
+            SubjectChoiceRead(id=c.id, name=c.name, common_name=c.common_name)
+            for c in options.species
+        ],
+        proposed_species_id=options.proposed_species_id,
+        blocked=options.blocked,
+        subject=reads[0] if reads else None,
+    )
+
+
+@router.put("/{integration_id}/subjects/{entity_id}", response_model=IntegrationSubjectRead)
+async def integrate_entity(
+    integration_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    body: IntegrationSubjectWrite,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> IntegrationSubjectRead:
+    """Integrate one entity (decision D412): its data is forwarded from now on, and it is
+    registered on the target with the species chosen. With `history_from` its old data goes
+    first, oldest first, and the registration follows the last of it (decision D409); at most
+    400 days back."""
+    integration = await _integration(session, context.project.id, integration_id)
+    _registrar(integration)
+    if body.history_from is not None:
+        if body.history_from >= utc_now():
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "The history starts in the past"
+            )
+        if utc_now() - body.history_from > timedelta(days=MAX_BACKFILL_DAYS):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"A history covers at most {MAX_BACKFILL_DAYS} days",
+            )
+    try:
+        row = await integrate(
+            session,
+            integration,
+            entity_id,
+            {"species_id": str(body.species_id), "species_name": body.species_name},
+            body.history_from,
+            context.user.id,
+        )
+    except TransientFailure as exc:
+        raise _target_refused(exc) from None
+    except PermanentFailure as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     await record_audit(
         session,
         user=context.user,
-        action="integration.subjects_registered",
+        action="integration.entity_integrated",
         object_type="integration",
         object_id=str(integration.id),
         project_id=context.project.id,
         details={
-            "registered": [str(s.entity_id) for s, st in pairs if st.state == "registered"],
-            "blocked": [str(s.entity_id) for s, st in pairs if st.state == "blocked"],
+            "entity_id": str(entity_id),
+            "species_id": str(body.species_id),
+            "history_from": body.history_from.isoformat() if body.history_from else None,
+            "state": str(row.state),
         },
     )
     await session.commit()
-    return _subjects(pairs)
+    if row.state == SubjectState.HISTORY_REQUESTED:
+        await bus.publish(Topic.INTEGRATION_BACKFILL_REQUESTED, {"subject_id": str(row.id)})
+    return (await _subject_reads(session, [row]))[0]
+
+
+@router.delete("/{integration_id}/subjects/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def stop_integrating_entity(
+    integration_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Stop forwarding an entity's data to the target. What the target holds stays there:
+    Protect ends and deletes nothing on a target."""
+    integration = await _integration(session, context.project.id, integration_id)
+    _registrar(integration)
+    if not await stop(session, integration, entity_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "The entity is not integrated here")
+    await record_audit(
+        session,
+        user=context.user,
+        action="integration.entity_stopped",
+        object_type="integration",
+        object_id=str(integration.id),
+        project_id=context.project.id,
+        details={"entity_id": str(entity_id)},
+    )
+    await session.commit()

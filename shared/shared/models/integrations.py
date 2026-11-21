@@ -26,7 +26,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.enums import DeliveryOrigin, DeliveryStatus, IntegrationObjectType, Severity
+from shared.enums import (
+    DeliveryOrigin,
+    DeliveryStatus,
+    IntegrationObjectType,
+    Severity,
+    SubjectState,
+)
 from shared.models.base import Base, TimestampMixin, UuidPrimaryKeyMixin, enum_check
 
 
@@ -83,14 +89,6 @@ class Integration(UuidPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         server_default=text("'{}'::jsonb"),
         comment="Progress of the last backfill: status, from, to, queued, started_at, finished_at",
-    )
-    connector_state: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
-        nullable=False,
-        server_default=text("'{}'::jsonb"),
-        default=dict,
-        comment="The connector's own memory between calls, such as what it registered on "
-        "the target (D408); never a credential",
     )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL")
@@ -163,4 +161,49 @@ class IntegrationDelivery(UuidPrimaryKeyMixin, Base):
     trace_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class IntegrationSubject(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """An entity integrated with a target that keeps a register of its own (decision D412):
+    what the user chose for it there, how far its history is, and what the target calls it.
+    One row per integration and entity; the integration's `entity_ids` holds the same
+    entities, since that is the filter every delivery passes."""
+
+    __tablename__ = "integration_subjects"
+    __table_args__ = (
+        UniqueConstraint("integration_id", "entity_id", name="uq_integration_subjects_entity"),
+        enum_check("state", SubjectState, "ck_integration_subjects_state"),
+    )
+
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("integrations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    settings: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        default=dict,
+        comment="What the user chose for this entity on the target, such as its species there",
+    )
+    state: Mapped[str] = mapped_column(String(24), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, comment="Why it is held or failed")
+    history_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="From when its old data is sent; none sends none"
+    )
+    history_queued: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0"), default=0
+    )
+    history_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    external_id: Mapped[str | None] = mapped_column(
+        String(200),
+        comment="The target's id of what Protect registered, kept so a second "
+        "attempt makes no second one",
+    )
+    registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
     )

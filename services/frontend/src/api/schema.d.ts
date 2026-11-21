@@ -5342,6 +5342,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/integrations/by-entity/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Entity Integrations
+         * @description The project's integrations that register their entities, as this entity stands with
+         *     each (decision D412): the card on the entity page. Protect's own account, the target is
+         *     not asked. Bounded by the project's integrations.
+         */
+        get: operations["entity_integrations_api_v1_projects__project_id__integrations_by_entity__entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects": {
         parameters: {
             query?: never;
@@ -5351,9 +5373,10 @@ export interface paths {
         };
         /**
          * List Subjects
-         * @description The entities ticked on the integration and what the target has for each (decision
-         *     D408), read from the target with the integration's credentials, which is why reading it
-         *     takes the right to change integrations. At most 200 entities.
+         * @description The entities integrated with this integration and what the target has for each
+         *     (decisions D408 and D412): the overview on the integration. The target is asked with the
+         *     integration's credentials, which is why this takes the right to change integrations.
+         *     At most 200 entities.
          */
         get: operations["list_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_get"];
         put?: never;
@@ -5364,7 +5387,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects/register": {
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects/{entity_id}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject Options
+         * @description What a user chooses from to integrate one entity (decision D413): the target's species
+         *     with Protect's proposal, the sensor id the entity will be known by, what the target has
+         *     for it, and why it cannot be integrated when it cannot. Read from the target.
+         */
+        get: operations["subject_options_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects/{entity_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -5372,15 +5417,21 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /**
-         * Register Integration Subjects
-         * @description Register the entities the target lacks, now (decision D408). An entity that cannot be
-         *     registered says why and does not stop the others. To send the history first, ask for a
-         *     backfill with `then_register`.
+         * Integrate Entity
+         * @description Integrate one entity (decision D412): its data is forwarded from now on, and it is
+         *     registered on the target with the species chosen. With `history_from` its old data goes
+         *     first, oldest first, and the registration follows the last of it (decision D409); at most
+         *     400 days back.
          */
-        post: operations["register_integration_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_register_post"];
-        delete?: never;
+        put: operations["integrate_entity_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__put"];
+        post?: never;
+        /**
+         * Stop Integrating Entity
+         * @description Stop forwarding an entity's data to the target. What the target holds stays there:
+         *     Protect ends and deletes nothing on a target.
+         */
+        delete: operations["stop_integrating_entity_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6893,12 +6944,6 @@ export interface components {
              * Format: date-time
              */
             time_to: string;
-            /**
-             * Then Register
-             * @description Register the integration's entities on the target once every object of the backfill is delivered (D409); for a connector that registers subjects
-             * @default false
-             */
-            then_register: boolean;
         };
         /** BackupItem */
         BackupItem: {
@@ -9825,6 +9870,26 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /**
+         * EntityIntegrationRead
+         * @description An integration of the project that registers its entities, as one entity sees it.
+         */
+        EntityIntegrationRead: {
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /** Name */
+            name: string;
+            /** Connector Key */
+            connector_key: string;
+            /** Connector Label */
+            connector_label: string;
+            /** Enabled */
+            enabled: boolean;
+            subject?: components["schemas"]["IntegrationSubjectRead"] | null;
+        };
         /** EntityRead */
         EntityRead: {
             /**
@@ -11579,10 +11644,10 @@ export interface components {
             updated_at: string;
         };
         /**
-         * IntegrationSubjectRead
-         * @description An entity the integration forwards and what the target has for it (D408).
+         * IntegrationSubjectOptions
+         * @description What a user sees before integrating one entity (D413).
          */
-        IntegrationSubjectRead: {
+        IntegrationSubjectOptions: {
             /**
              * Entity Id
              * Format: uuid
@@ -11590,44 +11655,112 @@ export interface components {
             entity_id: string;
             /** Entity Name */
             entity_name: string;
-            /** Device Id */
-            device_id?: string | null;
             /** Device Name */
             device_name?: string | null;
+            /**
+             * Assigned From
+             * @description Since when the device is on the entity: the earliest history
+             */
+            assigned_from?: string | null;
+            /** Sensor Id */
+            sensor_id?: string | null;
+            target: components["schemas"]["TargetStatus"];
+            /** Species */
+            species: components["schemas"]["SubjectChoiceRead"][];
+            /** Proposed Species Id */
+            proposed_species_id?: string | null;
+            /**
+             * Blocked
+             * @description Why it cannot be integrated as it is
+             */
+            blocked?: string | null;
+            /** @description What was chosen before, when the entity is integrated */
+            subject?: components["schemas"]["IntegrationSubjectRead"] | null;
+        };
+        /**
+         * IntegrationSubjectRead
+         * @description An entity integrated with a target that registers its entities (D412): what was chosen
+         *     for it, how far its history is, and what Protect registered.
+         */
+        IntegrationSubjectRead: {
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string;
             /**
              * State
              * @enum {string}
              */
-            state: "registered" | "not_registered" | "blocked";
+            state: "history_requested" | "sending_history" | "registered" | "held" | "failed";
             /**
              * Detail
-             * @description Why it cannot be registered
+             * @description Why it is held or failed
              */
             detail?: string | null;
+            /** Species Id */
+            species_id?: string | null;
+            /** Species Name */
+            species_name?: string | null;
+            /** History From */
+            history_from?: string | null;
             /**
-             * Sensor Id
-             * @description What the target knows the device by
+             * History Queued
+             * @default 0
              */
-            sensor_id?: string | null;
-            /** Species */
-            species?: string | null;
+            history_queued: number;
+            /**
+             * History Waiting
+             * @description Objects of its history not yet sent
+             * @default 0
+             */
+            history_waiting: number;
             /**
              * External Id
              * @description The target's id of the animal
              */
             external_id?: string | null;
-            /** External Name */
-            external_name?: string | null;
+            /** Registered At */
+            registered_at?: string | null;
             /**
-             * Since
-             * @description The start of the registration
+             * Created At
+             * Format: date-time
              */
-            since?: string | null;
+            created_at: string;
+            /** @description Only where the target was asked: the integration's overview */
+            target?: components["schemas"]["TargetStatus"] | null;
+        };
+        /** IntegrationSubjectWrite */
+        IntegrationSubjectWrite: {
+            /**
+             * Species Id
+             * Format: uuid
+             */
+            species_id: string;
+            /** Species Name */
+            species_name?: string | null;
+            /**
+             * History From
+             * @description Send the entity's data from this moment first, then register it (D409); none registers at once
+             */
+            history_from?: string | null;
         };
         /** IntegrationSubjects */
         IntegrationSubjects: {
             /** Items */
             items: components["schemas"]["IntegrationSubjectRead"][];
+            /**
+             * Target Error
+             * @description Why the target could not be asked; the rows are Protect's own
+             */
+            target_error?: string | null;
         };
         /** IntegrationTestRequest */
         IntegrationTestRequest: {
@@ -15158,6 +15291,15 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** SubjectChoiceRead */
+        SubjectChoiceRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Common Name */
+            common_name?: string | null;
+        };
         /** SystemHealth */
         SystemHealth: {
             /** Status */
@@ -15197,6 +15339,25 @@ export interface components {
              * Format: date-time
              */
             checked_at: string;
+        };
+        /**
+         * TargetStatus
+         * @description What the target has for an entity, read from the target.
+         */
+        TargetStatus: {
+            /** Registered */
+            registered: boolean;
+            /**
+             * Sensor Id
+             * @description What the target knows the device by
+             */
+            sensor_id?: string | null;
+            /** External Id */
+            external_id?: string | null;
+            /** External Name */
+            external_name?: string | null;
+            /** Since */
+            since?: string | null;
         };
         /** TestSendResult */
         TestSendResult: {
@@ -27226,6 +27387,38 @@ export interface operations {
             };
         };
     };
+    entity_integrations_api_v1_projects__project_id__integrations_by_entity__entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityIntegrationRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_get: {
         parameters: {
             query?: never;
@@ -27258,12 +27451,13 @@ export interface operations {
             };
         };
     };
-    register_integration_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_register_post: {
+    subject_options_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__options_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 integration_id: string;
+                entity_id: string;
                 project_id: string;
             };
             cookie?: never;
@@ -27276,8 +27470,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntegrationSubjects"];
+                    "application/json": components["schemas"]["IntegrationSubjectOptions"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    integrate_entity_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationSubjectWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationSubjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_integrating_entity_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

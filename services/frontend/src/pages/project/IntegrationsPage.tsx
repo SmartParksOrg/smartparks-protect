@@ -143,7 +143,7 @@ function toValues(
       };
 }
 
-function toBody(v: Values, editing: boolean) {
+function toBody(v: Values, editing: boolean, ownEntities = false) {
   const list = (s: string) =>
     s
       .split(",")
@@ -163,6 +163,8 @@ function toBody(v: Values, editing: boolean) {
   };
   if (v.credentials.trim()) body.credentials = JSON.parse(v.credentials);
   if (!editing) body.connector_key = v.connector_key;
+  // a target that registers its entities keeps its own list, filled from the entity pages
+  if (ownEntities) delete body.entity_ids;
   return body;
 }
 
@@ -226,9 +228,6 @@ export function IntegrationsPage() {
   const [removing, setRemoving] = useState<Integration | null>(null);
   const [inspecting, setInspecting] = useState<Integration | null>(null);
   const [backfilling, setBackfilling] = useState<Integration | null>(null);
-  // "then register": the entities are registered on the target after their history (D409)
-  const [thenRegister, setThenRegister] = useState(false);
-  const [backfillError, setBackfillError] = useState<string | null>(null);
   const [backfillRange, setBackfillRange] = useState({
     from: dateLocal(new Date(Date.now() - 7 * 86_400_000)),
     to: dateLocal(new Date()),
@@ -282,7 +281,7 @@ export function IntegrationsPage() {
     mutationFn: (v: Values) =>
       editing
         ? api.patch<Integration>(`${base}/${editing.id}`, {
-            body: toBody(v, true),
+            body: toBody(v, true, Boolean(connector?.registers_subjects)),
           })
         : api.post<Integration>(base, { body: toBody(v, false) }),
     invalidate,
@@ -324,18 +323,13 @@ export function IntegrationsPage() {
         body: {
           time_from: new Date(backfillRange.from).toISOString(),
           time_to: new Date(backfillRange.to).toISOString(),
-          then_register: thenRegister && registers(i),
         },
       }),
     invalidate,
     success: t(
       "Backfill queued; the integration service works through the range in batches",
     ),
-    onSuccess: () => {
-      setBackfilling(null);
-      setThenRegister(false);
-    },
-    onError: (error) => setBackfillError(error.message),
+    onSuccess: () => setBackfilling(null),
   });
   const retry = useMutationToast({
     mutationFn: (d: IntegrationDelivery) =>
@@ -362,23 +356,6 @@ export function IntegrationsPage() {
     onSuccess: () => setDeliveryDetail(null),
   });
   const { can } = usePermissions(projectId);
-  /** What became of the registration a backfill asked for (decision D409). */
-  const registrationText = (registration: unknown): string => {
-    const r = registration as
-      | {
-          status?: string;
-          registered?: number;
-          failed?: number;
-          error?: string;
-        }
-      | undefined;
-    if (!r?.status) return "";
-    if (r.status === "done")
-      return `. ${t("Registered after it: {{count}}.", { count: r.registered ?? 0 })}`;
-    if (r.status === "held")
-      return `. ${t("Not registered: {{count}} objects of the backfill failed. Look at the deliveries, then register by hand.", { count: r.failed ?? 0 })}`;
-    return `. ${t("The registration failed: {{error}}", { error: r.error ?? "" })}`;
-  };
   const connectorLabel = (key: string) =>
     CONNECTORS.find((c) => c.key === key)?.label ?? key;
   const integrationName = (id: string) =>
@@ -465,11 +442,7 @@ export function IntegrationsPage() {
             variant="ghost"
             size="sm"
             aria-label={t("Backfill")}
-            onClick={() => {
-              setThenRegister(false);
-              setBackfillError(null);
-              setBackfilling(row.original);
-            }}
+            onClick={() => setBackfilling(row.original)}
           >
             <History className="size-4" />
           </Button>
@@ -864,40 +837,50 @@ export function IntegrationsPage() {
                 />
               </Field>
             </div>
-            <Field
-              label={t("Entities")}
-              htmlFor="in-entities"
-              hint={t("Optional. Leave empty for every entity of the project.")}
-            >
-              <div
-                className="flex max-h-32 flex-wrap gap-2 overflow-y-auto"
-                id="in-entities"
+            {connector?.registers_subjects ? (
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "Entities are integrated one by one, each from its own page, where its species and history are chosen.",
+                )}
+              </p>
+            ) : (
+              <Field
+                label={t("Entities")}
+                htmlFor="in-entities"
+                hint={t(
+                  "Optional. Leave empty for every entity of the project.",
+                )}
               >
-                {entities.data?.items.map((e) => {
-                  const on = form.watch("entity_ids").includes(e.id);
-                  return (
-                    <Button
-                      key={e.id}
-                      type="button"
-                      size="sm"
-                      variant={on ? "default" : "outline"}
-                      onClick={() =>
-                        form.setValue(
-                          "entity_ids",
-                          on
-                            ? form
-                                .getValues("entity_ids")
-                                .filter((x) => x !== e.id)
-                            : [...form.getValues("entity_ids"), e.id],
-                        )
-                      }
-                    >
-                      {e.name}
-                    </Button>
-                  );
-                })}
-              </div>
-            </Field>
+                <div
+                  className="flex max-h-32 flex-wrap gap-2 overflow-y-auto"
+                  id="in-entities"
+                >
+                  {entities.data?.items.map((e) => {
+                    const on = form.watch("entity_ids").includes(e.id);
+                    return (
+                      <Button
+                        key={e.id}
+                        type="button"
+                        size="sm"
+                        variant={on ? "default" : "outline"}
+                        onClick={() =>
+                          form.setValue(
+                            "entity_ids",
+                            on
+                              ? form
+                                  .getValues("entity_ids")
+                                  .filter((x) => x !== e.id)
+                              : [...form.getValues("entity_ids"), e.id],
+                          )
+                        }
+                      >
+                        {e.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
             <Field
               label={t("Configuration (JSON)")}
               htmlFor="in-config"
@@ -1008,10 +991,6 @@ export function IntegrationsPage() {
                   {detail.data.backfill.error
                     ? `; ${String(detail.data.backfill.error)}`
                     : ""}
-                  {detail.data.backfill.then_register
-                    ? `. ${t("The entities are registered when every object of it is delivered.")}`
-                    : ""}
-                  {registrationText(detail.data.backfill.registration)}
                 </Callout>
               )}
               {inspecting &&
@@ -1021,13 +1000,6 @@ export function IntegrationsPage() {
                     projectId={projectId}
                     integrationId={inspecting.id}
                     target={connectorLabel(inspecting.connector_key)}
-                    hasEntities={detail.data.entity_ids.length > 0}
-                    onHistory={() => {
-                      setThenRegister(true);
-                      setBackfillError(null);
-                      setBackfilling(inspecting);
-                      setInspecting(null);
-                    }}
                   />
                 )}
               <JsonView value={detail.data.config} />
@@ -1159,28 +1131,6 @@ export function IntegrationsPage() {
               />
             </Field>
           </div>
-          {registers(backfilling) && (
-            <label className="flex items-start gap-2 text-sm">
-              <Switch
-                className="mt-0.5"
-                checked={thenRegister}
-                onCheckedChange={setThenRegister}
-              />
-              <span>
-                {t("Then register the entities on {{target}}", {
-                  target: backfilling
-                    ? connectorLabel(backfilling.connector_key)
-                    : "",
-                })}
-                <span className="block text-xs text-muted-foreground">
-                  {t(
-                    "The history goes first, oldest first. When every object of it is delivered, the ticked entities are registered and their readings belong to them from then on.",
-                  )}
-                </span>
-              </span>
-            </label>
-          )}
-          {backfillError && <Callout kind="error">{backfillError}</Callout>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setBackfilling(null)}>
               {t("Cancel")}

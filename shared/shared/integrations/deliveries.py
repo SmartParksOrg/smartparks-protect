@@ -34,6 +34,7 @@ from shared.integrations.base import (
     OutboundConnector,
     PermanentFailure,
     Skipped,
+    SubjectRegistrar,
     TransientFailure,
 )
 from shared.integrations.registry import CONNECTORS
@@ -116,6 +117,10 @@ def matches(integration: Integration, ref: ObjectRef) -> bool:
     if connector is None or ref.object_type not in connector.supports:
         return False
     if integration.entity_ids and str(ref.entity_id) not in integration.entity_ids:
+        return False
+    if not integration.entity_ids and isinstance(connector, SubjectRegistrar):
+        # a target that registers its entities gets the ones somebody integrated and no
+        # others (decision D412): an empty list means none there, not all
         return False
     if integration.device_ids and str(ref.device_id) not in integration.device_ids:
         return False
@@ -667,6 +672,67 @@ async def backfill(
         await session.commit()
         raise
     await session.commit()
+    return queued
+
+
+async def backfill_entity(
+    session: AsyncSession,
+    integration: Integration,
+    entity_id: uuid.UUID,
+    time_from: datetime,
+    time_to: datetime,
+    *,
+    batch: int = BACKFILL_BATCH,
+) -> int:
+    """Queue one entity's objects in [time_from, time_to) for the integration, read by the
+    entity's own index and oldest first (decision D412); keys queued before are skipped.
+    Flushes per batch; the caller commits."""
+    queued = 0
+    for object_type in integration.object_types or []:
+        model: Any
+        make: Any
+        if object_type == IntegrationObjectType.POSITION:
+            model, make = Position, _position_ref
+        elif object_type == IntegrationObjectType.EVENT:
+            model, make = Event, event_ref
+        elif object_type == IntegrationObjectType.MEASUREMENT:
+            model, make = Measurement, measurement_ref
+        else:
+            continue
+        cursor, last_id = time_from, None
+        while True:
+            rows = list(
+                (
+                    await session.scalars(
+                        select(model)
+                        .where(
+                            model.project_id == integration.project_id,
+                            model.entity_id == entity_id,
+                            model.time >= cursor,
+                            model.time < time_to,
+                        )
+                        .order_by(model.time, model.id)
+                        .limit(batch)
+                    )
+                ).all()
+            )
+            if last_id is not None:
+                rows = [r for r in rows if not (r.time == cursor and r.id <= last_id)]
+            if not rows:
+                break
+            queued += await enqueue(
+                session,
+                [integration],
+                [make(row) for row in rows],
+                origin=DeliveryOrigin.BACKFILL,
+                honour_age=False,
+            )
+            await session.flush()
+            if len(rows) < batch and rows[-1].time == cursor:
+                break
+            cursor, last_id = rows[-1].time, rows[-1].id
+            if len(rows) < batch:
+                break
     return queued
 
 

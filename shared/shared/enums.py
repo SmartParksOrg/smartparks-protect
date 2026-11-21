@@ -399,6 +399,16 @@ class BackfillStatus(StrEnum):
     FAILED = "failed"
 
 
+class SubjectState(StrEnum):
+    """Where an entity stands with an integration whose target registers it (D412)."""
+
+    HISTORY_REQUESTED = "history_requested"  # its old data is being looked up
+    SENDING_HISTORY = "sending_history"  # queued; the registration follows the last one
+    REGISTERED = "registered"
+    HELD = "held"  # part of the history failed; not registered until somebody looked
+    FAILED = "failed"  # the target refused the registration
+
+
 class BackupKind(StrEnum):
     """A scheduled backup or recovery job (architecture 28)."""
 

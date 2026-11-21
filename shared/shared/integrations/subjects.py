@@ -1,6 +1,8 @@
-"""The entities an integration forwards, as a target with a register of its own sees them
-(decision D408): each with the device it has now. And the step that follows a backfill:
-registering them once their history is on the target (decision D409).
+"""An entity integrated with a target that keeps a register of its own (decisions D408, D409
+and D412): the choices a user made for it, its history sent first, then its registration.
+
+The row in `integration_subjects` is Protect's own account of it; what the target has is read
+from the target when somebody asks.
 """
 
 import uuid
@@ -10,14 +12,15 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus
+from shared.enums import DeliveryOrigin, DeliveryStatus, SubjectState
 from shared.integrations.base import (
+    PartlyRegistered,
     PermanentFailure,
     Subject,
     SubjectRegistrar,
-    SubjectStatus,
+    TransientFailure,
 )
-from shared.integrations.deliveries import integration_context
+from shared.integrations.deliveries import backfill_entity, integration_context
 from shared.integrations.registry import CONNECTORS
 from shared.models import (
     Device,
@@ -27,6 +30,7 @@ from shared.models import (
     ExternalIdentity,
     Integration,
     IntegrationDelivery,
+    IntegrationSubject,
 )
 from shared.timeutil import utc_now
 
@@ -40,20 +44,18 @@ def registrar_of(integration: Integration) -> SubjectRegistrar:
     return connector
 
 
-async def load_subjects(session: AsyncSession, integration: Integration) -> list[Subject]:
-    """The entities ticked on the integration, by name, with the device on each now. An
-    integration that forwards every entity names none, and nothing is registered for it: the
-    register on the target is filled for entities somebody chose."""
-    ids = [uuid.UUID(str(value)) for value in integration.entity_ids or []]
-    if not ids:
-        raise PermanentFailure("Choose the entities to forward on the integration first")
-    if len(ids) > MAX_SUBJECTS:
-        raise PermanentFailure(f"At most {MAX_SUBJECTS} entities are registered at a time")
+async def load_subjects(
+    session: AsyncSession, project_id: uuid.UUID, entity_ids: list[uuid.UUID]
+) -> list[Subject]:
+    """The entities, by name, each with the device on it now and the identity that device
+    was heard under last, as a delivery names it."""
+    if not entity_ids:
+        return []
     rows = (
         await session.execute(
             select(Entity, EntityType)
             .join(EntityType, EntityType.id == Entity.entity_type_id)
-            .where(Entity.id.in_(ids), Entity.project_id == integration.project_id)
+            .where(Entity.id.in_(entity_ids), Entity.project_id == project_id)
             .order_by(Entity.name)
         )
     ).all()
@@ -72,7 +74,7 @@ async def load_subjects(session: AsyncSession, integration: Integration) -> list
         for a in await session.scalars(
             select(DeviceEntityAssignment)
             .where(
-                DeviceEntityAssignment.entity_id.in_(ids),
+                DeviceEntityAssignment.entity_id.in_(entity_ids),
                 DeviceEntityAssignment.validity.op("@>")(now),
             )
             .order_by(func.lower(DeviceEntityAssignment.validity))
@@ -86,7 +88,6 @@ async def load_subjects(session: AsyncSession, integration: Integration) -> list
     )
     identities: dict[uuid.UUID, str] = {}
     if device_ids:
-        # the identity heard last, as a delivery names it (`load_item`)
         for identity in await session.scalars(
             select(ExternalIdentity)
             .where(ExternalIdentity.device_id.in_(device_ids), ExternalIdentity.ignored.is_(False))
@@ -116,82 +117,183 @@ async def load_subjects(session: AsyncSession, integration: Integration) -> list
     return subjects
 
 
-async def subject_statuses(
-    session: AsyncSession, integration: Integration
-) -> list[tuple[Subject, SubjectStatus]]:
-    """What the target has for each entity of the integration, read from the target."""
+async def load_subject(
+    session: AsyncSession, integration: Integration, entity_id: uuid.UUID
+) -> Subject:
+    subjects = await load_subjects(session, integration.project_id, [entity_id])
+    if not subjects:
+        raise PermanentFailure("The entity is not in this integration's project")
+    return subjects[0]
+
+
+def _forwarded(integration: Integration, entity_id: uuid.UUID, wanted: bool) -> None:
+    """Keep the integration's entity filter in step: it is what every delivery passes."""
+    ids = [str(value) for value in integration.entity_ids or []]
+    key = str(entity_id)
+    if wanted and key not in ids:
+        integration.entity_ids = [*ids, key]
+    elif not wanted and key in ids:
+        integration.entity_ids = [value for value in ids if value != key]
+
+
+async def register_subject(
+    session: AsyncSession, integration: Integration, row: IntegrationSubject
+) -> None:
+    """Register one entity on the target as its row says and write the outcome on the row.
+    A target that cannot be reached leaves the row as it is and raises, so the caller tries
+    again; a refusal is written down and not repeated."""
     registrar = registrar_of(integration)
-    subjects = await load_subjects(session, integration)
-    statuses = await registrar.subjects(
-        integration_context(integration), subjects, dict(integration.connector_state or {})
-    )
-    return _paired(subjects, statuses)
+    subject = await load_subject(session, integration, row.entity_id)
+    try:
+        status = await registrar.register(
+            integration_context(integration), subject, dict(row.settings or {}), row.external_id
+        )
+    except PartlyRegistered as exc:
+        row.external_id = exc.external_id
+        row.state, row.detail = SubjectState.FAILED, str(exc)
+        return
+    except PermanentFailure as exc:
+        row.state, row.detail = SubjectState.FAILED, str(exc)
+        return
+    row.state, row.detail = SubjectState.REGISTERED, None
+    row.external_id = status.external_id or row.external_id
+    row.registered_at = utc_now()
 
 
-async def register_subjects(
-    session: AsyncSession, integration: Integration
-) -> list[tuple[Subject, SubjectStatus]]:
-    """Register the entities the target lacks and keep what the connector remembers. The
-    caller commits."""
-    registrar = registrar_of(integration)
-    subjects = await load_subjects(session, integration)
-    statuses, state = await registrar.register(
-        integration_context(integration), subjects, dict(integration.connector_state or {})
-    )
-    integration.connector_state = state
-    return _paired(subjects, statuses)
-
-
-def _paired(
-    subjects: list[Subject], statuses: list[SubjectStatus]
-) -> list[tuple[Subject, SubjectStatus]]:
-    by_entity = {status.entity_id: status for status in statuses}
-    return [(s, by_entity[s.entity_id]) for s in subjects if s.entity_id in by_entity]
-
-
-async def register_after_backfill(session: AsyncSession, integration: Integration) -> str | None:
-    """The step after a backfill that asked for it (decision D409): once every reading the
-    backfill queued is delivered, register the entities. Returns what happened (`waiting`,
-    `held`, `done`, `failed`) or None when nothing was asked. Commits."""
-    progress: dict[str, Any] = dict(integration.backfill or {})
-    if not progress.get("then_register") or progress.get("status") != BackfillStatus.DONE:
-        return None
-    backfilled = (
-        IntegrationDelivery.integration_id == integration.id,
-        IntegrationDelivery.origin == DeliveryOrigin.BACKFILL,
-    )
-    waiting = await session.scalar(
-        select(func.count())
-        .select_from(IntegrationDelivery)
-        .where(*backfilled, IntegrationDelivery.status == DeliveryStatus.QUEUED)
-    )
-    if waiting:
-        return "waiting"
-    registration: dict[str, Any] = {"at": utc_now().isoformat()}
-    started = datetime.fromisoformat(str(progress.get("started_at") or "1970-01-01T00:00:00+00:00"))
-    failed = await session.scalar(
-        select(func.count())
-        .select_from(IntegrationDelivery)
-        .where(
-            *backfilled,
-            IntegrationDelivery.status == DeliveryStatus.FAILED,
-            IntegrationDelivery.created_at >= started,
+async def integrate(
+    session: AsyncSession,
+    integration: Integration,
+    entity_id: uuid.UUID,
+    settings: dict[str, Any],
+    history_from: datetime | None,
+    user_id: uuid.UUID | None,
+) -> IntegrationSubject:
+    """Integrate one entity (decision D412): keep what the user chose, start forwarding its
+    data, and either ask for its history (the caller publishes the request, and the
+    registration follows the last reading, decision D409) or register it at once. The caller
+    commits."""
+    registrar_of(integration)
+    await load_subject(session, integration, entity_id)
+    row = await session.scalar(
+        select(IntegrationSubject).where(
+            IntegrationSubject.integration_id == integration.id,
+            IntegrationSubject.entity_id == entity_id,
         )
     )
-    if failed:
-        # a history with holes is not followed by a deployment: somebody looks first
-        registration.update(status="held", failed=int(failed))
+    if row is None:
+        count = await session.scalar(
+            select(func.count())
+            .select_from(IntegrationSubject)
+            .where(IntegrationSubject.integration_id == integration.id)
+        )
+        if (count or 0) >= MAX_SUBJECTS:
+            raise PermanentFailure(f"An integration holds at most {MAX_SUBJECTS} entities")
+        row = IntegrationSubject(
+            integration_id=integration.id,
+            entity_id=entity_id,
+            created_by_user_id=user_id,
+            state=SubjectState.HISTORY_REQUESTED,
+        )
+        session.add(row)
+    elif row.state in (SubjectState.HISTORY_REQUESTED, SubjectState.SENDING_HISTORY):
+        raise PermanentFailure("The entity's history is being sent; wait until it is done")
+    row.settings = settings
+    row.history_from = history_from
+    row.detail = None
+    _forwarded(integration, entity_id, True)
+    if history_from is not None:
+        row.state = SubjectState.HISTORY_REQUESTED
+        row.history_queued = 0
+        row.history_started_at = None
     else:
-        try:
-            pairs = await register_subjects(session, integration)
-        except Exception as exc:
-            registration.update(status="failed", error=f"{type(exc).__name__}: {exc}")
-        else:
-            registration.update(
-                status="done",
-                registered=sum(1 for _, s in pairs if s.state == "registered"),
-                blocked=sum(1 for _, s in pairs if s.state == "blocked"),
-            )
-    integration.backfill = {**progress, "then_register": False, "registration": registration}
+        await register_subject(session, integration, row)
+    await session.flush()
+    return row
+
+
+async def stop(session: AsyncSession, integration: Integration, entity_id: uuid.UUID) -> bool:
+    """Stop forwarding an entity. What the target holds stays there: Protect ends and deletes
+    nothing on a target. The caller commits."""
+    row = await session.scalar(
+        select(IntegrationSubject).where(
+            IntegrationSubject.integration_id == integration.id,
+            IntegrationSubject.entity_id == entity_id,
+        )
+    )
+    _forwarded(integration, entity_id, False)
+    if row is None:
+        return False
+    await session.delete(row)
+    return True
+
+
+async def send_history(session: AsyncSession, subject_id: uuid.UUID) -> int:
+    """The worker's part of a history request: queue the entity's old objects, oldest first,
+    and mark the row so the registration follows them. Commits."""
+    row = await session.get(IntegrationSubject, subject_id)
+    if row is None or row.state != SubjectState.HISTORY_REQUESTED or row.history_from is None:
+        return 0
+    integration = await session.get(Integration, row.integration_id)
+    if integration is None:
+        return 0
+    row.history_started_at = utc_now()
+    queued = await backfill_entity(
+        session, integration, row.entity_id, row.history_from, row.history_started_at
+    )
+    row.history_queued = queued
+    row.state = SubjectState.SENDING_HISTORY
     await session.commit()
-    return str(registration["status"])
+    return queued
+
+
+async def finish_histories(session: AsyncSession) -> dict[str, int]:
+    """Every entity whose history was queued (decision D409): once none of its objects waits,
+    it is registered; when one of them failed it is held, since a history with holes is not
+    followed by a registration until somebody looked. Commits per entity."""
+    rows = (
+        await session.scalars(
+            select(IntegrationSubject).where(
+                IntegrationSubject.state == SubjectState.SENDING_HISTORY
+            )
+        )
+    ).all()
+    outcome: dict[str, int] = {}
+    for row in rows:
+        integration = await session.get(Integration, row.integration_id)
+        if integration is None or not integration.enabled:
+            continue
+        mine = (
+            IntegrationDelivery.integration_id == row.integration_id,
+            IntegrationDelivery.entity_id == row.entity_id,
+            IntegrationDelivery.origin == DeliveryOrigin.BACKFILL,
+        )
+        waiting = await session.scalar(
+            select(func.count())
+            .select_from(IntegrationDelivery)
+            .where(*mine, IntegrationDelivery.status == DeliveryStatus.QUEUED)
+        )
+        if waiting:
+            continue
+        failed = await session.scalar(
+            select(func.count())
+            .select_from(IntegrationDelivery)
+            .where(
+                *mine,
+                IntegrationDelivery.status == DeliveryStatus.FAILED,
+                IntegrationDelivery.created_at >= (row.history_started_at or row.created_at),
+            )
+        )
+        if failed:
+            row.state = SubjectState.HELD
+            row.detail = (
+                f"{failed} objects of its history failed. Look at the deliveries, retry them, "
+                "then integrate the entity again without history."
+            )
+        else:
+            try:
+                await register_subject(session, integration, row)
+            except TransientFailure:
+                continue  # the target is away; the next cycle asks again
+        await session.commit()
+        outcome[str(row.state)] = outcome.get(str(row.state), 0) + 1
+    return outcome

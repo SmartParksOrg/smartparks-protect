@@ -185,3 +185,6 @@ export type ProjectDeviceCreate = Schemas["ProjectDeviceCreate"];
 export type DataSourceBrief = Schemas["DataSourceBrief"];
 export type NameConflict = Schemas["NameConflict"];
 export type IntegrationSubjects = Schemas["IntegrationSubjects"];
+export type IntegrationSubject = Schemas["IntegrationSubjectRead"];
+export type IntegrationSubjectOptions = Schemas["IntegrationSubjectOptions"];
+export type EntityIntegration = Schemas["EntityIntegrationRead"];

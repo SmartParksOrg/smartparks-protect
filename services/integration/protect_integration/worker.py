@@ -23,7 +23,7 @@ from shared.integrations.deliveries import (
     event_ref,
     measurement_ref,
 )
-from shared.integrations.subjects import register_after_backfill
+from shared.integrations.subjects import finish_histories, send_history
 from shared.logger import get_logger
 from shared.models import Event, Integration, Measurement
 from shared.timeutil import require_aware, utc_now
@@ -168,26 +168,6 @@ async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> 
     return outcome
 
 
-async def register_pending(session: AsyncSession) -> dict[str, str]:
-    """The backfills that asked for a registration afterwards (decision D409): each is
-    registered once its readings are all delivered. Few rows carry the flag, so the read is
-    cheap enough for every cycle."""
-    pending = (
-        await session.scalars(
-            select(Integration).where(
-                Integration.backfill["then_register"].as_boolean().is_(True),
-                Integration.enabled.is_(True),
-            )
-        )
-    ).all()
-    outcome: dict[str, str] = {}
-    for integration in pending:
-        result = await register_after_backfill(session, integration)
-        if result and result != "waiting":
-            outcome[integration.name] = result
-    return outcome
-
-
 async def delivery_loop(bus: RedisStreamsBus) -> None:
     while True:
         try:
@@ -195,10 +175,11 @@ async def delivery_loop(bus: RedisStreamsBus) -> None:
                 outcome = await deliver_due(session)
             if outcome:
                 log.info("deliveries", outcome=outcome)
+            # the entities whose history is out are registered (decision D409)
             async with session_scope() as session:
-                registered = await register_pending(session)
-            if registered:
-                log.info("registered after backfill", outcome=registered)
+                finished = await finish_histories(session)
+            if finished:
+                log.info("histories finished", outcome=finished)
             await bus.heartbeat("integration")
         except asyncio.CancelledError:
             raise
@@ -208,6 +189,12 @@ async def delivery_loop(bus: RedisStreamsBus) -> None:
 
 
 async def handle_backfill(session: AsyncSession, payload: dict[str, Any]) -> int:
+    if payload.get("subject_id"):
+        # one entity's history, asked from its own page (decision D412)
+        subject_id = _uuid(payload["subject_id"])
+        queued = await send_history(session, subject_id) if subject_id else 0
+        log.info("history queued", subject_id=str(subject_id), queued=queued)
+        return queued
     integration = await session.get(Integration, _uuid(payload.get("integration_id")))
     if integration is None:
         log.warning("backfill for unknown integration", payload=payload)

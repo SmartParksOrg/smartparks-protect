@@ -8,12 +8,16 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from protect_api.routers import integrations as integrations_router
 from shared.bus import RedisStreamsBus, Topic
 from shared.enums import Role
-from shared.integrations import subjects as subjects_module
-from shared.integrations.base import PermanentFailure, SubjectStatus
+from shared.integrations.base import (
+    PermanentFailure,
+    SubjectChoice,
+    SubjectOptions,
+    SubjectStatus,
+)
 from shared.integrations.deliveries import enqueue, event_ref
+from shared.integrations.registry import CONNECTORS
 from shared.models import Event, Integration, IntegrationDelivery
 from tests.api.conftest import actor, create_project, project_actor
 
@@ -217,42 +221,48 @@ async def test_deliveries_retry_and_backfill(client, db):
 class _Registrar:
     """A target with a register of entities, in place of the WildlifeNL connector's network."""
 
+    key = "wildlifenl"
+    label = "WildlifeNL"
+    supports = frozenset({"position"})
+
     def __init__(self) -> None:
-        self.registered: set[uuid.UUID] = set()
+        self.registered: dict[uuid.UUID, dict] = {}
 
-    def _statuses(self, subjects):
-        return [
-            SubjectStatus(
-                entity_id=s.entity_id,
-                state="registered" if s.entity_id in self.registered else "not_registered",
-                sensor_id=s.device_identity or s.device_name,
-                species="Bos taurus",
-            )
-            for s in subjects
-        ]
-
-    async def subjects(self, integration, subjects, state):
+    async def options(self, integration, subject):
         if integration.credentials.get("token") != "tok":
             raise PermanentFailure("the account lacks the herd-manager role")
-        return self._statuses(subjects)
+        return SubjectOptions(
+            sensor_id=subject.device_identity or "70B3D57ED0000012",
+            status=SubjectStatus(subject.entity_id in self.registered),
+            species=[SubjectChoice(id=BOS, name="Bos taurus", common_name="Rund")],
+            proposed_species_id=None,
+        )
 
-    async def register(self, integration, subjects, state):
-        self.registered |= {s.entity_id for s in subjects}
-        return self._statuses(subjects), {"animals": {str(s.entity_id): "a1" for s in subjects}}
+    async def statuses(self, integration, subjects):
+        return {
+            s.entity_id: SubjectStatus(s.entity_id in self.registered, external_name=s.entity_name)
+            for s in subjects
+        }
+
+    async def register(self, integration, subject, settings, external_id):
+        self.registered[subject.entity_id] = settings
+        return SubjectStatus(True, external_id="animal-1")
 
 
-async def test_subjects_are_read_and_registered_by_those_who_manage_integrations(
-    client, db, monkeypatch
-):
-    """Decisions D408 and D409: the ticked entities with what the target has, registered on a
-    word, or after a backfill; refused for a viewer and for an integration without entities."""
+BOS = "44444444-4444-4444-8444-444444444444"
+
+
+async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch):
+    """Decisions D412 and D413: the entity sees the integrations it can join, a user with the
+    right to change integrations picks its species from the target's list and integrates it,
+    with its history first or at once; a viewer reads its state and changes nothing."""
     registrar = _Registrar()
-    monkeypatch.setattr(subjects_module, "registrar_of", lambda integration: registrar)
-    monkeypatch.setattr(integrations_router, "registrar_of", lambda integration: registrar)
+    monkeypatch.setitem(CONNECTORS, "wildlifenl", registrar)
     admin = await actor(client, db, superuser=True)
     project = await create_project(db)
     manager = await project_actor(client, db, project, Role.PROJECT_ADMIN)
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    stranger = await project_actor(client, db, await create_project(db), Role.PROJECT_ADMIN)
     types = (
         await client.get("/api/v1/entity-types", params={"limit": 500}, headers=admin.headers)
     ).json()["items"]
@@ -265,69 +275,95 @@ async def test_subjects_are_read_and_registered_by_those_who_manage_integrations
         )
     ).json()
     base = f"/api/v1/projects/{project.id}/integrations"
-    connectors = (await client.get(f"{base}/connectors", headers=manager.headers)).json()
-    by_key = {c["key"]: c for c in connectors}
-    assert by_key["wildlifenl"]["registers_subjects"] is True
-    assert by_key["webhook"]["registers_subjects"] is False
+    by_entity = f"{base}/by-entity/{entity['id']}"
 
-    created = await client.post(
-        base,
-        json={
-            "name": "WildlifeNL test",
-            "connector_key": "wildlifenl",
-            "config": {"base_url": "https://wildlifenl.example"},
-            "credentials": {"token": "tok"},
-            "object_types": ["position"],
-        },
-        headers=manager.headers,
-    )
-    assert created.status_code == 201, created.text
-    integration = created.json()
-    subjects = f"{base}/{integration['id']}/subjects"
+    # no integration yet: the entity's card has nothing to show
+    assert (await client.get(by_entity, headers=viewer.headers)).json() == []
+    for name, connector in (("WildlifeNL test", "wildlifenl"), ("Hook", "webhook")):
+        made = await client.post(
+            base,
+            json={
+                "name": name,
+                "connector_key": connector,
+                "config": {"base_url": "https://wildlifenl.example", "url": "https://x.example"},
+                "credentials": {"token": "tok"},
+                "object_types": ["position"],
+            },
+            headers=manager.headers,
+        )
+        assert made.status_code == 201, made.text
+        if connector == "wildlifenl":
+            integration = made.json()
+    # the one that registers its entities shows, the webhook does not
+    listed = (await client.get(by_entity, headers=viewer.headers)).json()
+    assert [(i["name"], i["subject"]) for i in listed] == [("WildlifeNL test", None)]
+    assert (await client.get(by_entity, headers=stranger.headers)).status_code in (403, 404)
 
-    # no entity is ticked: nothing to register, said plainly
-    empty = await client.get(subjects, headers=manager.headers)
-    assert empty.status_code == 422 and "Choose the entities" in empty.text
-    window = {
-        "time_from": (datetime.now(UTC) - timedelta(days=2)).isoformat(),
-        "time_to": datetime.now(UTC).isoformat(),
-    }
-    refused = await client.post(
-        f"{base}/{integration['id']}/backfill",
-        json={**window, "then_register": True},
-        headers=manager.headers,
-    )
-    assert refused.status_code == 422 and "Choose the entities" in refused.text
+    subject = f"{base}/{integration['id']}/subjects/{entity['id']}"
+    options = await client.get(f"{subject}/options", headers=manager.headers)
+    assert options.status_code == 200, options.text
+    offered = options.json()
+    assert offered["species"] == [{"id": BOS, "name": "Bos taurus", "common_name": "Rund"}]
+    assert offered["proposed_species_id"] is None and offered["subject"] is None
+    assert offered["sensor_id"] == "70B3D57ED0000012" and offered["target"]["registered"] is False
+    assert (await client.get(f"{subject}/options", headers=viewer.headers)).status_code == 403
+    chosen = {"species_id": BOS, "species_name": "Bos taurus"}
+    assert (await client.put(subject, json=chosen, headers=viewer.headers)).status_code == 403
+    assert (await client.put(subject, json={}, headers=manager.headers)).status_code == 422
 
-    ticked = await client.patch(
-        f"{base}/{integration['id']}", json={"entity_ids": [entity["id"]]}, headers=manager.headers
-    )
-    assert ticked.status_code == 200, ticked.text
-    listed = await client.get(subjects, headers=manager.headers)
-    assert listed.status_code == 200, listed.text
-    (row,) = listed.json()["items"]
-    assert row["entity_name"] == "Cow 12" and row["state"] == "not_registered"
-    assert row["species"] == "Bos taurus" and row["device_name"] is None
-
-    assert (await client.get(subjects, headers=viewer.headers)).status_code == 403
-    assert (await client.post(f"{subjects}/register", headers=viewer.headers)).status_code == 403
-
-    done = await client.post(f"{subjects}/register", headers=manager.headers)
-    assert done.status_code == 200, done.text
-    assert done.json()["items"][0]["state"] == "registered"
+    # with its history first: asked on the bus, registered by the worker afterwards
+    bus = RedisStreamsBus()
+    try:
+        before = await bus.redis.xlen(Topic.INTEGRATION_BACKFILL_REQUESTED)
+        too_far = (datetime.now(UTC) - timedelta(days=500)).isoformat()
+        far = await client.put(
+            subject, json={**chosen, "history_from": too_far}, headers=manager.headers
+        )
+        assert far.status_code == 422 and "400 days" in far.text
+        since = (datetime.now(UTC) - timedelta(days=7)).isoformat()
+        asked = await client.put(
+            subject, json={**chosen, "history_from": since}, headers=manager.headers
+        )
+        assert asked.status_code == 200, asked.text
+        assert asked.json()["state"] == "history_requested" and not registrar.registered
+        assert await bus.redis.xlen(Topic.INTEGRATION_BACKFILL_REQUESTED) == before + 1
+    finally:
+        await bus.close()
     stored = await db.get(Integration, uuid.UUID(integration["id"]))
     await db.refresh(stored)
-    assert stored.connector_state == {"animals": {entity["id"]: "a1"}}
-    # what the connector remembers is the server's, never part of an answer
-    assert (
-        "connector_state"
-        not in (await client.get(f"{base}/{integration['id']}", headers=manager.headers)).json()
-    )
+    assert stored.entity_ids == [entity["id"]]  # forwarded from now on
+    busy = await client.put(subject, json=chosen, headers=manager.headers)
+    assert busy.status_code == 422 and "history is being sent" in busy.text
 
-    asked = await client.post(
-        f"{base}/{integration['id']}/backfill",
-        json={**window, "then_register": True},
-        headers=manager.headers,
+    # the entity's card and the integration's overview say where it stands
+    card = (await client.get(by_entity, headers=viewer.headers)).json()[0]["subject"]
+    assert card["state"] == "history_requested" and card["species_name"] == "Bos taurus"
+    overview = await client.get(f"{base}/{integration['id']}/subjects", headers=manager.headers)
+    assert overview.status_code == 200, overview.text
+    (row,) = overview.json()["items"]
+    assert row["entity_name"] == "Cow 12" and row["target"]["registered"] is False
+    assert (
+        await client.get(f"{base}/{integration['id']}/subjects", headers=viewer.headers)
+    ).status_code == 403
+
+    # stopped, then integrated at once without history
+    assert (await client.delete(subject, headers=viewer.headers)).status_code == 403
+    assert (await client.delete(subject, headers=manager.headers)).status_code == 204
+    assert (await client.delete(subject, headers=manager.headers)).status_code == 404
+    await db.refresh(stored)
+    assert stored.entity_ids == []
+    now = await client.put(subject, json=chosen, headers=manager.headers)
+    assert now.status_code == 200, now.text
+    assert now.json()["state"] == "registered" and now.json()["external_id"] == "animal-1"
+    assert registrar.registered == {uuid.UUID(entity["id"]): chosen}
+
+    # an integration that registers nothing has no subjects
+    hook = next(
+        i
+        for i in (await client.get(base, headers=manager.headers)).json()["items"]
+        if i["connector_key"] == "webhook"
     )
-    assert asked.status_code == 200, asked.text
-    assert asked.json()["backfill"]["then_register"] is True
+    refused = await client.put(
+        f"{base}/{hook['id']}/subjects/{entity['id']}", json=chosen, headers=manager.headers
+    )
+    assert refused.status_code == 422 and "keeps no register" in refused.text

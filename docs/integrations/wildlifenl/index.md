@@ -2,7 +2,7 @@
 
 [WildlifeNL](https://wildlifenl.nl) is the Dutch research programme on human-wildlife
 coexistence; Smart Parks is a consortium member. The connector sends positions and temperatures
-of the entities you choose as borne sensor readings, registers those entities as animals with
+of the entities you integrate as borne sensor readings, registers those entities as animals with
 their sensor on the platform, and sends camera trap detections as species detections
 (decisions D88 and D407 to D411).
 
@@ -32,51 +32,60 @@ email. The answer carries `token`. It stays valid.
 
 ## Setting it up in a project
 
+The connection is set once on the integration. Each entity is then integrated from its own
+page, where its species and its history are chosen (decision D412).
+
+### 1. The connection (a project admin, once)
+
 1. **Integrate, Integrations, New integration**, connector WildlifeNL.
-   - Config: `base_url`, the server's address from the table above.
-   - Credentials: `token`.
+   - Config: `{"base_url": "<the server's address from the table above>"}`.
+   - Credentials: `{"token": "<your token>"}`.
    - Forwards: positions, and measurements when the temperature should go along.
-   - **Entities**: tick the entities to integrate. Only their data is forwarded.
 2. **Test the connection** (the paper plane on the row). The answer names the account, its
    roles, whether it may register animals, the server's API version and which species field a
    detection takes there.
-3. Open the integration (click its row). **Entities on WildlifeNL** lists each ticked entity
-   with what the platform has for it:
-   - *Registered*: a deployment of its sensor exists, since the date shown.
-   - *Not registered*: it can be registered; the line shows the sensor id and the species.
-   - *Cannot be registered*, with the reason: no device on the entity, or no species the
-     platform knows.
-4. Choose **Send history, then register**, pick the period, and queue it. Protect sends the old
-   readings oldest first. When every one of them is delivered, it registers the animals and
-   their sensors. From then on the readings on the platform belong to those animals, the old
-   ones as well, and new readings follow as they arrive.
 
-**Register now** registers at once, without sending history. Use it when no old data should go.
+Nothing is sent yet. A WildlifeNL integration forwards the entities somebody integrated and no
+others.
 
-A run covers at most 400 days. For more, run it again for the earlier period before you
-register: choose the plain backfill (the clock icon on the row) without the tick for the earlier
-runs, and "Send history, then register" for the last one.
+### 2. An entity (whoever may change integrations)
+
+1. Open the entity. Its Overview has an **Integrations** card with the project's WildlifeNL
+   integration and "Not integrated".
+2. Choose **Integrate**. Protect asks the platform and shows:
+   - **Species on WildlifeNL**: the platform's own list. When the entity's type matches one of
+     its names, that one is chosen already; otherwise pick it.
+   - **Device** and **Sensor id**: how the platform will know this entity's readings.
+   - **Send its history first**, with the date to start from. It starts at the day the device
+     came onto the entity, at most 400 days back.
+3. Choose **Integrate**. The card follows what happens:
+   - *Preparing history*, then *Sending history, N to go*: the old readings go oldest first.
+   - *Integrated*: every reading was delivered and the animal and its sensor are registered.
+     New readings follow as they arrive.
+   - *On hold*: part of the history failed, so Protect did not register. Look at Deliveries,
+     retry the failed ones, then choose Change and integrate without history.
+   - *Not registered*: the platform refused the registration; the card says what it answered.
+
+With the history switched off the entity is registered at once and only new data is sent.
+
+**Change** opens the same dialog again, for another species or a history after all. **Stop**
+ends the forwarding; what the platform has stays there.
+
+The integration itself (click its row under Integrate, Integrations) lists every integrated
+entity with what the platform has for it. Nothing is changed there.
 
 ## The species of an entity
 
-The platform takes an animal only with a species from its own list. Protect looks for it in
-this order and matches against the platform's Latin and common names:
+The platform takes an animal only with a species from its own list, so the dialog offers that
+list and nothing else. Protect proposes one when it finds a match, in this order, against the
+platform's Latin and common names:
 
 1. the entity's own `taxon`, `species` or `scientific_name` value;
-2. the integration's `species` setting, by the key of the entity's type;
+2. the integration's optional `species` setting, by the key of the entity's type, for example
+   `{"species": {"cow": "Bos taurus"}}`, which saves the picking in a project of one kind;
 3. the label of the entity's type.
 
-When none is found the entity shows "Cannot be registered". Add the mapping to the config, for
-example for PWN's cattle and horses:
-
-```json
-{
-  "base_url": "https://test-api-wildlifenl.uu.nl",
-  "species": {"cow": "Bos taurus", "horse": "Equus ferus caballus"}
-}
-```
-
-The names must be the platform's own; `GET /species/` on the API page lists them.
+No match means no proposal: the user picks. Protect never registers an animal under a guess.
 
 ## Why history goes first
 
@@ -97,7 +106,7 @@ nobody. Before a project goes to LIVE, read the note under "Known limits".
 | --- | --- |
 | position | `POST /borne-sensor-reading/` with `sensorID`, `timestamp`, `location` and `altitude` |
 | temperature measurement | `POST /borne-sensor-reading/` with `sensorID`, `timestamp` and `temperature`; the platform keeps one reading per sensor and timestamp, so it joins the position of the same moment |
-| ticked entity | `POST /animal/` (`name`, `speciesID`), then `POST /borne-sensor-deployment/` (`animalID`, `sensorID`, `start` at the start of the device's time on the entity) |
+| integrated entity | `POST /animal/` (`name`, the species chosen), then `POST /borne-sensor-deployment/` (`animalID`, `sensorID`, `start` at the start of the device's time on the entity) |
 | `SPECIES_DETECTION` event (AddaxAI Connect) | `POST /detection/` per species: `speciesName` or `speciesID` as the server's own API document asks, `deploymentID`, `sensorType`, `location`, `start`, `end`, `uri`, `animals` with the confidence as a percentage |
 | other events | skipped: WildlifeNL has no free-form events |
 | corrected position | a new reading; a reading at the same timestamp replaces the earlier one |
@@ -108,10 +117,10 @@ used for the readings and for the deployment.
 
 ## Known limits
 
-- **A device replaced on an entity** is not followed by itself. Open the integration: the
-  entity shows "Not registered" for its new sensor; register it. The platform ends the earlier
-  deployment of a sensor when a new one is made for that sensor, not when the animal gets
-  another sensor.
+- **A device replaced on an entity** is not followed by itself. Open the entity, choose Change
+  on its Integrations card and integrate it again: its new sensor is registered on the animal
+  Protect made before. The platform ends the earlier deployment of a sensor when a new one is
+  made for that sensor, not when the animal gets another sensor.
 - **Late old readings after the registration** move the animal's location back and may raise
   alarms on the platform (see above). This is the platform's behaviour as its code reads; it is
   reported to its developers.
@@ -125,10 +134,9 @@ used for the readings and for the deployment.
 - `lacks the data-system role`: the account can log in but may not send readings.
 - `does not show its deployments to this account; it needs the herd-manager role`: the account
   may send readings but not register animals.
-- `knows no species for this entity`: see "The species of an entity".
-- "Not registered: N objects of the backfill failed": the history has holes, so Protect did not
+- "On hold: N objects of its history failed": the history has holes, so Protect did not
   register. Open Deliveries, filter on failed, read the platform's answer, retry them, then
-  choose Register now.
+  choose Change on the entity's card and integrate without history.
 - Readings arrive but the animal does not move on the platform: the sensor id of the readings
   and of the deployment differ; both follow `sensor_id_source`, so check that it was not changed
   between the two.

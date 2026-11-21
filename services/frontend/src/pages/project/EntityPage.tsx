@@ -45,6 +45,7 @@ import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
 import { EntityDetailsCard } from "@/components/entities/EntityDetailsCard";
 import { EntityDialog } from "@/components/entities/EntityDialog";
+import { EntityIntegrationsCard } from "@/components/integrations/EntityIntegrationsCard";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { Icon } from "@/components/icons/Icon";
 import { PictureCard } from "@/components/entities/PictureCard";
@@ -186,7 +187,10 @@ export function EntityPage() {
   // the device's type, for what its driver can do (decision D377): the raw log upload
   const deviceType = useQuery({
     queryKey: queryKeys.deviceType(device.data?.device_type_id ?? ""),
-    queryFn: () => api.get<DeviceType>(`/api/v1/device-types/${device.data?.device_type_id}`),
+    queryFn: () =>
+      api.get<DeviceType>(
+        `/api/v1/device-types/${device.data?.device_type_id}`,
+      ),
     enabled: Boolean(device.data?.device_type_id),
     staleTime: 10 * 60_000,
   });
@@ -389,9 +393,11 @@ export function EntityPage() {
                 </Link>
               </Button>
             )}
-            {current && can("devices:control") && supportsRawLogs(deviceType.data) && (
-              <UploadLogButton deviceId={current.device_id} />
-            )}
+            {current &&
+              can("devices:control") &&
+              supportsRawLogs(deviceType.data) && (
+                <UploadLogButton deviceId={current.device_id} />
+              )}
             {modules.includes("movement") && can("analysis:run") && (
               <Button asChild variant="outline" size="sm">
                 <Link
@@ -629,6 +635,11 @@ export function EntityPage() {
                 fields={fieldsOfType(types.data?.items, e.entity_type_id)}
                 attributes={e.attributes}
                 onEdit={admin ? () => setEditing(true) : undefined}
+              />
+              <EntityIntegrationsCard
+                projectId={projectId}
+                entityId={e.id}
+                canWrite={can("integrations:write")}
               />
               {/* what matters first (Tim, 2026-09-27): the device's health beside the entity,
                   the map and the picture under them, the device and the location source below */}

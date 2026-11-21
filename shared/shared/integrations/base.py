@@ -20,9 +20,12 @@ __all__ = [
     "DeliveryResult",
     "IntegrationContext",
     "OutboundConnector",
+    "PartlyRegistered",
     "PermanentFailure",
     "Skipped",
     "Subject",
+    "SubjectChoice",
+    "SubjectOptions",
     "SubjectRegistrar",
     "SubjectStatus",
     "TransientFailure",
@@ -144,36 +147,70 @@ class Subject:
 
 @dataclass(slots=True)
 class SubjectStatus:
-    """What the target has for one subject. `state` is `registered`, `not_registered` or
-    `blocked` (it cannot be registered as it is, and `detail` says why)."""
+    """What the target has for one subject: `registered` since a moment, under a name."""
 
-    entity_id: uuid.UUID
-    state: str
-    detail: str | None = None
+    registered: bool
     sensor_id: str | None = None
-    species: str | None = None
     external_id: str | None = None
     external_name: str | None = None
     since: datetime | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class SubjectChoice:
+    """One thing a user may pick for a subject on the target, such as a species."""
+
+    id: str
+    name: str
+    common_name: str | None = None
+
+
+@dataclass(slots=True)
+class SubjectOptions:
+    """What a user needs to see before integrating one entity (decision D413): how the target
+    will know it, what it has for it already, what may be chosen and Protect's proposal, or
+    why it cannot be integrated as it is."""
+
+    sensor_id: str | None
+    status: SubjectStatus
+    species: list[SubjectChoice] = field(default_factory=list)
+    proposed_species_id: str | None = None
+    blocked: str | None = None
+
+
 @runtime_checkable
 class SubjectRegistrar(Protocol):
-    """A connector whose target keeps a register of the subjects (decision D408). `state` is
-    the integration's `connector_state`, the connector's own memory between calls."""
+    """A connector whose target keeps a register of the subjects (decisions D408 and D412)."""
 
-    async def subjects(
-        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
-    ) -> list[SubjectStatus]:
-        """What the target has for each subject, read from the target."""
+    async def options(self, integration: IntegrationContext, subject: Subject) -> SubjectOptions:
+        """What may be chosen for one subject, read from the target."""
+        ...
+
+    async def statuses(
+        self, integration: IntegrationContext, subjects: list[Subject]
+    ) -> dict[uuid.UUID, SubjectStatus]:
+        """What the target has for each subject, by entity id, in one read."""
         ...
 
     async def register(
-        self, integration: IntegrationContext, subjects: list[Subject], state: dict[str, Any]
-    ) -> tuple[list[SubjectStatus], dict[str, Any]]:
-        """Register the subjects the target lacks. Returns every subject's status afterwards
-        and the state to keep. One subject's failure does not stop the others."""
+        self,
+        integration: IntegrationContext,
+        subject: Subject,
+        settings: dict[str, Any],
+        external_id: str | None,
+    ) -> SubjectStatus:
+        """Register one subject as the user chose. `external_id` is what an earlier attempt
+        made already. A refusal after something was made raises `PartlyRegistered` with its
+        id, so the caller keeps it."""
         ...
+
+
+class PartlyRegistered(PermanentFailure):
+    """The target made the first part of a registration and refused the rest."""
+
+    def __init__(self, message: str, *, external_id: str) -> None:
+        super().__init__(message)
+        self.external_id = external_id
 
 
 def require_config(integration: IntegrationContext, *keys: str) -> None:
