@@ -158,6 +158,10 @@ function IntegrateForm({
   );
   const missing = (data.fields ?? []).some((f) => !fields[f.key]?.trim());
   const animalMade = Boolean(data.subject?.external_id);
+  // the target cannot change an animal: its species and ear tag are corrected only with a
+  // new animal (decision D423)
+  const [newAnimal, setNewAnimal] = useState(false);
+  const locked = animalMade && !newAnimal;
   const chosen = data.species.find((s) => s.id === species);
   const save = useMutationToast({
     mutationFn: () =>
@@ -166,9 +170,11 @@ function IntegrateForm({
           species_id: species,
           species_name: chosen?.name ?? null,
           attributes: fields,
-          history_from: history
-            ? new Date(`${from}T00:00:00`).toISOString()
-            : null,
+          new_animal: newAnimal,
+          history_from:
+            history && !newAnimal
+              ? new Date(`${from}T00:00:00`).toISOString()
+              : null,
         },
       }),
     invalidate,
@@ -185,13 +191,52 @@ function IntegrateForm({
     <>
       <div className="space-y-4">
         {data.blocked && <Callout kind="warning">{data.blocked}</Callout>}
+        {/* what the target has differs from what Protect has: say so (decision D423) */}
+        {data.target.registered &&
+          data.target.external_species &&
+          data.subject?.species_name &&
+          !data.target.external_species.includes(data.subject.species_name) && (
+            <Callout kind="warning">
+              {t(
+                "Protect has {{protect}} for this entity, {{target}} has {{species}}. Make a new animal to correct it on {{target}}.",
+                {
+                  target,
+                  protect: data.subject.species_name,
+                  species: data.target.external_species,
+                },
+              )}
+            </Callout>
+          )}
         {data.target.registered && (
           <Callout kind="info">
             {t(
-              "{{target}} has this sensor on this entity's animal since {{time}}. Nothing new is sent; the data is forwarded.",
-              { target, time: formatTime(data.target.since) },
+              "On {{target}} this entity is {{name}}, {{species}}, with this sensor since {{time}}. {{target}} cannot change an animal.",
+              {
+                target,
+                name: data.target.external_name ?? "",
+                species: data.target.external_species ?? t("species unknown"),
+                time: formatTime(data.target.since),
+              },
             )}
           </Callout>
+        )}
+        {animalMade && (
+          <label className="flex items-start gap-2 text-sm">
+            <Switch
+              className="mt-0.5"
+              checked={newAnimal}
+              onCheckedChange={setNewAnimal}
+            />
+            <span>
+              {t("Make a new animal")}
+              <span className="block text-xs text-muted-foreground">
+                {t(
+                  "To correct the species or the ear tag number. {{target}} gets a new animal as chosen here and the sensor moves to it from the start of the device's assignment; the readings sent before belong to it. The old animal stays on {{target}} without a sensor.",
+                  { target },
+                )}
+              </span>
+            </span>
+          </label>
         )}
         {data.target.elsewhere && (
           <Callout kind="warning">
@@ -224,7 +269,7 @@ function IntegrateForm({
               : t("No match was found for the entity's type. Pick the species.")
           }
         >
-          <Select value={species} onValueChange={setSpecies}>
+          <Select value={species} onValueChange={setSpecies} disabled={locked}>
             <SelectTrigger id="subject-species">
               <SelectValue placeholder={t("Choose a species")} />
             </SelectTrigger>
@@ -243,9 +288,9 @@ function IntegrateForm({
             label={f.label}
             htmlFor={`subject-field-${f.key}`}
             hint={
-              animalMade
+              locked
                 ? t(
-                    "{{target}} keeps the identifier the animal was made with; a change here stays in Protect.",
+                    "{{target}} keeps the identifier the animal was made with. Choose Make a new animal to correct it.",
                     { target },
                   )
                 : t(
@@ -257,6 +302,7 @@ function IntegrateForm({
             <Input
               id={`subject-field-${f.key}`}
               required
+              disabled={locked}
               value={fields[f.key] ?? ""}
               placeholder={f.help ?? undefined}
               onChange={(e) =>
@@ -273,22 +319,24 @@ function IntegrateForm({
             {data.sensor_id ?? t("none")}
           </dd>
         </dl>
-        <label className="flex items-start gap-2 text-sm">
-          <Switch
-            className="mt-0.5"
-            checked={history}
-            onCheckedChange={setHistory}
-          />
-          <span>
-            {t("Send its history first")}
-            <span className="block text-xs text-muted-foreground">
-              {t(
-                "The old data goes first, oldest first, and the registration follows the last of it. Without it the entity is registered at once and only new data is sent.",
-              )}
+        {!newAnimal && (
+          <label className="flex items-start gap-2 text-sm">
+            <Switch
+              className="mt-0.5"
+              checked={history}
+              onCheckedChange={setHistory}
+            />
+            <span>
+              {t("Send its history first")}
+              <span className="block text-xs text-muted-foreground">
+                {t(
+                  "The old data goes first, oldest first, and the registration follows the last of it. Without it the entity is registered at once and only new data is sent.",
+                )}
+              </span>
             </span>
-          </span>
-        </label>
-        {history && (
+          </label>
+        )}
+        {history && !newAnimal && (
           <Field
             label={t("History from")}
             htmlFor="subject-from"
@@ -315,12 +363,16 @@ function IntegrateForm({
             Boolean(data.blocked) ||
             !species ||
             missing ||
-            (history && !from) ||
+            (history && !newAnimal && !from) ||
             save.isPending
           }
           onClick={() => save.mutate()}
         >
-          {save.isPending ? t("Integrating…") : t("Integrate")}
+          {save.isPending
+            ? t("Integrating…")
+            : newAnimal
+              ? t("Make a new animal")
+              : t("Integrate")}
         </Button>
       </DialogFooter>
     </>

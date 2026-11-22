@@ -11971,6 +11971,12 @@ export interface components {
             attributes?: {
                 [key: string]: string;
             };
+            /**
+             * New Animal
+             * @description Make a new animal as now chosen and move the devices to it (D423); the only way to correct the species or the ear tag once the target has the animal
+             * @default false
+             */
+            new_animal: boolean;
             /** Species Name */
             species_name?: string | null;
             /**
@@ -15644,6 +15650,11 @@ export interface components {
              * @description The other animal the target has the sensor on
              */
             elsewhere?: string | null;
+            /**
+             * External Species
+             * @description The species the target has for the animal
+             */
+            external_species?: string | null;
         };
         /** TestSendResult */
         TestSendResult: {

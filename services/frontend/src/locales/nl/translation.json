@@ -3532,7 +3532,6 @@
   "{{device}} on {{entity}}": "{{device}} op {{entity}}",
   "{{target}} gets a deployment of sensor {{sensor}} on the animal of {{entity}} from {{time}}. It ends the sensor's deployment before it at that moment. Then the held data of {{entity}} is sent, oldest first.": "{{target}} krijgt een deployment van sensor {{sensor}} op het dier van {{entity}} vanaf {{time}}. Het beëindigt de vorige deployment van de sensor op dat moment. Daarna wordt de vastgehouden data van {{entity}} gestuurd, de oudste eerst.",
   "{{target}} has this sensor on {{name}} since {{time}}. Integrating puts it on this entity's animal from {{from}}, and {{target}} ends it on {{name}} then. The history is sent after that.": "{{target}} heeft deze sensor op {{name}} sinds {{time}}. Integreren zet hem op het dier van deze entiteit vanaf {{from}}, en {{target}} beëindigt hem dan op {{name}}. De historie wordt daarna gestuurd.",
-  "{{target}} has this sensor on this entity's animal since {{time}}. Nothing new is sent; the data is forwarded.": "{{target}} heeft deze sensor op het dier van deze entiteit sinds {{time}}. Er wordt niets nieuws gemaakt; de data wordt doorgestuurd.",
   "{{target}} refused the deployment": "{{target}} weigerde de deployment",
   "A deployment cannot be removed from {{target}}.": "Een deployment kan niet meer uit {{target}} verwijderd worden.",
   "Confirm": "Bevestigen",
@@ -3559,6 +3558,10 @@
   "Try again": "Opnieuw proberen",
   "Waits for you": "Wacht op u",
   "This account may not send data to {{target}} yet. Ask its administrator for the rights; nothing reaches {{target}} until then.": "Dit account mag nog geen data naar {{target}} sturen. Vraag de beheerder om de rechten; tot dan bereikt niets {{target}}.",
-  "{{target}} keeps the identifier the animal was made with; a change here stays in Protect.": "{{target}} houdt de identificatie waarmee het dier is aangemaakt; een wijziging hier blijft in Protect.",
-  "{{target}} uses it as the animal's identifier. It is saved on the entity.": "{{target}} gebruikt het als identificatie van het dier. Het wordt bij de entiteit opgeslagen."
+  "{{target}} uses it as the animal's identifier. It is saved on the entity.": "{{target}} gebruikt het als identificatie van het dier. Het wordt bij de entiteit opgeslagen.",
+  "{{target}} keeps the identifier the animal was made with. Choose Make a new animal to correct it.": "{{target}} houdt de identificatie waarmee het dier is aangemaakt. Kies Nieuw dier aanmaken om die te corrigeren.",
+  "Make a new animal": "Nieuw dier aanmaken",
+  "On {{target}} this entity is {{name}}, {{species}}, with this sensor since {{time}}. {{target}} cannot change an animal.": "Bij {{target}} is deze entiteit {{name}}, {{species}}, met deze sensor sinds {{time}}. {{target}} kan een dier niet wijzigen.",
+  "Protect has {{protect}} for this entity, {{target}} has {{species}}. Make a new animal to correct it on {{target}}.": "Protect heeft {{protect}} voor deze entiteit, {{target}} heeft {{species}}. Maak een nieuw dier aan om het bij {{target}} te corrigeren.",
+  "To correct the species or the ear tag number. {{target}} gets a new animal as chosen here and the sensor moves to it from the start of the device's assignment; the readings sent before belong to it. The old animal stays on {{target}} without a sensor.": "Om de soort of het oormerknummer te corrigeren. {{target}} krijgt een nieuw dier zoals hier gekozen en de sensor gaat ernaar over vanaf het begin van de koppeling van het apparaat; de eerder gestuurde metingen horen erbij. Het oude dier blijft bij {{target}} staan zonder sensor."
 }

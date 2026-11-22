@@ -176,6 +176,9 @@ class SubjectStatus:
     external_name: str | None = None
     since: datetime | None = None
     elsewhere: str | None = None
+    external_species: str | None = field(
+        default=None, metadata={"doc": "The species the target has for the animal (D423)"}
+    )
 
 
 @dataclass(frozen=True, slots=True)

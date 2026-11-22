@@ -161,6 +161,7 @@ class Registrar(FakeConnector):
     def __init__(self) -> None:
         super().__init__()
         self.animals: dict[uuid.UUID, dict] = {}
+        self.made = 0
         self.deployed: list[tuple[str, str, datetime]] = []
         self.fail = False
         self.refuse_deploy = False
@@ -178,7 +179,8 @@ class Registrar(FakeConnector):
         if self.fail:
             raise PermanentFailure("the target refused")
         self.animals[subject.entity_id] = settings
-        return f"animal-{len(self.animals)}"
+        self.made += 1
+        return f"animal-{self.made}"
 
     async def deploy(self, integration, animal_id, sensor_id, start):
         if self.refuse_deploy:
@@ -503,3 +505,39 @@ async def test_a_measurement_carries_the_other_numbers_of_its_moment(db, world):
         "device_temperature": 2.75,
         "acceleration_x": 1.96,
     }
+
+
+async def test_a_wrong_species_is_corrected_with_a_new_animal(db, world):
+    """Decision D423: the target cannot change an animal, so once it has the entity's animal
+    the species is locked; Make a new animal makes one as now chosen and moves the device to
+    it from the same start. The old animal keeps nothing."""
+    from shared.integrations.subjects import LOCKED
+
+    await _isolate(db, world)
+    registrar = Registrar()
+    CONNECTORS["fake"] = registrar
+    integration = world.integration
+    wrong = {"species_id": "egel", "species_name": "Erinaceus europaeus"}
+    right = {"species_id": "hooglander", "species_name": "Bos taurus"}
+    start = T0 - timedelta(days=30)
+
+    row = await integrate(db, integration, world.entity.id, wrong, None, None)
+    await db.commit()
+    assert row.external_id == "animal-1"
+    assert registrar.deployed == [("animal-1", world.device.name, start)]
+    with pytest.raises(PermanentFailure, match="cannot change an animal"):
+        await integrate(db, integration, world.entity.id, right, None, None)
+    assert LOCKED.startswith("WildlifeNL cannot change")
+    await integrate(db, integration, world.entity.id, wrong, None, None)  # unchanged is fine
+    await db.commit()
+    assert registrar.made == 1
+
+    row = await integrate(db, integration, world.entity.id, right, None, None, new_animal=True)
+    await db.commit()
+    assert row.state == SubjectState.REGISTERED and row.external_id == "animal-2"
+    assert registrar.animals[world.entity.id] == right
+    # the sensor moves to the new animal from the same start; the row follows it
+    assert registrar.deployed[-1] == ("animal-2", world.device.name, start)
+    (deployment,) = await _rows(db, integration.id)
+    assert deployment.animal_id == "animal-2" and deployment.state == "sent"
+    assert await compare(db) == {}  # nothing left to ask

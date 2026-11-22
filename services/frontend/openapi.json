@@ -40658,6 +40658,12 @@
       "title": "Attributes",
       "description": "Values of the fields the target needs, stored on the entity (D422)"
      },
+     "new_animal": {
+      "type": "boolean",
+      "title": "New Animal",
+      "description": "Make a new animal as now chosen and move the devices to it (D423); the only way to correct the species or the ear tag once the target has the animal",
+      "default": false
+     },
      "species_name": {
       "anyOf": [
        {
@@ -50575,6 +50581,18 @@
       ],
       "title": "Elsewhere",
       "description": "The other animal the target has the sensor on"
+     },
+     "external_species": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Species",
+      "description": "The species the target has for the animal"
      }
     },
     "type": "object",

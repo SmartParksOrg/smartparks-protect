@@ -656,6 +656,13 @@ class WildlifeNlConnector:
         on = str(animal.get("ID") or deployment.get("animalID") or "") or None
         # `identifier` since the platform's API of 2026-11-22, `name` before (D422)
         name = str(animal.get("identifier") or animal.get("name") or "") or None
+        found_species = animal.get("species")
+        kind: dict[str, Any] = found_species if isinstance(found_species, dict) else {}
+        species = (
+            f"{kind['commonName']} ({kind['name']})"
+            if kind.get("commonName") and kind.get("name")
+            else str(kind.get("name") or kind.get("commonName") or "") or None
+        )
         if animal_id is None or on != animal_id:
             return SubjectStatus(
                 registered=False,
@@ -664,6 +671,7 @@ class WildlifeNlConnector:
                 external_name=name,
                 since=_moment(deployment.get("start")),
                 elsewhere=name or on or "another animal",
+                external_species=species,
             )
         return SubjectStatus(
             registered=True,
@@ -671,6 +679,7 @@ class WildlifeNlConnector:
             external_id=on,
             external_name=name,
             since=_moment(deployment.get("start")),
+            external_species=species,
         )
 
     def sensor(self, integration: IntegrationContext, subject: Subject) -> str | None:

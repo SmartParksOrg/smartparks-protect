@@ -84,7 +84,13 @@ others.
 
 With the history switched off the entity is registered at once and only new data is sent.
 
-**Change** opens the same dialog again, for another species or a history after all. **Stop**
+**Change** opens the same dialog again. Once WildlifeNL has the entity's animal, the dialog
+shows what the platform has for it (identifier, species, since when) and keeps the species and
+the ear tag number locked, since the platform cannot change an animal. When Protect and the
+platform disagree on the species, the dialog says so. **Make a new animal** corrects them: the
+platform gets a new animal as chosen, the sensor moves to it from the start of the device's
+assignment, so the readings sent before belong to it, and the old animal stays on the platform
+without a sensor (decision D423). Ask the platform's administrator to remove an old animal. **Stop**
 ends the forwarding; what the platform has stays there.
 
 The integration itself (click its row under Integrate, Integrations) lists every integrated

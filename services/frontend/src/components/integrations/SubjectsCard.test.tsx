@@ -214,6 +214,7 @@ describe("IntegrateEntityDialog", () => {
         species_id: "s1",
         species_name: "Bos taurus",
         attributes: {},
+        new_animal: false,
         history_from: null,
       },
     });
@@ -234,6 +235,46 @@ describe("IntegrateEntityDialog", () => {
     await waitFor(() => expect(put).toHaveBeenCalled());
     expect(put.mock.calls[0]![1]).toMatchObject({
       body: { attributes: { ear_tag: "NL123456789012" } },
+    });
+  });
+
+  it("locks species and ear tag once the animal exists, and corrects them with a new animal (D423)", async () => {
+    const put = open({
+      ...options,
+      proposed_species_id: "s1",
+      target: {
+        registered: true,
+        external_name: "NL999900051463",
+        external_species: "Egel (Erinaceus europaeus)",
+        since: "2026-09-08T14:32:33Z",
+      },
+      fields: [
+        { key: "ear_tag", label: "Ear tag number", value: "NL999900051463" },
+      ],
+      subject: {
+        integration_id: "i1",
+        entity_id: "e1",
+        entity_name: "Cow 12",
+        state: "registered",
+        species_id: "s1",
+        species_name: "Bos taurus",
+        external_id: "a1",
+        history_queued: 0,
+        history_waiting: 0,
+        created_at: "2026-11-22T10:00:00Z",
+      },
+    });
+    // what the target has differs from Protect: said, and the fields are locked
+    expect(
+      await screen.findByText(/Protect has Bos taurus/),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Ear tag number")).toBeDisabled();
+    fireEvent.click(screen.getByRole("switch", { name: /Make a new animal/ }));
+    expect(screen.getByLabelText("Ear tag number")).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Make a new animal" }));
+    await waitFor(() => expect(put).toHaveBeenCalled());
+    expect(put.mock.calls[0]![1]).toMatchObject({
+      body: { species_id: "s1", new_animal: true, history_from: null },
     });
   });
 

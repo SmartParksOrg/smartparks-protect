@@ -469,6 +469,8 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
         False,  # the sensor is on another animal: not this entity's (the bug of D408)
     ]
     assert statuses[known.entity_id].since == datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
+    # the species the platform has for the animal, to show beside Protect's choice (D423)
+    assert statuses[known.entity_id].external_species == "Konik (Equus ferus caballus)"
     assert statuses[moved.entity_id].elsewhere == "Konik 3"
     assert not [c for c in calls if c[0] == "POST"]  # reading changes nothing
 

@@ -172,24 +172,36 @@ async def _known_animal(
     )
 
 
+LOCKED = (
+    "WildlifeNL cannot change an animal. Choose Make a new animal to correct the species or "
+    "the ear tag number"
+)
+
+
 async def register_subject(
-    session: AsyncSession, integration: Integration, row: IntegrationSubject
+    session: AsyncSession,
+    integration: Integration,
+    row: IntegrationSubject,
+    *,
+    reuse: bool = True,
 ) -> None:
     """Register one entity on the target as its row says and write the outcome on the row:
     its animal, then a deployment of every device on it now (decisions D408 and D418), which
     the person integrating it confirmed by doing so. Later changes of its devices wait for a
     person (decision D416), so an entity registered before is not deployed again here.
     A target that cannot be reached leaves the rows as they are and raises, so the caller
-    tries again; a refusal is written down and not repeated."""
+    tries again; a refusal is written down and not repeated. `reuse=False` makes a new
+    animal even where Protect made one for the entity before (decision D423)."""
     registrar = registrar_of(integration)
     subject = await load_subject(session, integration, row.entity_id)
     context = integration_context(integration)
     first = row.registered_at is None
     try:
         if row.external_id is None:
-            row.external_id = await _known_animal(
-                session, integration, row.entity_id
-            ) or await registrar.register_animal(context, subject, dict(row.settings or {}))
+            known = await _known_animal(session, integration, row.entity_id) if reuse else None
+            row.external_id = known or await registrar.register_animal(
+                context, subject, dict(row.settings or {})
+            )
     except PermanentFailure as exc:
         row.state, row.detail = SubjectState.FAILED, str(exc)
         return
@@ -215,7 +227,7 @@ async def register_subject(
                     state=DeploymentState.PENDING,
                 )
                 session.add(deployment)
-            if deployment.state == DeploymentState.SENT:
+            if deployment.state == DeploymentState.SENT and deployment.animal_id == row.external_id:
                 continue
             sensor = registrar.sensor(context, as_device(subject, device))
             deployment.sensor_id = sensor
@@ -270,11 +282,18 @@ async def integrate(
     settings: dict[str, Any],
     history_from: datetime | None,
     user_id: uuid.UUID | None,
+    *,
+    new_animal: bool = False,
 ) -> IntegrationSubject:
     """Integrate one entity (decision D412): keep what the user chose, start forwarding its
     data, and either ask for its history (the caller publishes the request, and the
     registration follows the last reading, decision D409) or register it at once. The caller
-    commits."""
+    commits.
+
+    Once the target has the entity's animal its species is locked, since the target cannot
+    change an animal; `new_animal` makes a new one as now chosen and moves the entity's
+    devices to it from their assignments' start, at once and without history, since the
+    readings are on the target already under the sensor (decision D423)."""
     registrar_of(integration)
     await load_subject(session, integration, entity_id)
     row = await session.scalar(
@@ -300,6 +319,22 @@ async def integrate(
         session.add(row)
     elif row.state in (SubjectState.HISTORY_REQUESTED, SubjectState.SENDING_HISTORY):
         raise PermanentFailure("The entity's history is being sent; wait until it is done")
+    made = row.external_id is not None
+    chosen = str(settings.get("species_id"))
+    if made and not new_animal and chosen != str((row.settings or {}).get("species_id")):
+        raise PermanentFailure(LOCKED)
+    if new_animal:
+        if not made:
+            raise PermanentFailure("The entity has no animal on the target yet")
+        row.settings = settings
+        row.history_from = None
+        row.detail = None
+        row.external_id = None
+        row.registered_at = None
+        _forwarded(integration, entity_id, True)
+        await register_subject(session, integration, row, reuse=False)
+        await session.flush()
+        return row
     row.settings = settings
     row.history_from = history_from
     row.detail = None

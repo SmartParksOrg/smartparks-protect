@@ -73,6 +73,7 @@ from shared.integrations.deliveries import (
 from shared.integrations.deployments import confirm, decline, rewritten_by
 from shared.integrations.registry import CONNECTORS, describe_connector
 from shared.integrations.subjects import (
+    LOCKED,
     integrate,
     load_subject,
     load_subjects,
@@ -597,6 +598,7 @@ def _target(status: SubjectStatus | None) -> TargetStatus | None:
         external_name=status.external_name,
         since=status.since,
         elsewhere=status.elsewhere,
+        external_species=status.external_species,
     )
 
 
@@ -758,7 +760,12 @@ async def _subject_fields(
 
 
 async def _store_subject_fields(
-    session: AsyncSession, integration: Integration, entity_id: uuid.UUID, given: dict[str, str]
+    session: AsyncSession,
+    integration: Integration,
+    entity_id: uuid.UUID,
+    given: dict[str, str],
+    *,
+    locked: bool = False,
 ) -> dict[str, Any]:
     """The values a user gave for the fields the target needs, checked as the entity's own
     fields and stored on the entity; every one of them must have a value (decision D422).
@@ -779,6 +786,9 @@ async def _store_subject_fields(
     except FieldError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     changed = {k: v for k, v in checked.items() if current.get(k) != v}
+    if changed and locked:
+        # the target cannot change the animal it made with these (decision D423)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, LOCKED)
     merged = {**current, **checked}
     missing = [f.label for f in fields if not merged.get(f.key)]
     if missing:
@@ -1102,7 +1112,20 @@ async def integrate_entity(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 f"A history covers at most {MAX_BACKFILL_DAYS} days",
             )
-    changed = await _store_subject_fields(session, integration, entity_id, body.attributes)
+    existing = await session.scalar(
+        select(IntegrationSubject).where(
+            IntegrationSubject.integration_id == integration.id,
+            IntegrationSubject.entity_id == entity_id,
+        )
+    )
+    old_animal = existing.external_id if existing is not None else None
+    changed = await _store_subject_fields(
+        session,
+        integration,
+        entity_id,
+        body.attributes,
+        locked=old_animal is not None and not body.new_animal,
+    )
     if changed:
         await record_audit(
             session,
@@ -1121,6 +1144,7 @@ async def integrate_entity(
             {"species_id": str(body.species_id), "species_name": body.species_name},
             body.history_from,
             context.user.id,
+            new_animal=body.new_animal,
         )
     except TransientFailure as exc:
         raise _target_refused(exc) from None
@@ -1138,6 +1162,9 @@ async def integrate_entity(
             "species_id": str(body.species_id),
             "history_from": body.history_from.isoformat() if body.history_from else None,
             "state": str(row.state),
+            "new_animal": body.new_animal,
+            "old_animal": old_animal if body.new_animal else None,
+            "animal": row.external_id,
         },
     )
     await session.commit()

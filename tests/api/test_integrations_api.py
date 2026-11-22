@@ -243,6 +243,7 @@ class _Registrar:
 
     def __init__(self) -> None:
         self.registered: dict[uuid.UUID, dict] = {}
+        self.made = 0
         self.deployed: list[tuple[str, str, datetime]] = []
 
     async def options(self, integration, subject):
@@ -266,7 +267,8 @@ class _Registrar:
 
     async def register_animal(self, integration, subject, settings):
         self.registered[subject.entity_id] = settings
-        return f"animal-{len(self.registered)}"
+        self.made += 1
+        return f"animal-{self.made}"
 
     async def deploy(self, integration, animal_id, sensor_id, start):
         self.deployed.append((animal_id, sensor_id, start))
@@ -400,6 +402,13 @@ async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch
     assert stored.entity_ids == []
     now = await client.put(subject, json=chosen, headers=manager.headers)
     assert now.status_code == 200, now.text
+    # the animal exists: its ear tag and species are locked unless a new animal is made (D423)
+    retag = {**chosen, "attributes": {"ear_tag": "NL000000000999"}}
+    locked = await client.put(subject, json=retag, headers=manager.headers)
+    assert locked.status_code == 422 and "Make a new animal" in locked.text
+    renewed = await client.put(subject, json={**retag, "new_animal": True}, headers=manager.headers)
+    assert renewed.status_code == 200, renewed.text
+    assert renewed.json()["external_id"] == "animal-2"
     assert now.json()["state"] == "registered" and now.json()["external_id"] == "animal-1"
     assert registrar.registered == {
         uuid.UUID(entity["id"]): {"species_id": BOS, "species_name": "Bos taurus"}

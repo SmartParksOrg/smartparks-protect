@@ -150,6 +150,9 @@ class TargetStatus(BaseModel):
     elsewhere: str | None = Field(
         default=None, description="The other animal the target has the sensor on"
     )
+    external_species: str | None = Field(
+        default=None, description="The species the target has for the animal"
+    )
 
 
 class DeploymentRead(BaseModel):
@@ -259,6 +262,11 @@ class IntegrationSubjectWrite(BaseModel):
     attributes: dict[str, str] = Field(
         default_factory=dict,
         description="Values of the fields the target needs, stored on the entity (D422)",
+    )
+    new_animal: bool = Field(
+        default=False,
+        description="Make a new animal as now chosen and move the devices to it (D423); the "
+        "only way to correct the species or the ear tag once the target has the animal",
     )
     species_name: str | None = Field(default=None, max_length=200)
     history_from: AwareDatetime | None = Field(
