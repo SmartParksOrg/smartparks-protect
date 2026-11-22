@@ -15,10 +15,10 @@ from shared.integrations.base import (
     DeliveryItem,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     Skipped,
     Subject,
     SubjectRegistrar,
-    TransientFailure,
 )
 from shared.integrations.connectors.wildlifenl import (
     WildlifeNlConnector,
@@ -380,9 +380,9 @@ async def test_a_429_carries_the_time_the_platform_asks_for(monkeypatch):
 
     mock_platform(monkeypatch, handler)
     connector = WildlifeNlConnector()
-    with pytest.raises(TransientFailure, match="429") as raised:
+    with pytest.raises(RateLimited, match="429") as raised:
         await connector.deliver(integration(), item(), connector.render(integration(), item()))
-    assert raised.value.retry_after == 120
+    assert raised.value.retry_after == 120  # the integration waits as a whole (D424)
 
 
 def test_the_species_of_an_entity():

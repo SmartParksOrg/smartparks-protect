@@ -94,6 +94,26 @@ async def test_messages_become_rows(db, world):
     assert {r.object_type for r in rows} == {"position", "event"}
 
 
+async def test_a_rate_limited_target_gets_nothing_until_its_time(db, world, fake_connector):
+    """Decision D424: after a 429 the next cycles send nothing to the target until the time it
+    asked for, and then the objects go in their order, the first one first."""
+    await _isolate(db, world)
+    await enqueue(
+        db,
+        [world.integration],
+        [position_ref(world.position), event_ref(world.event)],
+        now=datetime.now(UTC) - timedelta(seconds=1),
+    )
+    await db.commit()
+    fake_connector.mode = "rate_limited"
+    assert await deliver_due(db) == {"rate_limited": 1}  # one request, then it waits
+    fake_connector.mode = "ok"
+    assert await deliver_due(db) == {}  # 13 s are not over
+    later = datetime.now(UTC) + timedelta(seconds=14)
+    assert await deliver_due(db, now=later) == {"sent": 2}
+    assert [d["type"] for d in fake_connector.delivered] == ["position", "event"]
+
+
 async def test_delivery_cycle_halts_an_unreachable_target(db, world, fake_connector):
     await _isolate(db, world)
     await enqueue(
@@ -210,7 +230,8 @@ async def test_a_registering_target_gets_the_integrated_entities_and_no_others(d
 
 
 async def test_an_entity_is_integrated_with_its_history_first(db, world):
-    """Decisions D409 and D412: the history is queued for this entity alone, the registration
+    """Decisions D409, D412 and D425: the animal is made when the history starts, so people
+    see it at once; the history is queued for this entity alone, the sensor's deployment
     follows its last object, a history with a hole holds it, a refusal is written down."""
     await _isolate(db, world)
     registrar = Registrar()
@@ -226,17 +247,18 @@ async def test_an_entity_is_integrated_with_its_history_first(db, world):
     with pytest.raises(PermanentFailure, match="history is being sent"):
         await integrate(db, integration, world.entity.id, chosen, None, None)
 
-    # the worker's part: the request from the bus queues the entity's two objects
+    # the worker's part: the animal first, then the entity's two objects are queued
     assert await handle_backfill(db, {"subject_id": str(row.id)}) == 2
     await db.refresh(row)
     assert row.state == SubjectState.SENDING_HISTORY and row.history_queued == 2
-    assert await finish_histories(db) == {} and not registrar.animals  # still waiting
+    assert row.external_id == "animal-1" and registrar.animals == {world.entity.id: chosen}
+    assert await finish_histories(db) == {} and not registrar.deployed  # still waiting
 
     await deliver_due(db)
     assert await finish_histories(db) == {"registered": 1}
     await db.refresh(row)
     assert row.state == SubjectState.REGISTERED and row.external_id == "animal-1"
-    assert registrar.animals == {world.entity.id: chosen}
+    assert registrar.made == 1  # the animal of the start, not a second one
     # the device on it now, from the start of its assignment (decision D418)
     assert registrar.deployed == [("animal-1", world.device.name, T0 - timedelta(days=30))]
     assert await finish_histories(db) == {}  # once

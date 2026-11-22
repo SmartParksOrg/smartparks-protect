@@ -135,6 +135,10 @@ export function IntegrationHead({
               t("registered {{time}}", {
                 time: formatTime(s.registered_at),
               }),
+            // the animal is made first and its sensor follows the history (decision D425)
+            s.state === "sending_history" &&
+              s.external_id &&
+              t("animal made, its sensor follows the history"),
             s.history_from &&
               t("history from {{time}}, {{count}} objects", {
                 time: formatTime(s.history_from),

@@ -73,6 +73,7 @@ from shared.integrations.base import (
     IntegrationContext,
     LoginResult,
     PermanentFailure,
+    RateLimited,
     Skipped,
     Subject,
     SubjectChoice,
@@ -81,6 +82,7 @@ from shared.integrations.base import (
     TransientFailure,
     iso,
     require_config,
+    retry_after_seconds,
 )
 
 DETECTION_EVENT_TYPE = "SPECIES_DETECTION"
@@ -358,14 +360,6 @@ def detection_species_field(document: dict[str, Any]) -> str:
     )
 
 
-def _retry_after(response: httpx.Response) -> float | None:
-    try:
-        seconds = float(response.headers.get("Retry-After", ""))
-    except ValueError:
-        return None
-    return seconds if seconds > 0 else None
-
-
 class WildlifeNlClient:
     def __init__(self, base_url: str, token: str | None) -> None:
         """`token` is None only for the login itself, the two calls that need none."""
@@ -389,9 +383,10 @@ class WildlifeNlClient:
         except httpx.HTTPError as exc:
             raise TransientFailure(f"wildlifenl: {type(exc).__name__}: {exc}") from exc
         if response.status_code == 429:
-            # the platform limits per token with a growing cooldown and says how long to wait
-            wait = _retry_after(response)
-            raise TransientFailure(
+            # the platform limits per token and says how long to wait; the integration waits
+            # as a whole (decision D424)
+            wait = retry_after_seconds(response.headers.get("Retry-After"))
+            raise RateLimited(
                 "wildlifenl answered 429" + (f", asking for {wait:g} s" if wait else ""),
                 retry_after=wait,
             )

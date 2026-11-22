@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, select
 from shared.enums import DeliveryOrigin, DeliveryStatus, TraceStatus
 from shared.integrations.deliveries import (
     MAX_ATTEMPTS,
+    RATE_LIMITED,
     attempt,
     backfill,
     backoff_seconds,
@@ -22,7 +23,7 @@ from shared.integrations.deliveries import (
     requeue,
 )
 from shared.integrations.deliveries import _position_ref as position_ref
-from shared.models import IntegrationDelivery, ProcessingTrace
+from shared.models import Entity, IntegrationDelivery, ProcessingTrace
 from tests.integration.conftest import T0
 
 pytestmark = pytest.mark.asyncio
@@ -320,3 +321,68 @@ async def test_an_entity_history_reads_every_page(db, world):
     world.integration.object_types = ["position"]
     span = (T0 - timedelta(hours=1), T0 + timedelta(hours=1))
     assert await backfill_entity(db, world.integration, world.entity.id, *span, batch=2) == 8
+
+
+async def test_a_rate_limit_pauses_the_integration_and_keeps_the_object_in_place(
+    db, world, fake_connector
+):
+    """Decision D424: a 429 is the target's pace. The object keeps its place and its attempts,
+    the integration has nothing due until the target's time, and no error is raised on it."""
+    delivery = await _one(db, world, position_ref(world.position))
+    now = datetime.now(UTC)
+    placed = delivery.next_attempt_at
+    fake_connector.mode = "rate_limited"
+    assert await attempt(db, delivery, world.integration, now=now) == RATE_LIMITED
+    assert delivery.status == DeliveryStatus.QUEUED and delivery.attempts == 0
+    assert delivery.next_attempt_at == placed and delivery.error_code is None
+    assert "waits 13 s" in (delivery.error_message or "")
+    assert world.integration.rate_limited_until == now + timedelta(seconds=13)
+    assert world.integration.last_error is None
+    await db.flush()
+
+    def mine(rows):
+        return [d for d in rows if d.integration_id == world.integration.id]
+
+    assert mine(await due_deliveries(db, now + timedelta(seconds=12))) == []
+    assert mine(await due_deliveries(db, now + timedelta(seconds=13))) == [delivery]
+    # a target that names no time is left alone for the first step of the schedule
+    fake_connector.mode = "rate_limited_bare"
+    assert await attempt(db, delivery, world.integration, now=now) == RATE_LIMITED
+    assert world.integration.rate_limited_until == now + timedelta(seconds=30)
+    await db.rollback()
+
+
+async def test_live_objects_go_before_another_entitys_history(db, world):
+    """Decision D424: a long history of one entity does not hold back the live objects of
+    the others, and an entity's own live objects still wait for its history (D410)."""
+    other = Entity(
+        project_id=world.project.id, entity_type_id=world.entity.entity_type_id, name="Other"
+    )
+    db.add(other)
+    await db.flush()
+    base = position_ref(world.position)
+    now = datetime.now(UTC)
+    history = [
+        replace(base, object_id=str(800_000_000 + days), time=base.time - timedelta(days=days))
+        for days in (3, 2)
+    ]
+    await enqueue(
+        db,
+        [world.integration],
+        history,
+        origin=DeliveryOrigin.BACKFILL,
+        now=now,
+        honour_age=False,
+    )
+    later = now + timedelta(seconds=1)
+    own_live = replace(base, object_id="800000100")
+    other_live = replace(base, object_id="800000101", entity_id=other.id)
+    await enqueue(db, [world.integration], [own_live, other_live], now=later, honour_age=False)
+    await db.flush()
+    due = [
+        d.object_id
+        for d in await due_deliveries(db, later, limit=1000)
+        if d.integration_id == world.integration.id
+    ]
+    assert due == ["800000101", "800000003", "800000002", "800000100"]
+    await db.rollback()

@@ -85,6 +85,10 @@ class Integration(UuidPrimaryKeyMixin, TimestampMixin, Base):
     last_delivery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
     last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rate_limited_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="The target answered 429: nothing is sent to it before this moment (D424)",
+    )
     backfill: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
@@ -112,6 +116,27 @@ class IntegrationDelivery(UuidPrimaryKeyMixin, Base):
         Index("ix_integration_deliveries_due", "status", "next_attempt_at", "integration_id"),
         Index("ix_integration_deliveries_integration_created", "integration_id", "created_at"),
         Index("ix_integration_deliveries_project_created", "project_id", "created_at"),
+        # what is due apart from histories and backfills, which goes first (decision D424)
+        Index(
+            "ix_integration_deliveries_live_due",
+            "integration_id",
+            "next_attempt_at",
+            postgresql_where=text("status = 'queued' AND origin <> 'backfill'"),
+        ),
+        # whether an entity still has old objects on their way (decision D424)
+        Index(
+            "ix_integration_deliveries_backfill_queued",
+            "integration_id",
+            "entity_id",
+            postgresql_where=text("status = 'queued' AND origin = 'backfill'"),
+        ),
+        # how fast a target takes objects now, for the time a history still needs (D424)
+        Index(
+            "ix_integration_deliveries_integration_delivered",
+            "integration_id",
+            "delivered_at",
+            postgresql_where=text("delivered_at IS NOT NULL"),
+        ),
         enum_check("status", DeliveryStatus, "ck_integration_deliveries_status"),
         enum_check("object_type", IntegrationObjectType, "ck_integration_deliveries_object_type"),
         enum_check("origin", DeliveryOrigin, "ck_integration_deliveries_origin"),

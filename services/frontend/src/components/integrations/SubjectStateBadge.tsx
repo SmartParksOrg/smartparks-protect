@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { IntegrationSubject } from "@/api/types";
 import { Badge } from "@/components/ui/badge";
+import { formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const TONES: Record<IntegrationSubject["state"], string> = {
@@ -13,7 +14,8 @@ const TONES: Record<IntegrationSubject["state"], string> = {
 };
 
 /** Where an entity stands with an integration (decision D412), in words: integrated, its
- * history on the way with what still waits, held, or refused. */
+ * history on the way with what still waits and about how long it needs at the target's pace
+ * (decision D424), held, or refused. */
 export function SubjectStateBadge({
   subject,
 }: {
@@ -24,11 +26,16 @@ export function SubjectStateBadge({
     registered: t("Integrated"),
     history_requested: t("Preparing history"),
     sending_history:
-      subject.history_waiting > 0
-        ? t("Sending history, {{count}} to go", {
+      subject.history_waiting > 0 && subject.history_seconds_left != null
+        ? t("Sending history, {{count}} to go, about {{left}}", {
             count: subject.history_waiting,
+            left: formatDuration(subject.history_seconds_left),
           })
-        : t("Sending history"),
+        : subject.history_waiting > 0
+          ? t("Sending history, {{count}} to go", {
+              count: subject.history_waiting,
+            })
+          : t("Sending history"),
     held: t("On hold"),
     failed: t("Not registered"),
   };

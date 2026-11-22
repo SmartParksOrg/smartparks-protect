@@ -206,6 +206,11 @@ const dateLocal = (d: Date) =>
     .slice(0, 16);
 
 /** Outbound integrations (architecture 18): what leaves the platform, to where, and what happened to every object. */
+/** Whether the target asked to wait and the time has not come (decision D424). */
+function waitsForTarget(until: string | null | undefined): boolean {
+  return Boolean(until) && new Date(until as string).getTime() > Date.now();
+}
+
 export function IntegrationsPage() {
   const { t } = useTranslation();
   const translate = t;
@@ -469,7 +474,13 @@ export function IntegrationsPage() {
       header: t("Status"),
       id: "status",
       cell: ({ row }) =>
-        row.original.last_error ? (
+        waitsForTarget(row.original.rate_limited_until) ? (
+          <span className="text-xs text-muted-foreground">
+            {t("Waiting for the target until {{time}}", {
+              time: formatTime(row.original.rate_limited_until),
+            })}
+          </span>
+        ) : row.original.last_error ? (
           <span
             className="text-xs text-destructive"
             title={row.original.last_error}
@@ -1144,6 +1155,14 @@ export function IntegrationsPage() {
                     </Button>
                   )}
                 </div>
+              )}
+              {waitsForTarget(detail.data.rate_limited_until) && (
+                <Callout kind="info">
+                  {t(
+                    "The target asked Protect to slow down. Nothing is sent before {{time}}, then the objects go on in their order.",
+                    { time: formatTime(detail.data.rate_limited_until) },
+                  )}
+                </Callout>
               )}
               {detail.data.last_error && (
                 <Callout kind="warning">

@@ -11,6 +11,7 @@ from shared.integrations.base import (
     DeliveryItem,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     Skipped,
     TransientFailure,
 )
@@ -235,7 +236,7 @@ async def test_webhook_signs_and_classifies(monkeypatch):
         await connector.deliver(
             _context("webhook", {"url": "https://example.org/down"}), _position(), payload
         )
-    with pytest.raises(TransientFailure):
+    with pytest.raises(RateLimited):
         await connector.deliver(
             _context("webhook", {"url": "https://example.org/busy"}), _position(), payload
         )

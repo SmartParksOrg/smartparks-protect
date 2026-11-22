@@ -11758,6 +11758,11 @@ export interface components {
             last_error: string | null;
             /** Last Error At */
             last_error_at: string | null;
+            /**
+             * Rate Limited Until
+             * @description The target asked to wait (a 429): nothing is sent before this (D424)
+             */
+            rate_limited_until?: string | null;
             /** Backfill */
             backfill: {
                 [key: string]: unknown;
@@ -11841,6 +11846,11 @@ export interface components {
             last_error: string | null;
             /** Last Error At */
             last_error_at: string | null;
+            /**
+             * Rate Limited Until
+             * @description The target asked to wait (a 429): nothing is sent before this (D424)
+             */
+            rate_limited_until?: string | null;
             /** Backfill */
             backfill: {
                 [key: string]: unknown;
@@ -11942,6 +11952,11 @@ export interface components {
              * @default 0
              */
             history_waiting: number;
+            /**
+             * History Seconds Left
+             * @description About how long its history still needs at the pace the target took objects in the last ten minutes, with the histories queued before it; none when nothing went in that time (decision D424)
+             */
+            history_seconds_left?: number | null;
             /**
              * External Id
              * @description The target's id of the animal

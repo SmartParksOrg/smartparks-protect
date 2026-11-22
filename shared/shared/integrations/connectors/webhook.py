@@ -18,8 +18,10 @@ from shared.integrations.base import (
     DeliveryResult,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     TransientFailure,
     iso,
+    retry_after_seconds,
 )
 
 USER_AGENT = "smartparks-protect"
@@ -94,7 +96,12 @@ async def post_json(
     except httpx.HTTPError as exc:
         raise TransientFailure(f"webhook: {type(exc).__name__}: {exc}") from exc
     summary = {"status": response.status_code, "body": response.text[:500]}
-    if response.status_code >= 500 or response.status_code == 429:
+    if response.status_code == 429:
+        raise RateLimited(
+            "webhook answered 429",
+            retry_after=retry_after_seconds(response.headers.get("Retry-After")),
+        )
+    if response.status_code >= 500:
         raise TransientFailure(f"webhook answered {response.status_code}")
     if response.status_code >= 400:
         raise PermanentFailure(f"webhook answered {response.status_code}: {response.text[:200]}")

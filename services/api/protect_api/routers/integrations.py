@@ -1,6 +1,7 @@
 """Outbound integrations per project (architecture 18): connectors, integrations, the delivery
 log with request and response inspection, retry, test sends and backfill requests."""
 
+import math
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -602,6 +603,62 @@ def _target(status: SubjectStatus | None) -> TargetStatus | None:
     )
 
 
+#: The window the pace of a target is read over (decision D424)
+PACE_WINDOW = timedelta(minutes=10)
+
+
+async def _seconds_left(
+    session: AsyncSession,
+    sending: Sequence[IntegrationSubject],
+    waiting: dict[tuple[uuid.UUID, uuid.UUID | None], int],
+) -> dict[uuid.UUID, int]:
+    """About how long each history still needs: what waits of it and of the histories queued
+    before it on the same integration, at the pace the target took objects over the last ten
+    minutes. A target that took nothing in that time gives no estimate."""
+    if not sending:
+        return {}
+    since = utc_now() - PACE_WINDOW
+    pace: dict[uuid.UUID, int] = {
+        integration_id: int(count)
+        for integration_id, count in (
+            await session.execute(
+                select(IntegrationDelivery.integration_id, func.count())
+                .where(
+                    IntegrationDelivery.integration_id.in_({r.integration_id for r in sending}),
+                    IntegrationDelivery.delivered_at.is_not(None),
+                    IntegrationDelivery.delivered_at >= since,
+                )
+                .group_by(IntegrationDelivery.integration_id)
+            )
+        ).all()
+    }
+    return estimate_left(sending, waiting, pace)
+
+
+def estimate_left(
+    sending: Sequence[IntegrationSubject],
+    waiting: dict[tuple[uuid.UUID, uuid.UUID | None], int],
+    pace: dict[uuid.UUID, int],
+) -> dict[uuid.UUID, int]:
+    """The arithmetic of `_seconds_left`: `pace` is what each integration's target took over
+    `PACE_WINDOW`. A history waits for its own objects and those of the histories queued
+    before it, since what is due goes oldest first."""
+    left: dict[uuid.UUID, int] = {}
+    for row in sending:
+        sent = pace.get(row.integration_id, 0)
+        if not sent:
+            continue
+        mine = row.history_started_at or row.created_at
+        ahead = sum(
+            waiting.get((other.integration_id, other.entity_id), 0)
+            for other in sending
+            if other.integration_id == row.integration_id
+            and (other.history_started_at or other.created_at) <= mine
+        )
+        left[row.id] = math.ceil(ahead * PACE_WINDOW.total_seconds() / sent)
+    return left
+
+
 async def _subject_reads(
     session: AsyncSession, rows: Sequence[IntegrationSubject]
 ) -> list[IntegrationSubjectRead]:
@@ -636,6 +693,7 @@ async def _subject_reads(
             )
         ).all():
             waiting[(integration_id, entity_id)] = int(count)
+    left = await _seconds_left(session, sending, waiting)
     return [
         IntegrationSubjectRead(
             integration_id=row.integration_id,
@@ -648,6 +706,7 @@ async def _subject_reads(
             history_from=row.history_from,
             history_queued=row.history_queued,
             history_waiting=waiting.get((row.integration_id, row.entity_id), 0),
+            history_seconds_left=left.get(row.id),
             external_id=row.external_id,
             registered_at=row.registered_at,
             created_at=row.created_at,

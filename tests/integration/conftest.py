@@ -19,6 +19,7 @@ from shared.integrations.base import (
     DeliveryResult,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     Skipped,
     TransientFailure,
 )
@@ -71,6 +72,10 @@ class FakeConnector:
             raise TransientFailure("target down")
         if self.mode == "throttled":
             raise TransientFailure("slow down", retry_after=300)
+        if self.mode == "rate_limited":
+            raise RateLimited("fake answered 429", retry_after=13)
+        if self.mode == "rate_limited_bare":
+            raise RateLimited("fake answered 429")
         if self.mode == "permanent":
             raise PermanentFailure("target refused")
         if self.mode == "crash":

@@ -26,9 +26,11 @@ from shared.integrations.base import (
     DeliveryResult,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     Skipped,
     TransientFailure,
     iso,
+    retry_after_seconds,
 )
 
 GUNDI_BASE_URL = "https://sensors.api.gundiservice.org/v2"
@@ -152,7 +154,12 @@ class GundiClient:
                 )
         except httpx.HTTPError as exc:
             raise TransientFailure(f"gundi: {type(exc).__name__}: {exc}") from exc
-        if response.status_code >= 500 or response.status_code == 429:
+        if response.status_code == 429:
+            raise RateLimited(
+                "gundi answered 429",
+                retry_after=retry_after_seconds(response.headers.get("Retry-After")),
+            )
+        if response.status_code >= 500:
             raise TransientFailure(f"gundi answered {response.status_code}")
         if response.status_code >= 400:
             raise PermanentFailure(f"gundi answered {response.status_code}: {response.text[:300]}")

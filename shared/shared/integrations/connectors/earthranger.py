@@ -31,10 +31,12 @@ from shared.integrations.base import (
     DeliveryResult,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     Skipped,
     TransientFailure,
     iso,
     require_config,
+    retry_after_seconds,
 )
 
 NAMESPACE = "smartparks_protect"
@@ -170,7 +172,12 @@ class EarthRangerClient:
                 )
         except httpx.HTTPError as exc:
             raise TransientFailure(f"earthranger: {type(exc).__name__}: {exc}") from exc
-        if response.status_code >= 500 or response.status_code == 429:
+        if response.status_code == 429:
+            raise RateLimited(
+                "earthranger answered 429",
+                retry_after=retry_after_seconds(response.headers.get("Retry-After")),
+            )
+        if response.status_code >= 500:
             raise TransientFailure(f"earthranger answered {response.status_code}")
         if response.status_code >= 400:
             raise PermanentFailure(

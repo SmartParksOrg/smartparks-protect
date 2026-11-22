@@ -178,6 +178,31 @@ LOCKED = (
 )
 
 
+async def make_animal(
+    session: AsyncSession,
+    integration: Integration,
+    row: IntegrationSubject,
+    *,
+    reuse: bool = True,
+) -> bool:
+    """Make the entity's animal on the target, once, and keep its id on the row. A refusal
+    marks the row failed and answers False; a target that cannot be reached raises, so the
+    caller tries again. Its sensor is not deployed here: that follows the history (D425)."""
+    if row.external_id is not None:
+        return True
+    try:
+        known = await _known_animal(session, integration, row.entity_id) if reuse else None
+        row.external_id = known or await registrar_of(integration).register_animal(
+            integration_context(integration),
+            await load_subject(session, integration, row.entity_id),
+            dict(row.settings or {}),
+        )
+    except PermanentFailure as exc:
+        row.state, row.detail = SubjectState.FAILED, str(exc)
+        return False
+    return True
+
+
 async def register_subject(
     session: AsyncSession,
     integration: Integration,
@@ -196,15 +221,11 @@ async def register_subject(
     subject = await load_subject(session, integration, row.entity_id)
     context = integration_context(integration)
     first = row.registered_at is None
-    try:
-        if row.external_id is None:
-            known = await _known_animal(session, integration, row.entity_id) if reuse else None
-            row.external_id = known or await registrar.register_animal(
-                context, subject, dict(row.settings or {})
-            )
-    except PermanentFailure as exc:
-        row.state, row.detail = SubjectState.FAILED, str(exc)
+    if not await make_animal(session, integration, row, reuse=reuse):
         return
+    animal = row.external_id
+    if animal is None:
+        raise RuntimeError("make_animal answered True without an animal")
     refused: list[str] = []
     if first:
         made = {
@@ -237,7 +258,7 @@ async def register_subject(
                 refused.append(f"{device.device_name}: {deployment.detail}")
                 continue
             try:
-                await registrar.deploy(context, row.external_id, sensor, device.assigned_from)
+                await registrar.deploy(context, animal, sensor, device.assigned_from)
             except PermanentFailure as exc:
                 deployment.state, deployment.detail = DeploymentState.REFUSED, str(exc)
                 refused.append(f"{device.device_name}: {exc}")
@@ -377,13 +398,20 @@ async def stop(session: AsyncSession, integration: Integration, entity_id: uuid.
 
 
 async def send_history(session: AsyncSession, subject_id: uuid.UUID) -> int:
-    """The worker's part of a history request: queue the entity's old objects, oldest first,
-    and mark the row so the registration follows them. Commits."""
+    """The worker's part of a history request: make the entity's animal, so people see it on
+    the target at once (decision D425), then queue the entity's old objects, oldest first, and
+    mark the row so the sensor's deployment follows them (decision D409: a reading of a
+    deployed sensor moves the animal and may raise alarms there, one of a sensor without a
+    deployment is only stored). A target that cannot be reached raises, so the bus tries the
+    request again. Commits."""
     row = await session.get(IntegrationSubject, subject_id)
     if row is None or row.state != SubjectState.HISTORY_REQUESTED or row.history_from is None:
         return 0
     integration = await session.get(Integration, row.integration_id)
     if integration is None:
+        return 0
+    if not await make_animal(session, integration, row):
+        await session.commit()
         return 0
     row.history_started_at = utc_now()
     queued = await backfill_entity(

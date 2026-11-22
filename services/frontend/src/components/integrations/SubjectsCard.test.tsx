@@ -75,6 +75,13 @@ describe("SubjectsCard", () => {
           target: { registered: false, sensor_id: "0016C001F016D24B" },
         }),
         subject({
+          entity_id: "e4",
+          entity_name: "Cow 15",
+          state: "sending_history",
+          history_waiting: 5485,
+          history_seconds_left: 5485,
+        }),
+        subject({
           entity_id: "e3",
           entity_name: "Cow 14",
           state: "held",
@@ -87,6 +94,10 @@ describe("SubjectsCard", () => {
     expect(await screen.findByText("Cow 12")).toBeInTheDocument();
     expect(screen.getByText("Integrated")).toBeInTheDocument();
     expect(screen.getByText("Sending history, 40 to go")).toBeInTheDocument();
+    // the time left at the target's pace (decision D424)
+    expect(
+      screen.getByText("Sending history, 5485 to go, about 1 h 31 min"),
+    ).toBeInTheDocument();
     expect(screen.getByText("On hold")).toBeInTheDocument();
     expect(
       screen.getByText("2 objects of its history failed."),

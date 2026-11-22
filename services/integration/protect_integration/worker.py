@@ -15,6 +15,7 @@ from shared.bus import Message, RedisStreamsBus, Topic
 from shared.database import session_scope
 from shared.enums import DeliveryOrigin, DeliveryStatus, IntegrationObjectType
 from shared.integrations.deliveries import (
+    RATE_LIMITED,
     ObjectRef,
     attempt,
     backfill,
@@ -134,7 +135,7 @@ async def handle_message(session: AsyncSession, cache: IntegrationCache, message
 async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> dict[str, int]:
     """One cycle: every due row, grouped per integration, in order. A transient failure ends
     the integration's share of the cycle so an unreachable target gets one request, not two
-    hundred."""
+    hundred; a target that asked to wait gets nothing until its time (decision D424)."""
     now = now or utc_now()
     rows = await due_deliveries(session, now, limit=BATCH)
     if not rows:
@@ -179,7 +180,7 @@ async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> 
         status = await attempt(session, delivery, integration, now=now)
         await session.commit()
         outcome[status] = outcome.get(status, 0) + 1
-        if status == DeliveryStatus.QUEUED:
+        if status in (DeliveryStatus.QUEUED, RATE_LIMITED):
             halted.add(delivery.integration_id)
     return outcome
 

@@ -75,9 +75,15 @@ others.
    - **Send its history first**, with the date to start from. It starts at the day the device
      came onto the entity, at most 400 days back.
 3. Choose **Integrate**. The card follows what happens:
-   - *Preparing history*, then *Sending history, N to go*: the old readings go oldest first.
-   - *Integrated*: every reading was delivered and the animal and its sensor are registered.
-     New readings follow as they arrive.
+   - *Preparing history*: Protect makes the animal on the platform first, so you see it there
+     at once, with its species and ear tag number and without a sensor (decision D425).
+   - *Sending history, N to go, about T*: the old readings go oldest first. The card says
+     "animal made, its sensor follows the history". T is the time left at the pace the platform
+     took readings over the last ten minutes (decision D424). The platform takes about 60
+     readings a minute (TEST, 2026-11-22), so 6,000 readings need about an hour and a half.
+     While it waits, the integration's row says "Waiting for the target until ...".
+   - *Integrated*: every reading was delivered and the sensor is deployed on the animal. New
+     readings follow as they arrive.
    - *On hold*: part of the history failed, so Protect did not register. Look at Deliveries,
      retry the failed ones, then choose Change and integrate without history.
    - *Not registered*: the platform refused the registration; the card says what it answered.
@@ -150,7 +156,9 @@ As the platform's code read on 2026-11-21, a reading with a location for an anim
 deployment does two things, whatever the reading's age: it becomes the animal's current
 location, and, when it is older than an hour, it raises zone alarms for the platform's users.
 A reading for a sensor without a deployment is stored and does neither. So Protect sends the
-history before the deployment exists.
+history before the deployment exists. The animal itself is made before the history (decision
+D425, Tim, 2026-11-22: he wanted to see the animal on the platform while its history goes): an
+animal without a sensor has no readings and raises nothing.
 
 What remains after the registration: a reading that reaches Protect late (a flash log read out
 days afterwards, an offload station's card) is forwarded when it is younger than the
@@ -190,7 +198,13 @@ used for the readings and for the deployment.
   alarms on the platform (see above). This is the platform's behaviour as its code reads; it is
   reported to its developers.
 - **The rate limit.** The platform limits requests per account and answers 429 with the time to
-  wait. Protect waits that long and goes on; a long history takes the time the platform allows.
+  wait; on TEST on 2026-11-22 that was 120 requests per two minutes. The platform has no call
+  that takes several readings at once, so every reading is one request. After a 429 Protect
+  sends nothing to the integration for the time asked, and the reading keeps its place and is
+  not counted as a failed attempt (decision D424); a long history takes the time the platform
+  allows. While one entity's history goes, the live readings of the other integrated entities
+  go first; an entity's own live readings wait behind its history, so its newest location is
+  sent last.
 - **What is sent.** Positions, and per status message the device temperature with the
   accelerometer (decision D421). The platform's reading has no field for the battery, the
   activity index, the uptime or the satellites, and refuses fields it does not know, so those
@@ -209,6 +223,9 @@ used for the readings and for the deployment.
 
 ## Troubleshooting
 
+- The integration's row says "Waiting for the target until ...": the platform answered 429.
+  Nothing is wrong; Protect goes on at that time. The entity's card says how long its history
+  still needs.
 - `did not accept the code`: the code was mistyped or has expired; choose Send a new code.
 - `is not signed in`: the integration has no sign-in yet; use the key on its row.
 - After the sign-in, "may not send data" or "may not register entities": the platform's own API

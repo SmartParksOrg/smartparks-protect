@@ -12,9 +12,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from shared.config import get_settings
 from shared.connectivity.network_location import NETWORK_RECORD_TYPE
@@ -33,6 +34,7 @@ from shared.integrations.base import (
     IntegrationContext,
     OutboundConnector,
     PermanentFailure,
+    RateLimited,
     Skipped,
     SubjectRegistrar,
     TransientFailure,
@@ -64,6 +66,8 @@ BACKOFF_BASE_SECONDS = 30
 BACKOFF_MAX_SECONDS = 6 * 3600
 MAX_ATTEMPTS = 30
 BACKFILL_BATCH = 1000
+#: What `attempt` answers when the target asked to wait (decision D424)
+RATE_LIMITED = "rate_limited"
 SEVERITY_RANK = {Severity.INFO: 0, Severity.WARNING: 1, Severity.CRITICAL: 2}
 
 
@@ -472,6 +476,18 @@ async def attempt(
                 user_actionable=True,
             ),
         )
+    except RateLimited as exc:
+        # the target's pace, not a fault of the object (decision D424): the object keeps its
+        # place in the order and its attempts, and the whole integration waits as asked
+        wait = min(math.ceil(exc.retry_after or BACKOFF_BASE_SECONDS), BACKOFF_MAX_SECONDS)
+        delivery.attempts -= 1
+        delivery.status = DeliveryStatus.QUEUED
+        delivery.error_code = None
+        delivery.error_message = f"{exc}; the integration waits {wait} s"
+        integration.rate_limited_until = now + timedelta(seconds=wait)
+        tracer.trace.status = TraceStatus.RETRYING
+        await session.flush()
+        return RATE_LIMITED
     except (TransientFailure, Exception) as exc:
         message = str(exc) if isinstance(exc, TransientFailure) else f"{type(exc).__name__}: {exc}"
         integration.last_error = message
@@ -515,26 +531,63 @@ async def attempt(
 async def due_deliveries(
     session: AsyncSession, now: datetime, *, limit: int = 200
 ) -> list[IntegrationDelivery]:
-    return list(
+    """What is due now, in the order it goes. An integration whose target asked to wait has
+    nothing due (decision D424). The live objects of entities without old objects on their way
+    go first, so a long history of one animal does not hold back the others; then the rest,
+    oldest first (decision D410): a backfill queues a thousand rows in one moment, and a
+    target that keeps "the newest location" must get an entity's newest one last."""
+    callable_now = or_(
+        Integration.rate_limited_until.is_(None), Integration.rate_limited_until <= now
+    )
+    due = (
+        IntegrationDelivery.status == DeliveryStatus.QUEUED,
+        IntegrationDelivery.next_attempt_at <= now,
+    )
+    order = (
+        IntegrationDelivery.next_attempt_at,
+        IntegrationDelivery.created_at,
+        IntegrationDelivery.object_time,
+    )
+    backlog = aliased(IntegrationDelivery)
+    has_backlog = (
+        select(backlog.id)
+        .where(
+            backlog.integration_id == IntegrationDelivery.integration_id,
+            backlog.entity_id == IntegrationDelivery.entity_id,
+            backlog.status == DeliveryStatus.QUEUED,
+            backlog.origin == DeliveryOrigin.BACKFILL,
+        )
+        .exists()
+    )
+    first = list(
         (
             await session.scalars(
                 select(IntegrationDelivery)
+                .join(Integration, Integration.id == IntegrationDelivery.integration_id)
                 .where(
-                    IntegrationDelivery.status == DeliveryStatus.QUEUED,
-                    IntegrationDelivery.next_attempt_at <= now,
+                    *due,
+                    callable_now,
+                    IntegrationDelivery.origin != DeliveryOrigin.BACKFILL,
+                    ~has_backlog,
                 )
-                # what is due goes oldest first (decision D410): a backfill queues a thousand
-                # rows in one moment, and a target that keeps "the newest location" must get
-                # the newest one last
-                .order_by(
-                    IntegrationDelivery.next_attempt_at,
-                    IntegrationDelivery.created_at,
-                    IntegrationDelivery.object_time,
-                )
+                .order_by(*order)
                 .limit(limit)
             )
         ).all()
     )
+    if len(first) >= limit:
+        return first
+    taken = {row.id for row in first}
+    rest = (
+        await session.scalars(
+            select(IntegrationDelivery)
+            .join(Integration, Integration.id == IntegrationDelivery.integration_id)
+            .where(*due, callable_now)
+            .order_by(*order)
+            .limit(limit)
+        )
+    ).all()
+    return first + [row for row in rest if row.id not in taken][: limit - len(first)]
 
 
 def requeue(delivery: IntegrationDelivery, now: datetime | None = None) -> None:

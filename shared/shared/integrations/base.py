@@ -3,7 +3,8 @@
 A connector owns the translation from canonical Smart Parks objects to one target platform and
 the delivery itself. It knows nothing about the delivery table, retries or filters: the
 integration service loads the object, calls `render`, then `deliver`, and records the outcome.
-Transient failures (network, 5xx, 429) raise `TransientFailure` and are retried on the schedule;
+Transient failures (network, 5xx) raise `TransientFailure` and are retried on the schedule; a 429
+raises `RateLimited`, and the whole integration waits as long as the target asks (D424);
 permanent ones (other 4xx, a payload the target refuses, no location) raise `PermanentFailure`
 and end the delivery as failed. `Skipped` ends it as skipped with a reason.
 """
@@ -23,6 +24,7 @@ __all__ = [
     "LoginResult",
     "OutboundConnector",
     "PermanentFailure",
+    "RateLimited",
     "Skipped",
     "Subject",
     "SubjectChoice",
@@ -31,7 +33,23 @@ __all__ = [
     "SubjectRegistrar",
     "SubjectStatus",
     "TransientFailure",
+    "retry_after_seconds",
 ]
+
+
+class RateLimited(TransientFailure):
+    """The target answered 429: it limits how fast it is called, and the object is fine. The
+    integration waits as a whole for `retry_after` seconds, or 30 when the target named no
+    time, and the object keeps its place and its attempts (decision D424)."""
+
+
+def retry_after_seconds(value: str | None) -> float | None:
+    """A `Retry-After` header in seconds; none for a missing, zero or date-shaped one."""
+    try:
+        seconds = float(value or "")
+    except ValueError:
+        return None
+    return seconds if seconds > 0 else None
 
 
 @dataclass(frozen=True, slots=True)

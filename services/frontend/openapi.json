@@ -40142,6 +40142,19 @@
       ],
       "title": "Last Error At"
      },
+     "rate_limited_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate Limited Until",
+      "description": "The target asked to wait (a 429): nothing is sent before this (D424)"
+     },
      "backfill": {
       "additionalProperties": true,
       "type": "object",
@@ -40343,6 +40356,19 @@
        }
       ],
       "title": "Last Error At"
+     },
+     "rate_limited_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate Limited Until",
+      "description": "The target asked to wait (a 429): nothing is sent before this (D424)"
      },
      "backfill": {
       "additionalProperties": true,
@@ -40590,6 +40616,18 @@
       "title": "History Waiting",
       "description": "Objects of its history not yet sent",
       "default": 0
+     },
+     "history_seconds_left": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "History Seconds Left",
+      "description": "About how long its history still needs at the pace the target took objects in the last ten minutes, with the histories queued before it; none when nothing went in that time (decision D424)"
      },
      "external_id": {
       "anyOf": [

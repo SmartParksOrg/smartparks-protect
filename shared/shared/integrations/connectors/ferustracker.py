@@ -41,9 +41,11 @@ from shared.integrations.base import (
     DeliveryResult,
     IntegrationContext,
     PermanentFailure,
+    RateLimited,
     Skipped,
     TransientFailure,
     iso,
+    retry_after_seconds,
 )
 
 DEFAULT_URL = "https://ferustracker.nl/api/smartparks"
@@ -202,7 +204,12 @@ class FerusTrackerConnector:
                 )
         except httpx.HTTPError as exc:
             raise TransientFailure(f"ferustracker: {type(exc).__name__}: {exc}") from exc
-        if response.status_code >= 500 or response.status_code == 429:
+        if response.status_code == 429:
+            raise RateLimited(
+                "ferustracker answered 429",
+                retry_after=retry_after_seconds(response.headers.get("Retry-After")),
+            )
+        if response.status_code >= 500:
             raise TransientFailure(f"ferustracker answered {response.status_code}")
         if body is not None and response.status_code >= 400:
             raise PermanentFailure(

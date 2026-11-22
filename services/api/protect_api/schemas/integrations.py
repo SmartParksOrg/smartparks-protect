@@ -62,6 +62,10 @@ class IntegrationRead(ORMModel):
     last_delivery_at: datetime | None
     last_error: str | None
     last_error_at: datetime | None
+    rate_limited_until: datetime | None = Field(
+        default=None,
+        description="The target asked to wait (a 429): nothing is sent before this (D424)",
+    )
     backfill: dict[str, Any]
     created_by_user_id: uuid.UUID | None
     created_at: datetime
@@ -200,6 +204,12 @@ class IntegrationSubjectRead(BaseModel):
     history_from: datetime | None = None
     history_queued: int = 0
     history_waiting: int = Field(default=0, description="Objects of its history not yet sent")
+    history_seconds_left: int | None = Field(
+        default=None,
+        description="About how long its history still needs at the pace the target took "
+        "objects in the last ten minutes, with the histories queued before it; none when "
+        "nothing went in that time (decision D424)",
+    )
     external_id: str | None = Field(default=None, description="The target's id of the animal")
     registered_at: datetime | None = None
     created_at: datetime

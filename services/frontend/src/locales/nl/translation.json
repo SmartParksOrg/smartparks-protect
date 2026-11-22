@@ -3563,5 +3563,10 @@
   "Make a new animal": "Nieuw dier aanmaken",
   "On {{target}} this entity is {{name}}, {{species}}, with this sensor since {{time}}. {{target}} cannot change an animal.": "Bij {{target}} is deze entiteit {{name}}, {{species}}, met deze sensor sinds {{time}}. {{target}} kan een dier niet wijzigen.",
   "Protect has {{protect}} for this entity, {{target}} has {{species}}. Make a new animal to correct it on {{target}}.": "Protect heeft {{protect}} voor deze entiteit, {{target}} heeft {{species}}. Maak een nieuw dier aan om het bij {{target}} te corrigeren.",
-  "To correct the species or the ear tag number. {{target}} gets a new animal as chosen here and the sensor moves to it from the start of the device's assignment; the readings sent before belong to it. The old animal stays on {{target}} without a sensor.": "Om de soort of het oormerknummer te corrigeren. {{target}} krijgt een nieuw dier zoals hier gekozen en de sensor gaat ernaar over vanaf het begin van de koppeling van het apparaat; de eerder gestuurde metingen horen erbij. Het oude dier blijft bij {{target}} staan zonder sensor."
+  "To correct the species or the ear tag number. {{target}} gets a new animal as chosen here and the sensor moves to it from the start of the device's assignment; the readings sent before belong to it. The old animal stays on {{target}} without a sensor.": "Om de soort of het oormerknummer te corrigeren. {{target}} krijgt een nieuw dier zoals hier gekozen en de sensor gaat ernaar over vanaf het begin van de koppeling van het apparaat; de eerder gestuurde metingen horen erbij. Het oude dier blijft bij {{target}} staan zonder sensor.",
+  "animal made, its sensor follows the history": "dier gemaakt, de sensor volgt na de historie",
+  "Sending history, {{count}} to go, about {{left}}_one": "Historie wordt gestuurd, nog {{count}}, ongeveer {{left}}",
+  "Sending history, {{count}} to go, about {{left}}_other": "Historie wordt gestuurd, nog {{count}}, ongeveer {{left}}",
+  "The target asked Protect to slow down. Nothing is sent before {{time}}, then the objects go on in their order.": "Het doel vroeg Protect om langzamer te sturen. Er gaat niets heen voor {{time}}, daarna gaan de objecten verder in hun volgorde.",
+  "Waiting for the target until {{time}}": "Wacht op het doel tot {{time}}"
 }

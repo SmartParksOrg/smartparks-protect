@@ -705,3 +705,33 @@ async def test_an_integration_is_signed_in_with_a_code_from_the_email(client, db
         f"{base}/{hook.json()['id']}/login/code", json=email, headers=manager.headers
     )
     assert none.status_code == 422 and "no sign-in" in none.text
+
+
+def test_the_time_a_history_still_needs():
+    """Decision D424: at the pace of the last ten minutes, behind the histories queued before
+    it on the same integration; no estimate without a pace."""
+    from datetime import UTC, datetime, timedelta
+
+    from protect_api.routers.integrations import estimate_left
+    from shared.models import IntegrationSubject
+
+    integration, quiet = uuid.uuid4(), uuid.uuid4()
+    start = datetime(2026, 11, 22, 13, tzinfo=UTC)
+
+    def subject(on: uuid.UUID, minutes: int) -> IntegrationSubject:
+        return IntegrationSubject(
+            id=uuid.uuid4(),
+            integration_id=on,
+            entity_id=uuid.uuid4(),
+            history_started_at=start + timedelta(minutes=minutes),
+        )
+
+    first, second, idle = subject(integration, 0), subject(integration, 5), subject(quiet, 0)
+    waiting = {
+        (first.integration_id, first.entity_id): 1200,
+        (second.integration_id, second.entity_id): 600,
+        (idle.integration_id, idle.entity_id): 50,
+    }
+    # 600 objects in ten minutes is one a second
+    left = estimate_left([first, second, idle], waiting, {integration: 600})
+    assert left == {first.id: 1200, second.id: 1800}
