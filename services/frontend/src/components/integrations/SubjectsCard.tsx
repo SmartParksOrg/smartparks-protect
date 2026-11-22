@@ -6,13 +6,15 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { IntegrationSubjects } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { DeploymentList } from "@/components/integrations/DeploymentList";
 import { SubjectStateBadge } from "@/components/integrations/SubjectStateBadge";
 
 /** The entities integrated with a target that keeps a register of its own, with what the
  * target has for each (decisions D408 and D412): the overview on the integration. Nothing is
  * changed here; an entity is integrated from its own page, where its species and history are
  * chosen. Shown to people who may change integrations, since the read uses the
- * integration's credentials. */
+ * integration's credentials. Devices that came onto an integrated entity and wait for a
+ * person are listed first, with Confirm and Decline (decision D416). */
 export function SubjectsCard({
   projectId,
   integrationId,
@@ -51,6 +53,21 @@ export function SubjectsCard({
         </p>
       ) : (
         <>
+          {(subjects.data?.waiting?.length ?? 0) > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  "Devices that came onto an integrated entity. Their data for it waits until you confirm.",
+                )}
+              </p>
+              <DeploymentList
+                projectId={projectId}
+                deployments={subjects.data?.waiting ?? []}
+                target={target}
+                canWrite
+              />
+            </div>
+          )}
           {subjects.data?.target_error && (
             <Callout kind="warning">
               {t("{{target}} could not be asked: {{error}}", {
@@ -82,7 +99,12 @@ export function SubjectsCard({
                             target,
                             name: s.target.external_name ?? s.entity_name,
                           })
-                        : t("not on {{target}} yet", { target })),
+                        : s.target.elsewhere
+                          ? t("the sensor is on {{name}} on {{target}}", {
+                              target,
+                              name: s.target.elsewhere,
+                            })
+                          : t("not on {{target}} yet", { target })),
                   ]
                     .filter(Boolean)
                     .join(" · ")}

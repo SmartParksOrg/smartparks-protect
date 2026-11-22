@@ -188,4 +188,6 @@ export type IntegrationSubjects = Schemas["IntegrationSubjects"];
 export type IntegrationSubject = Schemas["IntegrationSubjectRead"];
 export type IntegrationSubjectOptions = Schemas["IntegrationSubjectOptions"];
 export type EntityIntegration = Schemas["EntityIntegrationRead"];
+export type DeviceIntegration = Schemas["DeviceIntegrationRead"];
+export type Deployment = Schemas["DeploymentRead"];
 export type IntegrationLogin = Schemas["LoginRead"];

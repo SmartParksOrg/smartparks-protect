@@ -409,6 +409,15 @@ class SubjectState(StrEnum):
     FAILED = "failed"  # the target refused the registration
 
 
+class DeploymentState(StrEnum):
+    """A device on an integrated entity as the target should know it (decision D416)."""
+
+    PENDING = "pending"  # Protect saw it; a person confirms before it is sent
+    SENT = "sent"  # made on the target
+    REFUSED = "refused"  # the target refused it; confirm again or decline
+    DECLINED = "declined"  # a person said no; the device's data of the period is not sent
+
+
 class BackupKind(StrEnum):
     """A scheduled backup or recovery job (architecture 28)."""
 

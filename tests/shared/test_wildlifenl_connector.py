@@ -14,7 +14,6 @@ from shared.integrations.base import (
     CodeLogin,
     DeliveryItem,
     IntegrationContext,
-    PartlyRegistered,
     PermanentFailure,
     Skipped,
     Subject,
@@ -25,6 +24,7 @@ from shared.integrations.connectors.wildlifenl import (
     WildlifeNlConnector,
     detection_species_field,
     resolve_species,
+    rights,
     species_in_event,
     species_of,
 )
@@ -258,6 +258,25 @@ async def test_deliver_and_test_against_a_mock_platform(monkeypatch):
     assert sum(1 for c in calls if c[1] == "/api/openapi.json") == 1  # read once, then kept
 
 
+def test_the_rights_come_from_the_servers_own_document():
+    """Decision D420: the scopes each call takes are read from the server's document, so a
+    role given more rights there, or an administrator listed on an operation, is seen."""
+    document = {
+        "paths": {
+            "/borne-sensor-reading/": {"post": {"security": [{"auth": ["data-system", "admin"]}]}},
+            "/animal/": {"post": {"security": [{"auth": ["herd-manager", "admin"]}]}},
+            "/borne-sensor-deployment/": {"post": {"security": [{"auth": []}]}},
+        }
+    }
+    admin = rights(document, ["admin"])
+    assert admin["readings"] and admin["animals"] and admin["deployments"]
+    # not in the document: the scopes the source gave it
+    assert not admin["active_deployments"] and not admin["detections"]
+    system = rights(document, ["data-system"])
+    assert system["readings"] and system["detections"] and not system["animals"]
+    assert rights({}, ["herd-manager"])["active_deployments"]
+
+
 def test_the_species_field_of_a_detection_follows_the_server():
     """Decision D407: the TEST server of 2026-11 takes the Latin name, the LIVE server the id,
     and both refuse a field their schema does not name."""
@@ -328,9 +347,9 @@ def test_the_species_of_an_entity():
 
 
 async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeypatch):
-    """Decisions D408, D412 and D413: the platform's species to pick from with a proposal, what
-    the platform has read from its active deployments, an animal and a deployment made for the
-    entity it lacks, and no second animal after a half-done attempt."""
+    """Decisions D408, D413 and D416: the platform's species to pick from with a proposal,
+    what the platform has read from its active deployments and on which animal, an animal
+    made as chosen, and a deployment that is not sent twice."""
     assert isinstance(WildlifeNlConnector(), SubjectRegistrar)
     calls: list[tuple[str, str, dict | None]] = []
     active = list(ACTIVE)
@@ -348,14 +367,17 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
             return httpx.Response(200, json={"ID": "bbbbbbbb-0000-4000-8000-000000000002", **body})
         if path == "/borne-sensor-deployment/":
             if refuse_deployment["on"]:
-                return httpx.Response(500, json={"title": "Internal Server Error"})
+                return httpx.Response(422, json={"title": "Unprocessable Entity"})
+            # the platform's own rule: the sensor's deployment before it ends at this start
+            active[:] = [d for d in active if d["sensorID"] != body["sensorID"]]
             active.append({**body, "animal": {"ID": body["animalID"], "name": "Konik 9"}})
             return httpx.Response(200, json=body)
         return httpx.Response(404)
 
     mock_platform(monkeypatch, handler)
     connector = WildlifeNlConnector()
-    known = subject()
+    konik_3 = "aaaaaaaa-0000-4000-8000-000000000001"
+    known = subject(external_id=konik_3)
     new = subject(
         entity_id=uuid.UUID(int=9),
         entity_name="Konik 9",
@@ -365,6 +387,8 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
     no_device = subject(
         entity_id=uuid.UUID(int=10), device_identity=None, device_serial=None, device_name=None
     )
+    # Konik 3's device moved to Konik 10 in Protect: the platform still has it on Konik 3
+    moved = subject(entity_id=uuid.UUID(int=11), entity_name="Konik 10")
 
     options = await connector.options(integration(), new)
     # every species of the platform, by the name a person reads, and the one Protect proposes
@@ -373,36 +397,35 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
     assert options.sensor_id == "70B3D57ED0009999" and not options.status.registered
     unknown = await connector.options(integration(), subject(entity_type_label="Horse"))
     assert unknown.proposed_species_id is None  # never a guess (D411); the user picks
-    assert unknown.status.registered and unknown.status.external_name == "Konik 3"
-    assert "No device" in (await connector.options(integration(), no_device)).blocked
+    # an entity without a device may be integrated; its first device waits (D418)
+    assert (await connector.options(integration(), no_device)).blocked is None
+    elsewhere = await connector.options(integration(), moved)
+    assert not elsewhere.status.registered and elsewhere.status.elsewhere == "Konik 3"
 
-    statuses = await connector.statuses(integration(), [known, new, no_device])
-    assert [statuses[s.entity_id].registered for s in (known, new, no_device)] == [
+    statuses = await connector.statuses(integration(), [known, new, no_device, moved])
+    assert [statuses[s.entity_id].registered for s in (known, new, no_device, moved)] == [
         True,
         False,
         False,
+        False,  # the sensor is on another animal: not this entity's (the bug of D408)
     ]
     assert statuses[known.entity_id].since == datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
+    assert statuses[moved.entity_id].elsewhere == "Konik 3"
     assert not [c for c in calls if c[0] == "POST"]  # reading changes nothing
 
     chosen = {"species_id": HORSE["ID"], "species_name": HORSE["name"]}
     with pytest.raises(PermanentFailure, match="Choose the entity's species"):
-        await connector.register(integration(), new, {}, None)
-    with pytest.raises(PermanentFailure, match="No device"):
-        await connector.register(integration(), no_device, chosen, None)
-
-    # the platform fails between the animal and the deployment: the animal's id comes back
-    with pytest.raises(PartlyRegistered, match="refused its sensor") as partly:
-        await connector.register(integration(), new, chosen, None)
-    animal_id = partly.value.external_id
+        await connector.register_animal(integration(), new, {})
+    animal_id = await connector.register_animal(integration(), new, chosen)
     assert animal_id == "bbbbbbbb-0000-4000-8000-000000000002"
-
-    refuse_deployment["on"] = False
-    status = await connector.register(integration(), new, chosen, animal_id)
-    assert status.registered and status.external_id == animal_id
     animals = [c for c in calls if c[:2] == ("POST", "/animal/")]
-    assert len(animals) == 1  # not a second animal for the second attempt
-    assert animals[0][2] == {"name": "Konik 9", "speciesID": HORSE["ID"]}
+    assert animals == [("POST", "/animal/", {"name": "Konik 9", "speciesID": HORSE["ID"]})]
+
+    start = datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
+    with pytest.raises(PermanentFailure):
+        await connector.deploy(integration(), animal_id, "70B3D57ED0009999", start)
+    refuse_deployment["on"] = False
+    await connector.deploy(integration(), animal_id, "70B3D57ED0009999", start)
     deployment = [c for c in calls if c[:2] == ("POST", "/borne-sensor-deployment/")][-1][2]
     assert deployment == {
         "animalID": animal_id,
@@ -412,25 +435,33 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
         "start": "2026-05-01T08:00:00+00:00",
     }
 
+    # a second try sends nothing: the sensor is on that animal
     posts = len([c for c in calls if c[0] == "POST"])
-    again = await connector.register(integration(), new, chosen, animal_id)
-    assert again.registered and len([c for c in calls if c[0] == "POST"]) == posts
-    # an entity the platform has a deployment for is left as it is
-    assert (await connector.register(integration(), known, chosen, None)).external_name == "Konik 3"
+    await connector.deploy(integration(), animal_id, "70B3D57ED0009999", start)
+    await connector.deploy(integration(), konik_3, "70B3D57ED0001234", start)
     assert len([c for c in calls if c[0] == "POST"]) == posts
+    # the device moved: its sensor goes to the other animal, which ends it on Konik 3
+    await connector.deploy(integration(), animal_id, "70B3D57ED0001234", start)
+    assert len([c for c in calls if c[0] == "POST"]) == posts + 1
+    moved_status = await connector.statuses(integration(), [moved, known])
+    assert moved_status[known.entity_id].elsewhere == "Konik 9"
 
 
-async def test_an_account_without_the_herd_manager_role_is_told(monkeypatch):
+async def test_an_account_without_the_rights_is_told(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(403, json={"title": "Forbidden"})
 
     mock_platform(monkeypatch, handler)
-    with pytest.raises(PermanentFailure, match="herd-manager"):
+    with pytest.raises(PermanentFailure, match=r"does not show its deployments.*403"):
         await WildlifeNlConnector().statuses(integration(), [subject()])
 
 
 async def test_test_reports_a_missing_role_and_refused_tokens(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/openapi.json":
+            return httpx.Response(200, json=API_TEST)
+        if request.url.path == "/api/species/":
+            return httpx.Response(200, json=SPECIES)
         if request.headers.get("authorization") != "Bearer tok":
             return httpx.Response(
                 401, json={"title": "Unauthorized", "detail": "Invalid bearer token."}
@@ -444,8 +475,10 @@ async def test_test_reports_a_missing_role_and_refused_tokens(monkeypatch):
         httpx, "AsyncClient", lambda *a, **k: real(*a, transport=httpx.MockTransport(handler), **k)
     )
     connector = WildlifeNlConnector()
-    with pytest.raises(PermanentFailure, match="data-system"):
-        await connector.test(integration(), None)
+    # an account without the rights is reported, not refused: its roles may change (D420)
+    answer = await connector.test(integration(), None)
+    assert answer["roles"] == ["researcher"]
+    assert answer["can_send_readings"] is False and answer["can_register_animals"] is False
     bad = IntegrationContext(
         id=uuid.uuid4(),
         project_id=uuid.uuid4(),

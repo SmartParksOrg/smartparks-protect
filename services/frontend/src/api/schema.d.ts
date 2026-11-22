@@ -5406,6 +5406,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/integrations/by-device/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Integrations
+         * @description The project's integrations that register their entities, as this device sees them
+         *     (decision D418): the entity it is on now with how that entity stands, and the device's
+         *     deployments on each target. Protect's own account, the target is not asked. Bounded by
+         *     the project's integrations and 200 deployments.
+         */
+        get: operations["device_integrations_api_v1_projects__project_id__integrations_by_device__device_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects": {
         parameters: {
             query?: never;
@@ -5474,6 +5497,50 @@ export interface paths {
          *     Protect ends and deletes nothing on a target.
          */
         delete: operations["stop_integrating_entity_api_v1_projects__project_id__integrations__integration_id__subjects__entity_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/deployments/{deployment_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Deployment
+         * @description Send a deployment that waits (decision D416): the device's sensor on the entity's
+         *     animal from the start of its assignment. The target ends the sensor's deployment before
+         *     it at that moment. The device's held readings for the entity go after it, oldest first.
+         *     A refusal is answered with the row marked refused.
+         */
+        post: operations["confirm_deployment_api_v1_projects__project_id__integrations__integration_id__deployments__deployment_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/deployments/{deployment_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline Deployment
+         * @description Do not send a deployment that waits (decision D416): nothing is made on the target,
+         *     and the device's readings of the entity in the period are not sent.
+         */
+        post: operations["decline_deployment_api_v1_projects__project_id__integrations__integration_id__deployments__deployment_id__decline_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -8579,6 +8646,73 @@ export interface components {
             error?: string | null;
         };
         /**
+         * DeploymentRead
+         * @description A device on an integrated entity as a deployment of its sensor on the target's animal
+         *     (decisions D416 to D419): Protect's own account, the target is not asked.
+         */
+        DeploymentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Sensor Id */
+            sensor_id?: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             * @description The start of the device's assignment
+             */
+            starts_at: string;
+            /**
+             * Ends At
+             * @description The end of the assignment in Protect; none while on
+             */
+            ends_at?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "sent" | "refused" | "declined";
+            /** Detail */
+            detail?: string | null;
+            /** Animal Id */
+            animal_id?: string | null;
+            /** Sent At */
+            sent_at?: string | null;
+            /**
+             * Open On Target
+             * @description The device's latest sent deployment: the target keeps the sensor on this animal until it is deployed again, since it cannot end a deployment
+             * @default false
+             */
+            open_on_target: boolean;
+            /**
+             * Rewrites
+             * @description Finished deployments of the sensor the target would give a wrong end when this one is sent (decision D419)
+             * @default 0
+             */
+            rewrites: number;
+        };
+        /**
          * DeviceAssignmentsRead
          * @description The device's whole timeline: project and entity assignments in time order, each with
          *     its attribution job and last change; the device's active job once.
@@ -8836,6 +8970,40 @@ export interface components {
              * @default []
              */
             fields: components["schemas"]["HealthValue"][];
+        };
+        /**
+         * DeviceIntegrationRead
+         * @description An integration of the project that registers its entities, as one device sees it
+         *     (decision D418): the entity it is on now, how that entity stands, and the device's
+         *     deployments on the target.
+         */
+        DeviceIntegrationRead: {
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /** Name */
+            name: string;
+            /** Connector Key */
+            connector_key: string;
+            /** Connector Label */
+            connector_label: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Entity Id
+             * @description The entity it is on now
+             */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            subject?: components["schemas"]["IntegrationSubjectRead"] | null;
+            /**
+             * Deployments
+             * @description The device's deployments, newest first
+             */
+            deployments?: components["schemas"]["DeploymentRead"][];
         };
         /** DeviceLogFileRead */
         DeviceLogFileRead: {
@@ -9931,6 +10099,11 @@ export interface components {
             /** Enabled */
             enabled: boolean;
             subject?: components["schemas"]["IntegrationSubjectRead"] | null;
+            /**
+             * Deployments
+             * @description The entity's devices on the target, newest first
+             */
+            deployments?: components["schemas"]["DeploymentRead"][];
         };
         /** EntityRead */
         EntityRead: {
@@ -11798,6 +11971,11 @@ export interface components {
         IntegrationSubjects: {
             /** Items */
             items: components["schemas"]["IntegrationSubjectRead"][];
+            /**
+             * Waiting
+             * @description Deployments that wait for a person or were refused, at most 200
+             */
+            waiting?: components["schemas"]["DeploymentRead"][];
             /**
              * Target Error
              * @description Why the target could not be asked; the rows are Protect's own
@@ -15435,6 +15613,11 @@ export interface components {
             external_name?: string | null;
             /** Since */
             since?: string | null;
+            /**
+             * Elsewhere
+             * @description The other animal the target has the sensor on
+             */
+            elsewhere?: string | null;
         };
         /** TestSendResult */
         TestSendResult: {
@@ -27566,6 +27749,38 @@ export interface operations {
             };
         };
     };
+    device_integrations_api_v1_projects__project_id__integrations_by_device__device_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceIntegrationRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_subjects_api_v1_projects__project_id__integrations__integration_id__subjects_get: {
         parameters: {
             query?: never;
@@ -27687,6 +27902,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_deployment_api_v1_projects__project_id__integrations__integration_id__deployments__deployment_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                deployment_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_deployment_api_v1_projects__project_id__integrations__integration_id__deployments__deployment_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                deployment_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentRead"];
+                };
             };
             /** @description Validation Error */
             422: {

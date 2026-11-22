@@ -49,7 +49,12 @@ from shared.models.events import (
     RuleVersion,
 )
 from shared.models.field import MapExtract
-from shared.models.integrations import Integration, IntegrationDelivery, IntegrationSubject
+from shared.models.integrations import (
+    Integration,
+    IntegrationDelivery,
+    IntegrationDeployment,
+    IntegrationSubject,
+)
 from shared.models.log_files import DeviceLogFile
 from shared.models.lp0 import DeviceLp0Credentials
 from shared.models.network import DataSourceCursor, Gateway
@@ -118,6 +123,7 @@ __all__ = [
     "Group",
     "Integration",
     "IntegrationDelivery",
+    "IntegrationDeployment",
     "IntegrationSubject",
     "Invitation",
     "MapExtract",

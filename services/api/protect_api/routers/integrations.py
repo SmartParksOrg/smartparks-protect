@@ -17,6 +17,8 @@ from protect_api.deps import ProjectContext, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.integrations import (
     BackfillRequest,
+    DeploymentRead,
+    DeviceIntegrationRead,
     EntityIntegrationRead,
     IntegrationCreate,
     IntegrationDeliveryDetail,
@@ -38,7 +40,13 @@ from protect_api.schemas.integrations import (
 )
 from shared.bus import RedisStreamsBus, Topic
 from shared.database import get_session
-from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus, SubjectState
+from shared.enums import (
+    BackfillStatus,
+    DeliveryOrigin,
+    DeliveryStatus,
+    DeploymentState,
+    SubjectState,
+)
 from shared.integrations.base import (
     CodeLogin,
     PermanentFailure,
@@ -54,6 +62,7 @@ from shared.integrations.deliveries import (
     integration_context,
     requeue,
 )
+from shared.integrations.deployments import confirm, decline, rewritten_by
 from shared.integrations.registry import CONNECTORS, describe_connector
 from shared.integrations.subjects import (
     integrate,
@@ -63,10 +72,14 @@ from shared.integrations.subjects import (
     stop,
 )
 from shared.models import (
+    Device,
+    DeviceEntityAssignment,
+    DeviceProjectAssignment,
     Entity,
     EntityCurrentState,
     Integration,
     IntegrationDelivery,
+    IntegrationDeployment,
     IntegrationSubject,
 )
 from shared.permissions import Permission
@@ -564,6 +577,7 @@ def _target(status: SubjectStatus | None) -> TargetStatus | None:
         external_id=status.external_id,
         external_name=status.external_name,
         since=status.since,
+        elsewhere=status.elsewhere,
     )
 
 
@@ -621,6 +635,76 @@ async def _subject_reads(
     ]
 
 
+async def _deployment_reads(
+    session: AsyncSession, rows: Sequence[IntegrationDeployment]
+) -> list[DeploymentRead]:
+    """The rows with their names, newest first; which is still the device's open deployment
+    on the target; and for one that waits, how many finished ones sending it would rewrite."""
+    if not rows:
+        return []
+    entities: dict[uuid.UUID, str] = {
+        entity_id: name
+        for entity_id, name in (
+            await session.execute(
+                select(Entity.id, Entity.name).where(Entity.id.in_({r.entity_id for r in rows}))
+            )
+        ).all()
+    }
+    devices: dict[uuid.UUID, str] = {
+        device_id: name
+        for device_id, name in (
+            await session.execute(
+                select(Device.id, Device.name).where(Device.id.in_({r.device_id for r in rows}))
+            )
+        ).all()
+    }
+    latest: dict[tuple[uuid.UUID, uuid.UUID], datetime] = {
+        (integration_id, device_id): start
+        for integration_id, device_id, start in (
+            await session.execute(
+                select(
+                    IntegrationDeployment.integration_id,
+                    IntegrationDeployment.device_id,
+                    func.max(IntegrationDeployment.starts_at),
+                )
+                .where(
+                    IntegrationDeployment.integration_id.in_({r.integration_id for r in rows}),
+                    IntegrationDeployment.device_id.in_({r.device_id for r in rows}),
+                    IntegrationDeployment.state == DeploymentState.SENT,
+                )
+                .group_by(IntegrationDeployment.integration_id, IntegrationDeployment.device_id)
+            )
+        ).all()
+    }
+    reads = []
+    for row in sorted(rows, key=lambda r: r.starts_at, reverse=True):
+        waiting = row.state in (DeploymentState.PENDING, DeploymentState.REFUSED)
+        reads.append(
+            DeploymentRead(
+                id=row.id,
+                integration_id=row.integration_id,
+                entity_id=row.entity_id,
+                entity_name=str(entities.get(row.entity_id, "")),
+                device_id=row.device_id,
+                device_name=str(devices.get(row.device_id, "")),
+                sensor_id=row.sensor_id,
+                starts_at=row.starts_at,
+                ends_at=row.ends_at,
+                state=row.state,
+                detail=row.detail,
+                animal_id=row.animal_id,
+                sent_at=row.sent_at,
+                open_on_target=row.state == DeploymentState.SENT
+                and latest.get((row.integration_id, row.device_id)) == row.starts_at,
+                rewrites=await rewritten_by(session, row) if waiting else 0,
+            )
+        )
+    return reads
+
+
+MAX_DEPLOYMENT_ROWS = 200
+
+
 def _target_refused(exc: Exception) -> HTTPException:
     """A target that refuses or cannot be reached is not our caller's malformed request."""
     code = (
@@ -676,6 +760,23 @@ async def entity_integrations(
         else []
     )
     reads = {r.integration_id: r for r in await _subject_reads(session, rows)}
+    deployments: dict[uuid.UUID, list[DeploymentRead]] = {}
+    if integrations:
+        for read in await _deployment_reads(
+            session,
+            list(
+                await session.scalars(
+                    select(IntegrationDeployment)
+                    .where(
+                        IntegrationDeployment.entity_id == entity_id,
+                        IntegrationDeployment.integration_id.in_([i.id for i in integrations]),
+                    )
+                    .order_by(IntegrationDeployment.starts_at.desc())
+                    .limit(MAX_DEPLOYMENT_ROWS)
+                )
+            ),
+        ):
+            deployments.setdefault(read.integration_id, []).append(read)
     return [
         EntityIntegrationRead(
             integration_id=i.id,
@@ -684,6 +785,100 @@ async def entity_integrations(
             connector_label=CONNECTORS[i.connector_key].label,
             enabled=i.enabled,
             subject=reads.get(i.id),
+            deployments=deployments.get(i.id, []),
+        )
+        for i in integrations
+    ]
+
+
+@router.get("/by-device/{device_id}", response_model=list[DeviceIntegrationRead])
+async def device_integrations(
+    device_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[DeviceIntegrationRead]:
+    """The project's integrations that register their entities, as this device sees them
+    (decision D418): the entity it is on now with how that entity stands, and the device's
+    deployments on each target. Protect's own account, the target is not asked. Bounded by
+    the project's integrations and 200 deployments."""
+    in_project = await session.scalar(
+        select(DeviceProjectAssignment.id)
+        .where(
+            DeviceProjectAssignment.device_id == device_id,
+            DeviceProjectAssignment.project_id == context.project.id,
+        )
+        .limit(1)
+    )
+    if in_project is None or not context.visibility.device_visible(device_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
+    integrations = [
+        i
+        for i in await session.scalars(
+            select(Integration)
+            .where(Integration.project_id == context.project.id)
+            .order_by(Integration.name)
+        )
+        if isinstance(CONNECTORS.get(i.connector_key), SubjectRegistrar)
+    ]
+    if not integrations:
+        return []
+    on = (
+        await session.execute(
+            select(Entity.id, Entity.name)
+            .join(DeviceEntityAssignment, DeviceEntityAssignment.entity_id == Entity.id)
+            .where(
+                DeviceEntityAssignment.device_id == device_id,
+                DeviceEntityAssignment.validity.op("@>")(utc_now()),
+                Entity.project_id == context.project.id,
+            )
+            .limit(1)
+        )
+    ).first()
+    entity_id = on[0] if on is not None and context.visibility.entity_visible(on[0]) else None
+    subjects: dict[uuid.UUID, IntegrationSubjectRead] = {}
+    if entity_id is not None:
+        subjects = {
+            r.integration_id: r
+            for r in await _subject_reads(
+                session,
+                list(
+                    await session.scalars(
+                        select(IntegrationSubject).where(
+                            IntegrationSubject.entity_id == entity_id,
+                            IntegrationSubject.integration_id.in_([i.id for i in integrations]),
+                        )
+                    )
+                ),
+            )
+        }
+    deployments: dict[uuid.UUID, list[DeploymentRead]] = {}
+    for read in await _deployment_reads(
+        session,
+        list(
+            await session.scalars(
+                select(IntegrationDeployment)
+                .where(
+                    IntegrationDeployment.device_id == device_id,
+                    IntegrationDeployment.integration_id.in_([i.id for i in integrations]),
+                )
+                .order_by(IntegrationDeployment.starts_at.desc())
+                .limit(MAX_DEPLOYMENT_ROWS)
+            )
+        ),
+    ):
+        if context.visibility.entity_visible(read.entity_id):
+            deployments.setdefault(read.integration_id, []).append(read)
+    return [
+        DeviceIntegrationRead(
+            integration_id=i.id,
+            name=i.name,
+            connector_key=i.connector_key,
+            connector_label=CONNECTORS[i.connector_key].label,
+            enabled=i.enabled,
+            entity_id=entity_id,
+            entity_name=on[1] if entity_id is not None and on is not None else None,
+            subject=subjects.get(i.id),
+            deployments=deployments.get(i.id, []),
         )
         for i in integrations
     ]
@@ -709,14 +904,35 @@ async def list_subjects(
     reads = await _subject_reads(session, rows)
     if not reads:
         return IntegrationSubjects(items=[])
-    subjects = await load_subjects(session, integration.project_id, [r.entity_id for r in rows])
+    waiting = await _deployment_reads(
+        session,
+        list(
+            await session.scalars(
+                select(IntegrationDeployment)
+                .where(
+                    IntegrationDeployment.integration_id == integration.id,
+                    IntegrationDeployment.state.in_(
+                        [DeploymentState.PENDING, DeploymentState.REFUSED]
+                    ),
+                )
+                .order_by(IntegrationDeployment.starts_at.desc())
+                .limit(MAX_DEPLOYMENT_ROWS)
+            )
+        ),
+    )
+    subjects = await load_subjects(
+        session,
+        integration.project_id,
+        [r.entity_id for r in rows],
+        {r.entity_id: r.external_id for r in rows if r.external_id},
+    )
     try:
         statuses = await registrar.statuses(integration_context(integration), subjects)
     except (PermanentFailure, TransientFailure) as exc:
-        return IntegrationSubjects(items=reads, target_error=str(exc))
+        return IntegrationSubjects(items=reads, waiting=waiting, target_error=str(exc))
     for read in reads:
         read.target = _target(statuses.get(read.entity_id))
-    return IntegrationSubjects(items=reads)
+    return IntegrationSubjects(items=reads, waiting=waiting)
 
 
 @router.get(
@@ -845,3 +1061,85 @@ async def stop_integrating_entity(
         details={"entity_id": str(entity_id)},
     )
     await session.commit()
+
+
+async def _deployment(
+    session: AsyncSession, integration: Integration, deployment_id: uuid.UUID
+) -> IntegrationDeployment:
+    row = await session.get(IntegrationDeployment, deployment_id)
+    if row is None or row.integration_id != integration.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Deployment not found")
+    return row
+
+
+@router.post("/{integration_id}/deployments/{deployment_id}/confirm", response_model=DeploymentRead)
+async def confirm_deployment(
+    integration_id: uuid.UUID,
+    deployment_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> DeploymentRead:
+    """Send a deployment that waits (decision D416): the device's sensor on the entity's
+    animal from the start of its assignment. The target ends the sensor's deployment before
+    it at that moment. The device's held readings for the entity go after it, oldest first.
+    A refusal is answered with the row marked refused."""
+    integration = await _integration(session, context.project.id, integration_id)
+    _registrar(integration)
+    row = await _deployment(session, integration, deployment_id)
+    try:
+        await confirm(session, integration, row, context.user.id)
+    except TransientFailure as exc:
+        raise _target_refused(exc) from None
+    except PermanentFailure as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await record_audit(
+        session,
+        user=context.user,
+        action="integration.deployment_confirmed",
+        object_type="integration",
+        object_id=str(integration.id),
+        project_id=context.project.id,
+        details={
+            "deployment_id": str(row.id),
+            "entity_id": str(row.entity_id),
+            "device_id": str(row.device_id),
+            "sensor_id": row.sensor_id,
+            "start": row.starts_at.isoformat(),
+            "state": str(row.state),
+        },
+    )
+    await session.commit()
+    return (await _deployment_reads(session, [row]))[0]
+
+
+@router.post("/{integration_id}/deployments/{deployment_id}/decline", response_model=DeploymentRead)
+async def decline_deployment(
+    integration_id: uuid.UUID,
+    deployment_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> DeploymentRead:
+    """Do not send a deployment that waits (decision D416): nothing is made on the target,
+    and the device's readings of the entity in the period are not sent."""
+    integration = await _integration(session, context.project.id, integration_id)
+    _registrar(integration)
+    row = await _deployment(session, integration, deployment_id)
+    try:
+        await decline(session, row, context.user.id)
+    except PermanentFailure as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await record_audit(
+        session,
+        user=context.user,
+        action="integration.deployment_declined",
+        object_type="integration",
+        object_id=str(integration.id),
+        project_id=context.project.id,
+        details={
+            "deployment_id": str(row.id),
+            "entity_id": str(row.entity_id),
+            "device_id": str(row.device_id),
+        },
+    )
+    await session.commit()
+    return (await _deployment_reads(session, [row]))[0]

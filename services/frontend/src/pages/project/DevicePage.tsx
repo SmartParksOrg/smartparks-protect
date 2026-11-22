@@ -40,6 +40,7 @@ import {
   RecordHistoryDialog,
 } from "@/components/curation/CurationDialogs";
 import { HealthCard } from "@/components/devices/HealthCard";
+import { DeviceIntegrationsCard } from "@/components/integrations/DeviceIntegrationsCard";
 import { ContactsCard } from "@/components/devices/ContactsCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
 import { UploadLogButton } from "@/components/devices/UploadLogButton";
@@ -70,7 +71,10 @@ import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { AssignmentsTab } from "@/components/devices/AssignmentsTab";
-import { BoundaryDialog, type BoundaryTarget } from "@/components/devices/BoundaryDialog";
+import {
+  BoundaryDialog,
+  type BoundaryTarget,
+} from "@/components/devices/BoundaryDialog";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { MeasurementsCard } from "@/components/data/MeasurementsCard";
@@ -92,7 +96,11 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
-import { useAnalysisModules, usePermissions, useProject } from "@/hooks/useProjects";
+import {
+  useAnalysisModules,
+  usePermissions,
+  useProject,
+} from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { courseText, speedText } from "@/lib/speed";
@@ -357,7 +365,12 @@ export function DevicePage() {
             <StatusBadge value={d.status} />
             {(d.links ?? []).map((link) => (
               // two sources may both offer OPEN_DEVICE, so the key takes the address too
-              <Button key={`${link.key}:${link.url}`} asChild variant="outline" size="sm">
+              <Button
+                key={`${link.key}:${link.url}`}
+                asChild
+                variant="outline"
+                size="sm"
+              >
                 <a href={link.url} target="_blank" rel="noreferrer">
                   <ExternalLink className="size-4" /> {link.label}
                 </a>
@@ -679,6 +692,13 @@ export function DevicePage() {
                 deviceId={d.id}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
               />
+              {projectId && (
+                <DeviceIntegrationsCard
+                  projectId={projectId}
+                  deviceId={d.id}
+                  canWrite={can("integrations:write")}
+                />
+              )}
             </div>
           </TabsContent>
           <TabsContent value="assignments">
@@ -691,47 +711,47 @@ export function DevicePage() {
               onEdit={setBoundary}
               projectActions={
                 <>
-            {!deviceProjectId && user?.is_superuser && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setAssigning("project")}
-              >
-                {t("Assign to project")}
-              </Button>
-            )}
-            {deviceProjectId &&
-              (user?.is_superuser || can("project:write")) && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMoving(true)}
-                >
-                  <ArrowRightLeft className="size-4" />{" "}
-                  {t("Move to project…")}
-                </Button>
-              )}
+                  {!deviceProjectId && user?.is_superuser && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAssigning("project")}
+                    >
+                      {t("Assign to project")}
+                    </Button>
+                  )}
+                  {deviceProjectId &&
+                    (user?.is_superuser || can("project:write")) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setMoving(true)}
+                      >
+                        <ArrowRightLeft className="size-4" />{" "}
+                        {t("Move to project…")}
+                      </Button>
+                    )}
                 </>
               }
               entityActions={
                 <>
-            {mayAssign &&
-              (currentEntityAssignment ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={release.isPending}
-                  onClick={() =>
-                    release.mutate(currentEntityAssignment.id)
-                  }
-                >
-                  {t("Release")}
-                </Button>
-              ) : (
-                <Button size="sm" onClick={() => setAssigning("entity")}>
-                  {t("Assign to entity")}
-                </Button>
-              ))}
+                  {mayAssign &&
+                    (currentEntityAssignment ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={release.isPending}
+                        onClick={() =>
+                          release.mutate(currentEntityAssignment.id)
+                        }
+                      >
+                        {t("Release")}
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setAssigning("entity")}>
+                        {t("Assign to entity")}
+                      </Button>
+                    ))}
                 </>
               }
             />
@@ -860,7 +880,10 @@ export function DevicePage() {
                 canWrite={can("devices:control")}
               />
               {supportsRawLogs(type) && (
-                <LogFilesCard deviceId={d.id} canWrite={can("devices:control")} />
+                <LogFilesCard
+                  deviceId={d.id}
+                  canWrite={can("devices:control")}
+                />
               )}
               {(type?.driver_key === "opencollar" ||
                 type?.driver_key === "ble_tag") && (

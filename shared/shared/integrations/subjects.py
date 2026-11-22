@@ -12,24 +12,35 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.enums import DeliveryOrigin, DeliveryStatus, SubjectState
+from shared.enums import DeliveryOrigin, DeliveryStatus, DeploymentState, SubjectState
 from shared.integrations.base import (
-    PartlyRegistered,
     PermanentFailure,
     Subject,
+    SubjectDevice,
     SubjectRegistrar,
     TransientFailure,
 )
-from shared.integrations.deliveries import backfill_entity, integration_context
+from shared.integrations.deliveries import (
+    backfill_entity,
+    integration_context,
+    primary_identities,
+)
+from shared.integrations.deployments import (
+    animal_at,
+    as_device,
+    device_rows,
+    forget_undecided,
+    target_spans,
+)
 from shared.integrations.registry import CONNECTORS
 from shared.models import (
     Device,
     DeviceEntityAssignment,
     Entity,
     EntityType,
-    ExternalIdentity,
     Integration,
     IntegrationDelivery,
+    IntegrationDeployment,
     IntegrationSubject,
 )
 from shared.timeutil import utc_now
@@ -45,10 +56,14 @@ def registrar_of(integration: Integration) -> SubjectRegistrar:
 
 
 async def load_subjects(
-    session: AsyncSession, project_id: uuid.UUID, entity_ids: list[uuid.UUID]
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    entity_ids: list[uuid.UUID],
+    external_ids: dict[uuid.UUID, str] | None = None,
 ) -> list[Subject]:
-    """The entities, by name, each with the device on it now and the identity that device
-    was heard under last, as a delivery names it."""
+    """The entities, by name, each with the devices on it now (the oldest assignment first
+    is the one the target is told about first) and the identity each device is known by
+    (decision D417). `external_ids` is what the target calls each entity, where known."""
     if not entity_ids:
         return []
     rows = (
@@ -69,58 +84,61 @@ async def load_subjects(
         else {}
     )
     now = utc_now()
-    assignments = {
-        a.entity_id: a
-        for a in await session.scalars(
-            select(DeviceEntityAssignment)
-            .where(
-                DeviceEntityAssignment.entity_id.in_(entity_ids),
-                DeviceEntityAssignment.validity.op("@>")(now),
-            )
-            .order_by(func.lower(DeviceEntityAssignment.validity))
+    on: dict[uuid.UUID, list[DeviceEntityAssignment]] = {}
+    for a in await session.scalars(
+        select(DeviceEntityAssignment)
+        .where(
+            DeviceEntityAssignment.entity_id.in_(entity_ids),
+            DeviceEntityAssignment.validity.op("@>")(now),
         )
-    }
-    device_ids = {a.device_id for a in assignments.values()}
+        .order_by(func.lower(DeviceEntityAssignment.validity))
+    ):
+        on.setdefault(a.entity_id, []).append(a)
+    device_ids = {a.device_id for found in on.values() for a in found}
     devices = (
         {d.id: d for d in await session.scalars(select(Device).where(Device.id.in_(device_ids)))}
         if device_ids
         else {}
     )
-    identities: dict[uuid.UUID, str] = {}
-    if device_ids:
-        for identity in await session.scalars(
-            select(ExternalIdentity)
-            .where(ExternalIdentity.device_id.in_(device_ids), ExternalIdentity.ignored.is_(False))
-            .order_by(ExternalIdentity.last_seen_at.desc().nulls_last())
-        ):
-            if identity.device_id is not None:
-                identities.setdefault(identity.device_id, identity.external_id)
+    identities = await primary_identities(session, list(device_ids))
     subjects: list[Subject] = []
     for entity, entity_type in rows:
-        assignment = assignments.get(entity.id)
-        device = devices.get(assignment.device_id) if assignment is not None else None
-        subjects.append(
-            Subject(
-                entity_id=entity.id,
-                entity_name=entity.name,
-                entity_type_key=entity_type.key,
-                entity_type_label=entity_type.label,
-                entity_type_parent_key=parents.get(entity_type.parent_id),
-                attributes=dict(entity.attributes or {}),
-                device_id=device.id if device is not None else None,
-                device_name=device.name if device is not None else None,
-                device_serial=device.serial_number if device is not None else None,
-                device_identity=identities.get(device.id) if device is not None else None,
-                assigned_from=assignment.validity.lower if assignment is not None else None,
+        found = tuple(
+            SubjectDevice(
+                device_id=a.device_id,
+                device_name=devices[a.device_id].name,
+                device_serial=devices[a.device_id].serial_number,
+                device_identity=identities.get(a.device_id),
+                assigned_from=a.validity.lower,
             )
+            for a in on.get(entity.id, [])
+            if a.device_id in devices
         )
+        subject = Subject(
+            entity_id=entity.id,
+            entity_name=entity.name,
+            entity_type_key=entity_type.key,
+            entity_type_label=entity_type.label,
+            entity_type_parent_key=parents.get(entity_type.parent_id),
+            attributes=dict(entity.attributes or {}),
+            external_id=(external_ids or {}).get(entity.id),
+            devices=found,
+        )
+        subjects.append(as_device(subject, found[0]) if found else subject)
     return subjects
 
 
 async def load_subject(
     session: AsyncSession, integration: Integration, entity_id: uuid.UUID
 ) -> Subject:
-    subjects = await load_subjects(session, integration.project_id, [entity_id])
+    row = await session.scalar(
+        select(IntegrationSubject).where(
+            IntegrationSubject.integration_id == integration.id,
+            IntegrationSubject.entity_id == entity_id,
+        )
+    )
+    known = {entity_id: row.external_id} if row is not None and row.external_id else {}
+    subjects = await load_subjects(session, integration.project_id, [entity_id], known)
     if not subjects:
         raise PermanentFailure("The entity is not in this integration's project")
     return subjects[0]
@@ -136,28 +154,113 @@ def _forwarded(integration: Integration, entity_id: uuid.UUID, wanted: bool) -> 
         integration.entity_ids = [value for value in ids if value != key]
 
 
+async def _known_animal(
+    session: AsyncSession, integration: Integration, entity_id: uuid.UUID
+) -> str | None:
+    """The animal Protect made for the entity before, kept on its sent deployments when the
+    entity was stopped and integrated again: the target keeps it, so no second one."""
+    return await session.scalar(
+        select(IntegrationDeployment.animal_id)
+        .where(
+            IntegrationDeployment.integration_id == integration.id,
+            IntegrationDeployment.entity_id == entity_id,
+            IntegrationDeployment.state == DeploymentState.SENT,
+            IntegrationDeployment.animal_id.is_not(None),
+        )
+        .order_by(IntegrationDeployment.starts_at.desc())
+        .limit(1)
+    )
+
+
 async def register_subject(
     session: AsyncSession, integration: Integration, row: IntegrationSubject
 ) -> None:
-    """Register one entity on the target as its row says and write the outcome on the row.
-    A target that cannot be reached leaves the row as it is and raises, so the caller tries
-    again; a refusal is written down and not repeated."""
+    """Register one entity on the target as its row says and write the outcome on the row:
+    its animal, then a deployment of every device on it now (decisions D408 and D418), which
+    the person integrating it confirmed by doing so. Later changes of its devices wait for a
+    person (decision D416), so an entity registered before is not deployed again here.
+    A target that cannot be reached leaves the rows as they are and raises, so the caller
+    tries again; a refusal is written down and not repeated."""
     registrar = registrar_of(integration)
     subject = await load_subject(session, integration, row.entity_id)
+    context = integration_context(integration)
+    first = row.registered_at is None
     try:
-        status = await registrar.register(
-            integration_context(integration), subject, dict(row.settings or {}), row.external_id
-        )
-    except PartlyRegistered as exc:
-        row.external_id = exc.external_id
-        row.state, row.detail = SubjectState.FAILED, str(exc)
-        return
+        if row.external_id is None:
+            row.external_id = await _known_animal(
+                session, integration, row.entity_id
+            ) or await registrar.register_animal(context, subject, dict(row.settings or {}))
     except PermanentFailure as exc:
         row.state, row.detail = SubjectState.FAILED, str(exc)
         return
+    refused: list[str] = []
+    if first:
+        made = {
+            (d.device_id, d.starts_at): d
+            for d in await session.scalars(
+                select(IntegrationDeployment).where(
+                    IntegrationDeployment.integration_id == integration.id,
+                    IntegrationDeployment.entity_id == row.entity_id,
+                )
+            )
+        }
+        for device in subject.devices:
+            deployment = made.get((device.device_id, device.assigned_from))
+            if deployment is None:
+                deployment = IntegrationDeployment(
+                    integration_id=integration.id,
+                    entity_id=row.entity_id,
+                    device_id=device.device_id,
+                    starts_at=device.assigned_from,
+                    state=DeploymentState.PENDING,
+                )
+                session.add(deployment)
+            if deployment.state == DeploymentState.SENT:
+                continue
+            sensor = registrar.sensor(context, as_device(subject, device))
+            deployment.sensor_id = sensor
+            if sensor is None:
+                deployment.state = DeploymentState.REFUSED
+                deployment.detail = "The device has no identity the target could know it by"
+                refused.append(f"{device.device_name}: {deployment.detail}")
+                continue
+            try:
+                await registrar.deploy(context, row.external_id, sensor, device.assigned_from)
+            except PermanentFailure as exc:
+                deployment.state, deployment.detail = DeploymentState.REFUSED, str(exc)
+                refused.append(f"{device.device_name}: {exc}")
+                continue
+            deployment.state, deployment.detail = DeploymentState.SENT, None
+            deployment.animal_id = row.external_id
+            deployment.sent_at = utc_now()
+    if refused:
+        row.state = SubjectState.FAILED
+        row.detail = "The target made the animal and refused its sensor. " + "; ".join(refused)
+        return
     row.state, row.detail = SubjectState.REGISTERED, None
-    row.external_id = status.external_id or row.external_id
-    row.registered_at = utc_now()
+    row.registered_at = row.registered_at or utc_now()
+
+
+async def _sensor_elsewhere(
+    session: AsyncSession, integration: Integration, subject: Subject
+) -> bool:
+    """Whether a device on the entity has its sensor on another animal on the target now,
+    as Protect sent it or as the target says."""
+    registrar = registrar_of(integration)
+    context = integration_context(integration)
+    rows = await device_rows(session, integration.id, {d.device_id for d in subject.devices})
+    now = utc_now()
+    for device in subject.devices:
+        on = animal_at(target_spans(rows.get(device.device_id, [])), now)
+        if on is not None and on != subject.external_id:
+            return True
+    if not subject.devices:
+        return False
+    statuses = await registrar.statuses(
+        context, [as_device(subject, d) for d in subject.devices[:1]]
+    )
+    status = statuses.get(subject.entity_id)
+    return status is not None and status.elsewhere is not None
 
 
 async def integrate(
@@ -201,6 +304,15 @@ async def integrate(
     row.history_from = history_from
     row.detail = None
     _forwarded(integration, entity_id, True)
+    if history_from is not None and row.registered_at is None:
+        subject = await load_subject(session, integration, entity_id)
+        if await _sensor_elsewhere(session, integration, subject):
+            # its history would land on the other animal: the deployment goes first here
+            # and the history follows it (decision D416)
+            await register_subject(session, integration, row)
+            if row.state != SubjectState.REGISTERED:
+                await session.flush()
+                return row
     if history_from is not None:
         row.state = SubjectState.HISTORY_REQUESTED
         row.history_queued = 0
@@ -213,7 +325,8 @@ async def integrate(
 
 async def stop(session: AsyncSession, integration: Integration, entity_id: uuid.UUID) -> bool:
     """Stop forwarding an entity. What the target holds stays there: Protect ends and deletes
-    nothing on a target. The caller commits."""
+    nothing on a target, and keeps its sent deployments, so the entity integrated again gets
+    its animal back. The caller commits."""
     row = await session.scalar(
         select(IntegrationSubject).where(
             IntegrationSubject.integration_id == integration.id,
@@ -221,6 +334,7 @@ async def stop(session: AsyncSession, integration: Integration, entity_id: uuid.
         )
     )
     _forwarded(integration, entity_id, False)
+    await forget_undecided(session, integration.id, entity_id)
     if row is None:
         return False
     await session.delete(row)

@@ -22213,6 +22213,69 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/integrations/by-device/{device_id}": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Device Integrations",
+    "description": "The project's integrations that register their entities, as this device sees them\n(decision D418): the entity it is on now with how that entity stands, and the device's\ndeployments on each target. Protect's own account, the target is not asked. Bounded by\nthe project's integrations and 200 deployments.",
+    "operationId": "device_integrations_api_v1_projects__project_id__integrations_by_device__device_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DeviceIntegrationRead"
+         },
+         "title": "Response Device Integrations Api V1 Projects  Project Id  Integrations By Device  Device Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/integrations/{integration_id}/subjects": {
    "get": {
     "tags": [
@@ -22466,6 +22529,144 @@
     "responses": {
      "204": {
       "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/deployments/{deployment_id}/confirm": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Confirm Deployment",
+    "description": "Send a deployment that waits (decision D416): the device's sensor on the entity's\nanimal from the start of its assignment. The target ends the sensor's deployment before\nit at that moment. The device's held readings for the entity go after it, oldest first.\nA refusal is answered with the row marked refused.",
+    "operationId": "confirm_deployment_api_v1_projects__project_id__integrations__integration_id__deployments__deployment_id__confirm_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "deployment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Deployment Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeploymentRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/deployments/{deployment_id}/decline": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Decline Deployment",
+    "description": "Do not send a deployment that waits (decision D416): nothing is made on the target,\nand the device's readings of the entity in the period are not sent.",
+    "operationId": "decline_deployment_api_v1_projects__project_id__integrations__integration_id__deployments__deployment_id__decline_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "deployment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Deployment Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeploymentRead"
+        }
+       }
+      }
      },
      "422": {
       "description": "Validation Error",
@@ -31614,6 +31815,137 @@
     ],
     "title": "DependencyStatus"
    },
+   "DeploymentRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "integration_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Integration Id"
+     },
+     "entity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "type": "string",
+      "title": "Entity Name"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "sensor_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sensor Id"
+     },
+     "starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Starts At",
+      "description": "The start of the device's assignment"
+     },
+     "ends_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ends At",
+      "description": "The end of the assignment in Protect; none while on"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "sent",
+       "refused",
+       "declined"
+      ],
+      "title": "State"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     },
+     "animal_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Animal Id"
+     },
+     "sent_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sent At"
+     },
+     "open_on_target": {
+      "type": "boolean",
+      "title": "Open On Target",
+      "description": "The device's latest sent deployment: the target keeps the sensor on this animal until it is deployed again, since it cannot end a deployment",
+      "default": false
+     },
+     "rewrites": {
+      "type": "integer",
+      "title": "Rewrites",
+      "description": "Finished deployments of the sensor the target would give a wrong end when this one is sent (decision D419)",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "integration_id",
+     "entity_id",
+     "entity_name",
+     "device_id",
+     "device_name",
+     "starts_at",
+     "state"
+    ],
+    "title": "DeploymentRead",
+    "description": "A device on an integrated entity as a deployment of its sensor on the target's animal\n(decisions D416 to D419): Protect's own account, the target is not asked."
+   },
    "DeviceAssignmentsRead": {
     "properties": {
      "device_id": {
@@ -32305,6 +32637,83 @@
     },
     "type": "object",
     "title": "DeviceHealth"
+   },
+   "DeviceIntegrationRead": {
+    "properties": {
+     "integration_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Integration Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "connector_key": {
+      "type": "string",
+      "title": "Connector Key"
+     },
+     "connector_label": {
+      "type": "string",
+      "title": "Connector Label"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id",
+      "description": "The entity it is on now"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "subject": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/IntegrationSubjectRead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "deployments": {
+      "items": {
+       "$ref": "#/components/schemas/DeploymentRead"
+      },
+      "type": "array",
+      "title": "Deployments",
+      "description": "The device's deployments, newest first"
+     }
+    },
+    "type": "object",
+    "required": [
+     "integration_id",
+     "name",
+     "connector_key",
+     "connector_label",
+     "enabled"
+    ],
+    "title": "DeviceIntegrationRead",
+    "description": "An integration of the project that registers its entities, as one device sees it\n(decision D418): the entity it is on now, how that entity stands, and the device's\ndeployments on the target."
    },
    "DeviceLogFileRead": {
     "properties": {
@@ -35225,6 +35634,14 @@
         "type": "null"
        }
       ]
+     },
+     "deployments": {
+      "items": {
+       "$ref": "#/components/schemas/DeploymentRead"
+      },
+      "type": "array",
+      "title": "Deployments",
+      "description": "The entity's devices on the target, newest first"
      }
     },
     "type": "object",
@@ -40265,6 +40682,14 @@
       },
       "type": "array",
       "title": "Items"
+     },
+     "waiting": {
+      "items": {
+       "$ref": "#/components/schemas/DeploymentRead"
+      },
+      "type": "array",
+      "title": "Waiting",
+      "description": "Deployments that wait for a person or were refused, at most 200"
      },
      "target_error": {
       "anyOf": [
@@ -50081,6 +50506,18 @@
        }
       ],
       "title": "Since"
+     },
+     "elsewhere": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Elsewhere",
+      "description": "The other animal the target has the sensor on"
      }
     },
     "type": "object",

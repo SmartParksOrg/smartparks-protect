@@ -29,6 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from shared.enums import (
     DeliveryOrigin,
     DeliveryStatus,
+    DeploymentState,
     IntegrationObjectType,
     Severity,
     SubjectState,
@@ -205,5 +206,53 @@ class IntegrationSubject(UuidPrimaryKeyMixin, TimestampMixin, Base):
     )
     registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class IntegrationDeployment(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """A device on an integrated entity, as a deployment of its sensor on the target's animal
+    (decisions D416 to D419). One row per integration, entity, device and the start of that
+    assignment, so a device that comes back to an entity is a row of its own. Protect's own
+    account of what it sent: the target has no call to read a sensor's past deployments."""
+
+    __tablename__ = "integration_deployments"
+    __table_args__ = (
+        UniqueConstraint(
+            "integration_id",
+            "entity_id",
+            "device_id",
+            "starts_at",
+            name="uq_integration_deployments_assignment",
+        ),
+        enum_check("state", DeploymentState, "ck_integration_deployments_state"),
+        Index("ix_integration_deployments_device", "integration_id", "device_id"),
+    )
+
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("integrations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    device_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False
+    )
+    sensor_id: Mapped[str | None] = mapped_column(
+        String(256), comment="What the target knows the device by, fixed when the row is made"
+    )
+    starts_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, comment="The start of the device's assignment"
+    )
+    ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="The end of the assignment in Protect; none while on"
+    )
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, comment="Why it was refused or is outdated")
+    animal_id: Mapped[str | None] = mapped_column(
+        String(200), comment="The target's animal it was sent for"
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL")
     )

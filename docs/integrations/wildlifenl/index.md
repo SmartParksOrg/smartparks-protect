@@ -3,11 +3,12 @@
 [WildlifeNL](https://wildlifenl.nl) is the Dutch research programme on human-wildlife
 coexistence; Smart Parks is a consortium member. The connector sends positions and temperatures
 of the entities you integrate as borne sensor readings, registers those entities as animals with
-their sensor on the platform, and sends camera trap detections as species detections
-(decisions D88 and D407 to D411).
+their sensor on the platform, follows a device that moves to another entity after a person
+confirmed it, and sends camera trap detections as species detections (decisions D88, D407
+to D420).
 
 Built from the platform's [open source API](https://github.com/UtrechtUniversity/wildlifenl)
-(MPL-2.0), read at its push of 2026-11-16, and from the API documents the two servers serve
+(MPL-2.0), read at its push of 2026-11-16 and again at cc71256 of 2026-11-22, and from the API documents the two servers serve
 themselves:
 
 | Server (as the form names it) | Address | API version read on 2026-11-21 |
@@ -62,6 +63,11 @@ others.
    - **Species on WildlifeNL**: the platform's own list. When the entity's type matches one of
      its names, that one is chosen already; otherwise pick it.
    - **Device** and **Sensor id**: how the platform will know this entity's readings.
+   - What the platform has for that sensor: on this entity's animal already, or on another
+     animal. In the second case integrating moves the sensor here, and the history is sent
+     after the deployment, so it does not land on the other animal.
+   - An entity without a device can be integrated too: its animal is made, and the first
+     device assigned to it waits for a confirmation (below).
    - **Send its history first**, with the date to start from. It starts at the day the device
      came onto the entity, at most 400 days back.
 3. Choose **Integrate**. The card follows what happens:
@@ -78,7 +84,42 @@ With the history switched off the entity is registered at once and only new data
 ends the forwarding; what the platform has stays there.
 
 The integration itself (click its row under Integrate, Integrations) lists every integrated
-entity with what the platform has for it. Nothing is changed there.
+entity with what the platform has for it, and the devices that wait for a confirmation.
+
+The device's own page has the same **Integrations** card. It shows the entity the device is on
+now with Integrate, Change and Stop for that entity, and every deployment of the device: on
+which entity, from when to when, and whether it waits.
+
+### 3. A device that moves to another entity
+
+In Protect the device is the sensor and the entity is the animal. WildlifeNL links a reading
+to an animal through a deployment of the sensor, and a new deployment of a sensor ends the
+one before it at the new start. It has no call to end or remove a deployment.
+
+Every half minute Protect compares the devices on integrated entities with what it sent:
+
+| What happened in Protect | What Protect does |
+| --- | --- |
+| A device moved from one integrated entity to another | A deployment on the new entity's animal **waits for you**. The device's readings for the new entity are held: sent now they would land on the old animal. |
+| A second device on an integrated entity, or the first on one integrated without a device | The same: a deployment that waits, the readings held. |
+| A device back on an animal that still has it (its move was declined, or an assignment cut in two) | Nothing. The platform has the sensor there already. |
+| A device moved to an entity that is not integrated, or to none | Its readings stop. The card says the platform keeps the sensor on the old animal, since it cannot end a deployment; that ends when the sensor is deployed again. |
+| An assignment's start changed after the deployment was sent | The sent one is marked as changed, and a deployment from the new start waits. |
+
+On the entity's card, the device's card or the integration's overview:
+
+- **Confirm** makes the deployment from the start of the device's assignment. The held
+  readings go after it, oldest first. When the platform refuses, the row says what it
+  answered and **Try again** stays.
+- **Decline** sends nothing, and the device's readings for that entity in that period are not
+  sent either.
+
+**When a sensor had a deployment before.** The platform's code (cc71256) sets the end of
+*every* deployment of a sensor to the new start, not only of the open one. A device's first move
+is right. From its second move on, the finished deployments get a wrong end and overlap, and
+the animals' tracks over that time are wrong. The confirm dialog warns when this would happen,
+with how many deployments it touches. A report for the platform's developers was written on
+2026-11-22.
 
 ## The species of an entity
 
@@ -117,16 +158,24 @@ nobody. Before a project goes to LIVE, read the note under "Known limits".
 | other events | skipped: WildlifeNL has no free-form events |
 | corrected position | a new reading; a reading at the same timestamp replaces the earlier one |
 
-`sensorID` is the device's identity (the DevEUI, IMEI or serial on the hardware) by default;
+`sensorID` is the device's identity by default: its DevEUI when it has one, else the identity it
+was heard under first, so a device heard over LoRaWAN and Iridium keeps one name there
+(decision D417). Protect keeps the sensor id with each deployment it makes;
 `sensor_id_source` in the config changes it to `device_name` or `entity_id`. The same value is
 used for the readings and for the deployment.
 
 ## Known limits
 
-- **A device replaced on an entity** is not followed by itself. Open the entity, choose Change
-  on its Integrations card and integrate it again: its new sensor is registered on the animal
-  Protect made before. The platform ends the earlier deployment of a sensor when a new one is
-  made for that sensor, not when the animal gets another sensor.
+- **A device that leaves its animal** stays deployed there on the platform until the sensor is
+  deployed again: the platform has no call to end a deployment.
+- **A sensor's third deployment** gives the earlier ones a wrong end on the platform (see
+  "A device that moves to another entity").
+- **An animal's track on the platform** holds every reading of its sensor in the period asked,
+  also those from after the sensor moved on: the platform reads the sensor's readings over the
+  asked period, not over the deployment's own. In the same report.
+- **Late readings after a confirmation.** The readings held while a deployment waited go after
+  it, oldest first. Each moves the animal's location, and the old ones may raise alarms on the
+  platform (see "Why history goes first").
 - **Late old readings after the registration** move the animal's location back and may raise
   alarms on the platform (see above). This is the platform's behaviour as its code reads; it is
   reported to its developers.
@@ -144,9 +193,14 @@ used for the readings and for the deployment.
 
 - `did not accept the code`: the code was mistyped or has expired; choose Send a new code.
 - `is not signed in`: the integration has no sign-in yet; use the key on its row.
-- `lacks the data-system role`: the account can sign in but may not send readings.
-- `does not show its deployments to this account; it needs the herd-manager role`: the account
-  may send readings but not register animals.
+- After the sign-in, "may not send data" or "may not register entities": the platform's own API
+  document says the account's roles do not reach the calls Protect needs. Protect reads which
+  roles each call takes from that document, so a role given more rights by the platform's
+  administrator works without a change in Protect (decision D420). Ask the administrator.
+- `does not show its deployments to this account`: the account may not read the platform's
+  deployments, which registration needs.
+- Readings stay queued with "Waits until a person confirms the deployment of this device": the
+  device came onto the entity. Confirm or decline it on the entity's card.
 - "On hold: N objects of its history failed": the history has holes, so Protect did not
   register. Open Deliveries, filter on failed, read the platform's answer, retry them, then
   choose Change on the entity's card and integrate without history.

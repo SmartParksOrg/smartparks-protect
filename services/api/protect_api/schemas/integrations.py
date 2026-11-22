@@ -136,6 +136,7 @@ class LoginRead(BaseModel):
 
 
 SubjectStateName = Literal["history_requested", "sending_history", "registered", "held", "failed"]
+DeploymentStateName = Literal["pending", "sent", "refused", "declined"]
 
 
 class TargetStatus(BaseModel):
@@ -146,6 +147,40 @@ class TargetStatus(BaseModel):
     external_id: str | None = None
     external_name: str | None = None
     since: datetime | None = None
+    elsewhere: str | None = Field(
+        default=None, description="The other animal the target has the sensor on"
+    )
+
+
+class DeploymentRead(BaseModel):
+    """A device on an integrated entity as a deployment of its sensor on the target's animal
+    (decisions D416 to D419): Protect's own account, the target is not asked."""
+
+    id: uuid.UUID
+    integration_id: uuid.UUID
+    entity_id: uuid.UUID
+    entity_name: str
+    device_id: uuid.UUID
+    device_name: str
+    sensor_id: str | None = None
+    starts_at: datetime = Field(description="The start of the device's assignment")
+    ends_at: datetime | None = Field(
+        default=None, description="The end of the assignment in Protect; none while on"
+    )
+    state: DeploymentStateName
+    detail: str | None = None
+    animal_id: str | None = None
+    sent_at: datetime | None = None
+    open_on_target: bool = Field(
+        default=False,
+        description="The device's latest sent deployment: the target keeps the sensor on this "
+        "animal until it is deployed again, since it cannot end a deployment",
+    )
+    rewrites: int = Field(
+        default=0,
+        description="Finished deployments of the sensor the target would give a wrong end "
+        "when this one is sent (decision D419)",
+    )
 
 
 class IntegrationSubjectRead(BaseModel):
@@ -172,6 +207,10 @@ class IntegrationSubjectRead(BaseModel):
 
 class IntegrationSubjects(BaseModel):
     items: list[IntegrationSubjectRead]
+    waiting: list[DeploymentRead] = Field(
+        default_factory=list,
+        description="Deployments that wait for a person or were refused, at most 200",
+    )
     target_error: str | None = Field(
         default=None, description="Why the target could not be asked; the rows are Protect's own"
     )
@@ -221,6 +260,27 @@ class EntityIntegrationRead(BaseModel):
     connector_label: str
     enabled: bool
     subject: IntegrationSubjectRead | None = None
+    deployments: list[DeploymentRead] = Field(
+        default_factory=list, description="The entity's devices on the target, newest first"
+    )
+
+
+class DeviceIntegrationRead(BaseModel):
+    """An integration of the project that registers its entities, as one device sees it
+    (decision D418): the entity it is on now, how that entity stands, and the device's
+    deployments on the target."""
+
+    integration_id: uuid.UUID
+    name: str
+    connector_key: str
+    connector_label: str
+    enabled: bool
+    entity_id: uuid.UUID | None = Field(default=None, description="The entity it is on now")
+    entity_name: str | None = None
+    subject: IntegrationSubjectRead | None = None
+    deployments: list[DeploymentRead] = Field(
+        default_factory=list, description="The device's deployments, newest first"
+    )
 
 
 class GatewayRead(ORMModel):

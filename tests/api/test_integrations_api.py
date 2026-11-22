@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import Range
 
 from shared.bus import RedisStreamsBus, Topic
 from shared.enums import Role
@@ -19,8 +20,18 @@ from shared.integrations.base import (
 )
 from shared.integrations.connectors.wildlifenl import WildlifeNlConnector
 from shared.integrations.deliveries import enqueue, event_ref
+from shared.integrations.deployments import compare
 from shared.integrations.registry import CONNECTORS
-from shared.models import Event, Integration, IntegrationDelivery, IntegrationSubject
+from shared.models import (
+    Device,
+    DeviceEntityAssignment,
+    DeviceProjectAssignment,
+    DeviceType,
+    Event,
+    Integration,
+    IntegrationDelivery,
+    IntegrationSubject,
+)
 from shared.secrets import decrypt_json
 from tests.api.conftest import actor, create_project, project_actor
 
@@ -230,6 +241,7 @@ class _Registrar:
 
     def __init__(self) -> None:
         self.registered: dict[uuid.UUID, dict] = {}
+        self.deployed: list[tuple[str, str, datetime]] = []
 
     async def options(self, integration, subject):
         if integration.credentials.get("token") != "tok":
@@ -247,9 +259,15 @@ class _Registrar:
             for s in subjects
         }
 
-    async def register(self, integration, subject, settings, external_id):
+    def sensor(self, integration, subject):
+        return subject.device_name
+
+    async def register_animal(self, integration, subject, settings):
         self.registered[subject.entity_id] = settings
-        return SubjectStatus(True, external_id="animal-1")
+        return f"animal-{len(self.registered)}"
+
+    async def deploy(self, integration, animal_id, sensor_id, start):
+        self.deployed.append((animal_id, sensor_id, start))
 
 
 BOS = "44444444-4444-4444-8444-444444444444"
@@ -370,6 +388,153 @@ async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch
         f"{base}/{hook['id']}/subjects/{entity['id']}", json=chosen, headers=manager.headers
     )
     assert refused.status_code == 422 and "keeps no register" in refused.text
+
+
+async def test_a_moved_device_is_confirmed_from_the_entity_or_the_device(client, db, monkeypatch):
+    """Decisions D416 to D418: a device moved from one integrated entity to another shows as
+    a deployment to confirm on both entities, on the device and on the integration's overview;
+    a project admin confirms or declines it, a viewer reads it and changes nothing."""
+    registrar = _Registrar()
+    monkeypatch.setitem(CONNECTORS, "wildlifenl", registrar)
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    manager = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    stranger = await project_actor(client, db, await create_project(db), Role.PROJECT_ADMIN)
+    types = (
+        await client.get("/api/v1/entity-types", params={"limit": 500}, headers=admin.headers)
+    ).json()["items"]
+    cow = next(t for t in types if t["key"] == "cow")
+    base = f"/api/v1/projects/{project.id}/integrations"
+    cows = [
+        (
+            await client.post(
+                f"/api/v1/projects/{project.id}/entities",
+                json={"entity_type_id": cow["id"], "name": name},
+                headers=manager.headers,
+            )
+        ).json()
+        for name in ("Cow 12", "Cow 13")
+    ]
+    device_type = DeviceType(
+        key=f"t_{uuid.uuid4().hex[:8]}", label="Tag", driver_key="generic_json"
+    )
+    db.add(device_type)
+    await db.flush()
+    device = Device(name=f"SP-{uuid.uuid4().hex[:6]}", device_type_id=device_type.id)
+    db.add(device)
+    await db.flush()
+    start = datetime.now(UTC) - timedelta(days=10)
+    moved = datetime.now(UTC) - timedelta(days=1)
+    db.add_all(
+        [
+            DeviceProjectAssignment(
+                device_id=device.id,
+                project_id=project.id,
+                validity=Range(start, None, bounds="[)"),
+            ),
+            DeviceEntityAssignment(
+                device_id=device.id,
+                entity_id=uuid.UUID(cows[0]["id"]),
+                validity=Range(start, moved, bounds="[)"),
+            ),
+            DeviceEntityAssignment(
+                device_id=device.id,
+                entity_id=uuid.UUID(cows[1]["id"]),
+                validity=Range(moved, None, bounds="[)"),
+            ),
+        ]
+    )
+    await db.commit()
+    integration = (
+        await client.post(
+            base,
+            json={
+                "name": "WildlifeNL test",
+                "connector_key": "wildlifenl",
+                "config": {"base_url": "https://wildlifenl.example"},
+                "credentials": {"token": "tok"},
+                "object_types": ["position"],
+            },
+            headers=manager.headers,
+        )
+    ).json()
+    chosen = {"species_id": BOS, "species_name": "Bos taurus"}
+    by_device = f"{base}/by-device/{device.id}"
+    # the device's card: the entity it is on now, not integrated yet
+    (seen,) = (await client.get(by_device, headers=viewer.headers)).json()
+    assert seen["entity_name"] == "Cow 13" and seen["subject"] is None
+    assert seen["deployments"] == []
+    assert (await client.get(by_device, headers=stranger.headers)).status_code in (403, 404)
+
+    for cow_row in cows:
+        made = await client.put(
+            f"{base}/{integration['id']}/subjects/{cow_row['id']}",
+            json=chosen,
+            headers=manager.headers,
+        )
+        assert made.json()["state"] == "registered", made.text
+    # Cow 13 has the device now: its deployment was made by integrating it
+    assert registrar.deployed == [("animal-2", device.name, moved)]
+
+    # the device goes back to Cow 12 at the next hour: Protect asks first
+    back = datetime.now(UTC)
+    await db.execute(
+        delete(DeviceEntityAssignment).where(
+            DeviceEntityAssignment.device_id == device.id,
+            DeviceEntityAssignment.entity_id == uuid.UUID(cows[1]["id"]),
+        )
+    )
+    db.add_all(
+        [
+            DeviceEntityAssignment(
+                device_id=device.id,
+                entity_id=uuid.UUID(cows[1]["id"]),
+                validity=Range(moved, back, bounds="[)"),
+            ),
+            DeviceEntityAssignment(
+                device_id=device.id,
+                entity_id=uuid.UUID(cows[0]["id"]),
+                validity=Range(back, None, bounds="[)"),
+            ),
+        ]
+    )
+    await db.commit()
+    assert await compare(db) == {"pending": 1}
+
+    (seen,) = (await client.get(by_device, headers=viewer.headers)).json()
+    assert seen["entity_name"] == "Cow 12" and seen["subject"]["state"] == "registered"
+    newest, before = seen["deployments"]
+    assert (newest["entity_name"], newest["state"]) == ("Cow 12", "pending")
+    assert newest["rewrites"] == 0 and newest["sensor_id"] == device.name
+    assert (before["entity_name"], before["state"], before["open_on_target"]) == (
+        "Cow 13",
+        "sent",
+        True,  # the target keeps it there until the new one is sent
+    )
+    card = (await client.get(f"{base}/by-entity/{cows[0]['id']}", headers=viewer.headers)).json()
+    assert [d["state"] for d in card[0]["deployments"]] == ["pending"]
+    overview = (
+        await client.get(f"{base}/{integration['id']}/subjects", headers=manager.headers)
+    ).json()
+    assert [d["entity_name"] for d in overview["waiting"]] == ["Cow 12"]
+
+    action = f"{base}/{integration['id']}/deployments/{newest['id']}"
+    assert (await client.post(f"{action}/confirm", headers=viewer.headers)).status_code == 403
+    assert (
+        await client.post(
+            f"{base}/{integration['id']}/deployments/{uuid.uuid4()}/confirm",
+            headers=manager.headers,
+        )
+    ).status_code == 404
+    done = await client.post(f"{action}/confirm", headers=manager.headers)
+    assert done.status_code == 200, done.text
+    assert done.json()["state"] == "sent" and done.json()["open_on_target"] is True
+    assert registrar.deployed[-1][:2] == ("animal-1", device.name)
+    again = await client.post(f"{action}/decline", headers=manager.headers)
+    assert again.status_code == 422 and "waits or was refused" in again.text
+    (seen,) = (await client.get(by_device, headers=viewer.headers)).json()
+    assert [d["open_on_target"] for d in seen["deployments"]] == [True, False]
 
 
 async def test_an_integration_is_signed_in_with_a_code_from_the_email(client, db, monkeypatch):

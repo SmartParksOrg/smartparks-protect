@@ -22,11 +22,11 @@ __all__ = [
     "IntegrationContext",
     "LoginResult",
     "OutboundConnector",
-    "PartlyRegistered",
     "PermanentFailure",
     "Skipped",
     "Subject",
     "SubjectChoice",
+    "SubjectDevice",
     "SubjectOptions",
     "SubjectRegistrar",
     "SubjectStatus",
@@ -145,17 +145,37 @@ class Subject:
     assigned_from: datetime | None = field(
         default=None, metadata={"doc": "Since when the device has been on the entity"}
     )
+    external_id: str | None = field(
+        default=None, metadata={"doc": "What the target calls the entity, once Protect made it"}
+    )
+    devices: tuple["SubjectDevice", ...] = field(
+        default=(),
+        metadata={"doc": "Every device on the entity now, oldest assignment first (D418)"},
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class SubjectDevice:
+    """One device on an entity now, with the identity a target knows it by."""
+
+    device_id: uuid.UUID
+    device_name: str
+    device_serial: str | None
+    device_identity: str | None
+    assigned_from: datetime
 
 
 @dataclass(slots=True)
 class SubjectStatus:
-    """What the target has for one subject: `registered` since a moment, under a name."""
+    """What the target has for one subject's sensor: `registered` when the sensor is on the
+    subject's own animal since a moment; `elsewhere` names the other animal it is on."""
 
     registered: bool
     sensor_id: str | None = None
     external_id: str | None = None
     external_name: str | None = None
     since: datetime | None = None
+    elsewhere: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +204,10 @@ class SubjectOptions:
 class SubjectRegistrar(Protocol):
     """A connector whose target keeps a register of the subjects (decisions D408 and D412)."""
 
+    def sensor(self, integration: IntegrationContext, subject: Subject) -> str | None:
+        """What the target knows the subject's device by; none when it has no usable one."""
+        ...
+
     async def options(self, integration: IntegrationContext, subject: Subject) -> SubjectOptions:
         """What may be chosen for one subject, read from the target."""
         ...
@@ -194,16 +218,26 @@ class SubjectRegistrar(Protocol):
         """What the target has for each subject, by entity id, in one read."""
         ...
 
-    async def register(
+    async def register_animal(
         self,
         integration: IntegrationContext,
         subject: Subject,
         settings: dict[str, Any],
-        external_id: str | None,
-    ) -> SubjectStatus:
-        """Register one subject as the user chose. `external_id` is what an earlier attempt
-        made already. A refusal after something was made raises `PartlyRegistered` with its
-        id, so the caller keeps it."""
+    ) -> str:
+        """Make what the target calls the entity (an animal) as the user chose, and answer its
+        id. The caller keeps the id, so it is made once."""
+        ...
+
+    async def deploy(
+        self,
+        integration: IntegrationContext,
+        animal_id: str,
+        sensor_id: str,
+        start: datetime,
+    ) -> None:
+        """Put a sensor on an animal from a moment (decision D416). Nothing is sent when the
+        target has that sensor on that animal already, so a second try makes no second
+        deployment."""
         ...
 
 
@@ -232,14 +266,6 @@ class CodeLogin(Protocol):
         """Trade the code for the credentials. A wrong or expired code is a
         `PermanentFailure` with what the target said."""
         ...
-
-
-class PartlyRegistered(PermanentFailure):
-    """The target made the first part of a registration and refused the rest."""
-
-    def __init__(self, message: str, *, external_id: str) -> None:
-        super().__init__(message)
-        self.external_id = external_id
 
 
 def require_config(integration: IntegrationContext, *keys: str) -> None:

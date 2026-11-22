@@ -107,6 +107,16 @@ export function SignInDialog({
               </p>
             )}
             {done.test.ok &&
+              done.test.response?.can_send_readings === false && (
+                <Callout kind="warning">
+                  {t(
+                    "This account may not send data to {{target}} yet. Ask its administrator for the rights; nothing reaches {{target}} until then.",
+                    { target },
+                  )}
+                </Callout>
+              )}
+            {done.test.ok &&
+              done.test.response?.can_send_readings !== false &&
               done.test.response?.can_register_animals === false && (
                 <Callout kind="warning">
                   {t(

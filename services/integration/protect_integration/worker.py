@@ -5,7 +5,7 @@ first transient failure of that integration in a cycle (architecture 18, decisio
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from shared.integrations.deliveries import (
     event_ref,
     measurement_ref,
 )
+from shared.integrations.deployments import COMPARE_SECONDS, HOLD_SECONDS, Holds, compare
 from shared.integrations.subjects import finish_histories, send_history
 from shared.logger import get_logger
 from shared.models import Event, Integration, Measurement
@@ -147,6 +148,7 @@ async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> 
     }
     outcome: dict[str, int] = {}
     halted: set[uuid.UUID] = set()
+    holds = Holds(session)
     for delivery in rows:
         integration = integrations.get(delivery.integration_id)
         if integration is None:
@@ -160,6 +162,20 @@ async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> 
             await session.commit()
             outcome["skipped"] = outcome.get("skipped", 0) + 1
             continue
+        verdict = await holds.verdict(integration, delivery)
+        if verdict is not None:
+            # a reading whose sensor is not on the entity's animal yet waits for a person
+            # (decision D416); one of a declined period or an entity let go is not sent
+            kind, why = verdict
+            delivery.error_message = why
+            if kind == "skip":
+                delivery.status = DeliveryStatus.SKIPPED
+                delivery.next_attempt_at = None
+            else:
+                delivery.next_attempt_at = now + timedelta(seconds=HOLD_SECONDS)
+            await session.commit()
+            outcome[f"{kind}s"] = outcome.get(f"{kind}s", 0) + 1
+            continue
         status = await attempt(session, delivery, integration, now=now)
         await session.commit()
         outcome[status] = outcome.get(status, 0) + 1
@@ -169,8 +185,16 @@ async def deliver_due(session: AsyncSession, *, now: datetime | None = None) -> 
 
 
 async def delivery_loop(bus: RedisStreamsBus) -> None:
+    compared_at: datetime | None = None
     while True:
         try:
+            if compared_at is None or (utc_now() - compared_at).total_seconds() >= COMPARE_SECONDS:
+                # the devices on integrated entities against what the targets have (D416)
+                compared_at = utc_now()
+                async with session_scope() as session:
+                    changes = await compare(session)
+                if changes:
+                    log.info("deployments compared", outcome=changes)
             async with session_scope() as session:
                 outcome = await deliver_due(session)
             if outcome:

@@ -219,6 +219,8 @@ export const queryKeys = {
     ["projects", projectId, "integrations", id, "subjects", entityId] as const,
   entityIntegrations: (projectId: string, entityId: string) =>
     ["projects", projectId, "entities", entityId, "integrations"] as const,
+  deviceIntegrations: (projectId: string, deviceId: string) =>
+    ["projects", projectId, "integrations", "by-device", deviceId] as const,
   gateways: (projectId: string, hours: number) =>
     ["projects", projectId, "gateways", hours] as const,
   gateway: (projectId: string, id: string, hours: number) =>

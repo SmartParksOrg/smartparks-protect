@@ -72,6 +72,29 @@ def backoff_seconds(attempts: int) -> int:
     return int(min(BACKOFF_MAX_SECONDS, BACKOFF_BASE_SECONDS * 2 ** max(0, attempts - 1)))
 
 
+async def primary_identities(
+    session: AsyncSession, device_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """The identity a target knows each device by (decision D417): its DevEUI when it has
+    one, else the identity it was heard under first. Fixed, so a device heard over LoRaWAN
+    and Iridium in turn does not change its name on the target with every message."""
+    if not device_ids:
+        return {}
+    out: dict[uuid.UUID, str] = {}
+    for identity in await session.scalars(
+        select(ExternalIdentity)
+        .where(ExternalIdentity.device_id.in_(device_ids), ExternalIdentity.ignored.is_(False))
+        .order_by(
+            (ExternalIdentity.identity_type != "dev_eui"),
+            ExternalIdentity.first_seen_at.asc().nulls_last(),
+            ExternalIdentity.external_id,
+        )
+    ):
+        if identity.device_id is not None:
+            out.setdefault(identity.device_id, identity.external_id)
+    return out
+
+
 def integration_context(integration: Integration) -> IntegrationContext:
     credentials = (
         decrypt_json(integration.credentials_encrypted) if integration.credentials_encrypted else {}
@@ -334,12 +357,7 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
             item.device_type_key = await session.scalar(
                 select(DeviceType.key).where(DeviceType.id == device.device_type_id)
             )
-            item.device_identity = await session.scalar(
-                select(ExternalIdentity.external_id)
-                .where(ExternalIdentity.device_id == device.id, ExternalIdentity.ignored.is_(False))
-                .order_by(ExternalIdentity.last_seen_at.desc().nulls_last())
-                .limit(1)
-            )
+            item.device_identity = (await primary_identities(session, [device.id])).get(device.id)
             if item.link is None:
                 item.link = f"{base_url}/projects/{project.id}/devices/{device.id}"
     if data_source_id is not None:

@@ -39,9 +39,10 @@ const day = (d: Date) =>
     .toISOString()
     .slice(0, 10);
 
-/** Integrate one entity with a target that keeps a register of its own (decisions D412 and
- * D413): the species picked from the target's own list with Protect's proposal chosen
- * already, the sensor id the entity will be known by, and whether its history goes first.
+/** Integrate one entity with a target that keeps a register of its own (decisions D412,
+ * D413 and D416): the species picked from the target's own list with Protect's proposal
+ * chosen already, the sensor id the entity will be known by, what the target has for that
+ * sensor (on this animal, on another one, or nothing), and whether its history goes first.
  * With history the old data is sent oldest first and the registration follows the last of
  * it (decision D409), since a target may react to old readings of an animal it knows. */
 export function IntegrateEntityDialog({
@@ -142,7 +143,9 @@ function IntegrateForm({
     data.subject?.species_id ?? data.proposed_species_id ?? "",
   );
   // no history for a sensor the target knows already: its old data would move the animal
-  const [history, setHistory] = useState(!data.target.registered);
+  const [history, setHistory] = useState(
+    !data.target.registered && Boolean(data.device_name),
+  );
   // from the day the device came onto the entity
   const [from, setFrom] = useState(() => {
     const since = data.assigned_from ? new Date(data.assigned_from) : earliest;
@@ -178,12 +181,28 @@ function IntegrateForm({
         {data.target.registered && (
           <Callout kind="info">
             {t(
-              "{{target}} has this sensor already, on {{name}} since {{time}}. Nothing new is registered; the data is forwarded.",
+              "{{target}} has this sensor on this entity's animal since {{time}}. Nothing new is sent; the data is forwarded.",
+              { target, time: formatTime(data.target.since) },
+            )}
+          </Callout>
+        )}
+        {data.target.elsewhere && (
+          <Callout kind="warning">
+            {t(
+              "{{target}} has this sensor on {{name}} since {{time}}. Integrating puts it on this entity's animal from {{from}}, and {{target}} ends it on {{name}} then. The history is sent after that.",
               {
                 target,
-                name: data.target.external_name ?? "",
+                name: data.target.elsewhere,
                 time: formatTime(data.target.since),
+                from: formatTime(data.assigned_from),
               },
+            )}
+          </Callout>
+        )}
+        {!data.device_name && (
+          <Callout kind="info">
+            {t(
+              "No device is on this entity. Its animal is made now; the first device assigned to it waits for your confirmation on the entity's page.",
             )}
           </Callout>
         )}

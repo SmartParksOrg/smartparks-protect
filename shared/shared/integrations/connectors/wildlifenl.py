@@ -45,6 +45,14 @@ server (20260826):
   older than an hour. A reading without a deployment is stored and does neither. So old data
   goes first and the deployment after it (decision D409).
 - Readings are kept per sensor and timestamp, so a reading sent twice overwrites itself.
+
+Read again on 2026-11-22 at cc71256 (decisions D416 to D420): a new deployment sets the end of
+every deployment of the sensor to its start, not only of the open one, so a sensor's third
+deployment gives the earlier ones a wrong end; an animal's track is its sensors' readings over
+the asked period, not over each deployment's own; a reading moves the animal whose deployment
+covers its time. A call is allowed when one of the account's roles is among the scopes the
+server's own API document lists for it; no role passes everything by its name. Which device
+is on which animal is followed in `shared/integrations/deployments.py`.
 """
 
 import uuid
@@ -58,7 +66,6 @@ from shared.integrations.base import (
     DeliveryResult,
     IntegrationContext,
     LoginResult,
-    PartlyRegistered,
     PermanentFailure,
     Skipped,
     Subject,
@@ -81,6 +88,15 @@ SPECIES_CACHE_SECONDS = 600
 API_DOCUMENT_CACHE_SECONDS = 3600
 DATA_SYSTEM_ROLE = "data-system"
 HERD_MANAGER_ROLE = "herd-manager"
+# What Protect calls, with the scopes the source gave each on 2026-11-22 (decision D420).
+NEEDED_OPERATIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "readings": ("post", "/borne-sensor-reading/", (DATA_SYSTEM_ROLE,)),
+    "detections": ("post", "/detection/", (DATA_SYSTEM_ROLE,)),
+    "animals": ("post", "/animal/", (HERD_MANAGER_ROLE,)),
+    "deployments": ("post", "/borne-sensor-deployment/", (HERD_MANAGER_ROLE,)),
+    "active_deployments": ("get", "/borne-sensor-deployment/active/", (HERD_MANAGER_ROLE,)),
+}
+REGISTER_RIGHTS = ("animals", "deployments", "active_deployments")
 # The name in the platform's login email ("displayNameApp").
 LOGIN_APP_NAME = "Smart Parks Protect"
 SPECIES_FIELDS = ("speciesName", "speciesID")
@@ -258,6 +274,30 @@ def species_of(
         if species is not None and species.get("name"):
             return species
     return None
+
+
+def rights(document: dict[str, Any], roles: list[str]) -> dict[str, bool]:
+    """What the account may do of what Protect needs (decision D420, Tim, 2026-11-22: the
+    roles and their rights are being changed on the servers, so Protect reads them and never
+    refuses an account by a role's name). The platform lets a call through when one of the
+    account's roles is among the scopes its own OpenAPI document lists for that operation, or
+    when it lists none; an operation the document does not describe is judged by the scopes
+    the source gave it on 2026-11-22."""
+    paths = document.get("paths") or {}
+    out: dict[str, bool] = {}
+    for name, (method, path, default) in NEEDED_OPERATIONS.items():
+        operation = (paths.get(path) or {}).get(method)
+        if isinstance(operation, dict) and "security" in operation:
+            scopes = [
+                str(scope)
+                for scheme in operation.get("security") or []
+                if isinstance(scheme, dict)
+                for scope in scheme.get("auth") or []
+            ]
+        else:
+            scopes = list(default)
+        out[name] = not scopes or any(role in scopes for role in roles)
+    return out
 
 
 def detection_species_field(document: dict[str, Any]) -> str:
@@ -533,18 +573,16 @@ class WildlifeNlConnector:
         answer = profile.get("body")
         body: dict[str, Any] = dict(answer) if isinstance(answer, dict) else {}
         roles = [str(r.get("name")) for r in body.get("roles") or [] if isinstance(r, dict)]
-        if DATA_SYSTEM_ROLE not in roles:
-            raise PermanentFailure(
-                f"the WildlifeNL account {body.get('email') or ''} lacks the {DATA_SYSTEM_ROLE} "
-                f"role (roles: {', '.join(roles) or 'none'}); readings would be refused"
-            )
         catalogue = await self.species_catalogue(integration, client)
         document = await self.api_document(client)
+        allowed = rights(document, roles)
         return {
             "status": profile["status"],
             "account": body.get("email"),
             "roles": roles,
-            "can_register_animals": HERD_MANAGER_ROLE in roles,
+            "rights": allowed,
+            "can_send_readings": allowed["readings"],
+            "can_register_animals": all(allowed[k] for k in REGISTER_RIGHTS),
             "species_count": len(catalogue),
             "api_version": (document.get("info") or {}).get("version"),
             "detection_species_field": detection_species_field(document),
@@ -556,26 +594,43 @@ class WildlifeNlConnector:
             answer = await client.request("GET", "/borne-sensor-deployment/active/")
         except PermanentFailure as exc:
             raise PermanentFailure(
-                f"WildlifeNL does not show its deployments to this account; it needs the "
-                f"{HERD_MANAGER_ROLE} role ({exc})"
+                f"WildlifeNL does not show its deployments to this account ({exc})"
             ) from exc
         body = answer.get("body")
         rows = [d for d in body if isinstance(d, dict)] if isinstance(body, list) else []
         return {str(d["sensorID"]): d for d in rows if d.get("sensorID")}
 
     @staticmethod
-    def _deployed(deployment: dict[str, Any] | None, sensor: str | None) -> SubjectStatus:
+    def _deployed(
+        deployment: dict[str, Any] | None, sensor: str | None, animal_id: str | None
+    ) -> SubjectStatus:
+        """What the platform has for a sensor, seen from one entity: on its own animal, on
+        another one (the device was on another entity, or somebody put it there), or not."""
         if deployment is None:
             return SubjectStatus(registered=False, sensor_id=sensor)
         found = deployment.get("animal")
         animal: dict[str, Any] = found if isinstance(found, dict) else {}
+        on = str(animal.get("ID") or deployment.get("animalID") or "") or None
+        name = str(animal.get("name") or "") or None
+        if animal_id is None or on != animal_id:
+            return SubjectStatus(
+                registered=False,
+                sensor_id=sensor,
+                external_id=on,
+                external_name=name,
+                since=_moment(deployment.get("start")),
+                elsewhere=name or on or "another animal",
+            )
         return SubjectStatus(
             registered=True,
             sensor_id=sensor,
-            external_id=str(animal.get("ID") or deployment.get("animalID") or "") or None,
-            external_name=str(animal.get("name") or "") or None,
+            external_id=on,
+            external_name=name,
             since=_moment(deployment.get("start")),
         )
+
+    def sensor(self, integration: IntegrationContext, subject: Subject) -> str | None:
+        return sensor_id(integration, subject)
 
     async def statuses(
         self, integration: IntegrationContext, subjects: list[Subject]
@@ -585,12 +640,16 @@ class WildlifeNlConnector:
         out: dict[uuid.UUID, SubjectStatus] = {}
         for subject in subjects:
             sensor = sensor_id(integration, subject)
-            out[subject.entity_id] = self._deployed(active.get(sensor or ""), sensor)
+            out[subject.entity_id] = self._deployed(
+                active.get(sensor or ""), sensor, subject.external_id
+            )
         return out
 
     async def options(self, integration: IntegrationContext, subject: Subject) -> SubjectOptions:
         """The platform's species to choose from with Protect's proposal (decisions D411 and
-        D413), the sensor id the entity will be known by, and what the platform has for it."""
+        D413), the sensor id the entity will be known by, and what the platform has for it.
+        An entity without a device may be integrated: its animal is made and the first device
+        assigned to it becomes a deployment to confirm (decision D418)."""
         client = self._client(integration)
         active = await self._active_deployments(client)
         catalogue = await self.species_catalogue(integration, client)
@@ -599,7 +658,7 @@ class WildlifeNlConnector:
         proposal = species_of(subject, catalogue, mapping)
         options = SubjectOptions(
             sensor_id=sensor,
-            status=self._deployed(active.get(sensor or ""), sensor),
+            status=self._deployed(active.get(sensor or ""), sensor, subject.external_id),
             species=sorted(
                 (
                     SubjectChoice(
@@ -614,64 +673,51 @@ class WildlifeNlConnector:
             ),
             proposed_species_id=str(proposal["ID"]) if proposal else None,
         )
-        if sensor is None:
-            options.blocked = "No device is on this entity, so there is no sensor to register"
-        elif len(subject.entity_name) < 2:
+        if len(subject.entity_name) < 2:
             options.blocked = "WildlifeNL asks for a name of at least two characters"
         return options
 
-    async def register(
+    async def register_animal(
         self,
         integration: IntegrationContext,
         subject: Subject,
         settings: dict[str, Any],
-        external_id: str | None,
-    ) -> SubjectStatus:
-        """An animal and a deployment of its sensor (decision D408), unless the platform has
-        a deployment of the sensor already. The animal's id travels in `PartlyRegistered`
-        when the deployment is refused after the animal was made, so no second one follows."""
-        client = self._client(integration)
-        sensor = sensor_id(integration, subject)
-        if sensor is None:
-            raise PermanentFailure("No device is on this entity, so there is no sensor to register")
-        active = await self._active_deployments(client)
-        status = self._deployed(active.get(sensor), sensor)
-        if status.registered:
-            return status
+    ) -> str:
+        """The entity as an animal of the chosen species (decision D408)."""
         species = str(settings.get("species_id") or "")
         if not _is_uuid(species):
             raise PermanentFailure("Choose the entity's species on WildlifeNL first")
-        animal = external_id
-        if animal is None:
-            made = await client.request(
-                "POST", "/animal/", {"name": subject.entity_name, "speciesID": species}
-            )
-            body = made.get("body")
-            if not isinstance(body, dict) or not body.get("ID"):
-                raise PermanentFailure("wildlifenl made an animal without an ID")
-            animal = str(body["ID"])
-        start = subject.assigned_from or datetime.now(UTC)
-        try:
-            await client.request(
-                "POST",
-                "/borne-sensor-deployment/",
-                {
-                    "animalID": animal,
-                    "sensorID": sensor,
-                    "contactHardwareAddress": None,
-                    "start": iso(start),
-                },
-            )
-        except (PermanentFailure, TransientFailure) as exc:
-            raise PartlyRegistered(
-                f"WildlifeNL made the animal and refused its sensor: {exc}", external_id=animal
-            ) from exc
-        return SubjectStatus(
-            registered=True,
-            sensor_id=sensor,
-            external_id=animal,
-            external_name=subject.entity_name,
-            since=start,
+        made = await self._client(integration).request(
+            "POST", "/animal/", {"name": subject.entity_name, "speciesID": species}
+        )
+        body = made.get("body")
+        if not isinstance(body, dict) or not body.get("ID"):
+            raise PermanentFailure("wildlifenl made an animal without an ID")
+        return str(body["ID"])
+
+    async def deploy(
+        self,
+        integration: IntegrationContext,
+        animal_id: str,
+        sensor_id: str,
+        start: datetime,
+    ) -> None:
+        """A deployment of the sensor on the animal from `start` (decisions D408 and D416).
+        The platform ends the sensor's deployment before it at that moment. Nothing is sent
+        when the sensor is on this animal already."""
+        client = self._client(integration)
+        active = await self._active_deployments(client)
+        if self._deployed(active.get(sensor_id), sensor_id, animal_id).registered:
+            return
+        await client.request(
+            "POST",
+            "/borne-sensor-deployment/",
+            {
+                "animalID": animal_id,
+                "sensorID": sensor_id,
+                "contactHardwareAddress": None,
+                "start": iso(start),
+            },
         )
 
 
