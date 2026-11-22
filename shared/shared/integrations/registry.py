@@ -41,6 +41,8 @@ def describe_connector(connector: OutboundConnector) -> dict[str, Any]:
         # sign-in this makes the whole setup a name and a choice (decision D415)
         "servers": [dict(server) for server in getattr(connector, "servers", ())],
         "intro": getattr(connector, "intro", None),
+        # what an integration of this target forwards whatever a form says (decision D421)
+        "forwards": dict(getattr(connector, "forwards", {}) or {}),
     }
 
 

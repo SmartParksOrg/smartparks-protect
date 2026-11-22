@@ -311,6 +311,24 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
         if value is None:
             value = measurement.value_json
         item.data = {"metric_key": measurement.metric_key, "value": value}
+        if measurement.device_id is not None:
+            # the device's other numbers of the same moment, for a target that sends a
+            # message as one reading (decision D421)
+            item.data["moment"] = {
+                key: number
+                for key, number in (
+                    await session.execute(
+                        select(
+                            Measurement.metric_key,
+                            func.coalesce(Measurement.curated_value_num, Measurement.value_num),
+                        ).where(
+                            Measurement.device_id == measurement.device_id,
+                            Measurement.time == measurement.time,
+                        )
+                    )
+                ).all()
+                if number is not None
+            }
     if delivery.object_version > 1:
         earlier = await session.scalar(
             select(IntegrationDelivery.external_id)

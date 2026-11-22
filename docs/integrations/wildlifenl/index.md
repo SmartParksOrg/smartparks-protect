@@ -152,7 +152,7 @@ nobody. Before a project goes to LIVE, read the note under "Known limits".
 | Smart Parks Protect | WildlifeNL |
 | --- | --- |
 | position | `POST /borne-sensor-reading/` with `sensorID`, `timestamp`, `location` and `altitude` |
-| temperature measurement | `POST /borne-sensor-reading/` with `sensorID`, `timestamp` and `temperature`; the platform keeps one reading per sensor and timestamp, so it joins the position of the same moment |
+| status message (device temperature and accelerometer) | `POST /borne-sensor-reading/` without a location: `sensorID`, `timestamp`, `temperature` (the temperature inside the device, °C) and `accelero` (x, y, z in m/s², as Protect stores them) when the device measured all three axes. One request per status message. It moves no animal and raises no alarm. The platform keeps one reading per sensor and timestamp, so a position of the same moment joins it |
 | integrated entity | `POST /animal/` (`name`, the species chosen), then `POST /borne-sensor-deployment/` (`animalID`, `sensorID`, `start` at the start of the device's time on the entity) |
 | `SPECIES_DETECTION` event (AddaxAI Connect) | `POST /detection/` per species: `speciesName` or `speciesID` as the server's own API document asks, `deploymentID`, `sensorType`, `location`, `start`, `end`, `uri`, `animals` with the confidence as a percentage |
 | other events | skipped: WildlifeNL has no free-form events |
@@ -181,9 +181,15 @@ used for the readings and for the deployment.
   reported to its developers.
 - **The rate limit.** The platform limits requests per account and answers 429 with the time to
   wait. Protect waits that long and goes on; a long history takes the time the platform allows.
-- **Positions only.** The form sets the integration to forward positions. Temperatures and
-  camera trap detections are built in the connector and not offered in the form; say so when
-  a project needs them.
+- **What is sent.** Positions, and per status message the device temperature with the
+  accelerometer (decision D421). The platform's reading has no field for the battery, the
+  activity index, the uptime or the satellites, and refuses fields it does not know, so those
+  stay in Protect. A status message without a temperature is not sent. Camera trap detections
+  are built in the connector and not set by the form; say so when a project needs them.
+- **The accelerometer's unit.** The platform's document gives none; Protect sends m/s². Asked
+  of the platform's administrator on 2026-11-22.
+- **The device temperature** is measured inside the device. On an animal it lies between the
+  body and the air temperature; read it as such.
 - **Another server is another integration.** The server of an integration cannot change while
   entities are integrated with it, and changing it signs the integration out.
 - **Accelerometer values** are not sent.

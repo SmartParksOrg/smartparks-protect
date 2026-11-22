@@ -23,10 +23,11 @@ the API's root):
 - `GET /species/` lists species with `ID`, `name` (the Latin binomen), `commonName` and
   `category`; `GET /profile/me/` returns the account with its `roles`.
 
-Mapping: positions and temperature measurements are borne sensor readings under the device's
-identity (configurable); `SPECIES_DETECTION` events (camera traps) are detections, with the
-species resolved by name against the platform's list. Other events are skipped: WildlifeNL
-has no free-form events, its interactions are people's reports.
+Mapping: positions are borne sensor readings with a location, and a status message is one
+reading without a location with its temperature and its accelerometer (decision D421), under
+the device's identity (configurable); `SPECIES_DETECTION` events (camera traps) are
+detections, with the species resolved by name against the platform's list. Other events are
+skipped: WildlifeNL has no free-form events, its interactions are people's reports.
 
 Read again on 2026-11-21 (phase 49, decisions D407 to D411), the source at its push of
 2026-11-16 and the OpenAPI documents of the TEST server (version 20261116) and the LIVE
@@ -80,7 +81,11 @@ from shared.integrations.base import (
 DETECTION_EVENT_TYPE = "SPECIES_DETECTION"
 DEFAULT_SENSOR_ID_SOURCE = "device_identity"
 SENSOR_ID_SOURCES = ("device_identity", "device_name", "entity_id")
-DEFAULT_TEMPERATURE_METRICS = ["temperature"]
+# What a device's status message carries as WildlifeNL's temperature (decision D421): the
+# temperature inside the device for an OpenCollar, a plain temperature for other drivers.
+DEFAULT_TEMPERATURE_METRICS = ["device_temperature", "temperature"]
+# The accelerometer of the same moment, sent as `accelero` in m/s², as Protect stores it.
+ACCELERO_METRICS = ("acceleration_x", "acceleration_y", "acceleration_z")
 DEFAULT_SENSOR_TYPE = "visual"
 SENSOR_TYPES = ("visual", "acoustic", "motion", "radio", "chemical", "other")
 REQUEST_TIMEOUT_SECONDS = 30
@@ -144,15 +149,27 @@ def build_position_reading(integration: IntegrationContext, item: DeliveryItem) 
 def build_measurement_reading(
     integration: IntegrationContext, item: DeliveryItem
 ) -> dict[str, Any]:
+    """One status message as one reading without a location (decision D421): its temperature,
+    with the accelerometer of the same moment when the device measured all three axes. The
+    temperature is what is forwarded; the other values ride along, so a moment is one request.
+    A reading without a location moves no animal and raises no alarm on the platform."""
     metrics = [str(m) for m in integration.config.get("temperature_metrics") or []]
     metric = str(item.data.get("metric_key") or "")
     value = item.data.get("value")
     if metric not in (metrics or DEFAULT_TEMPERATURE_METRICS):
-        raise Skipped(f"WildlifeNL readings carry temperature only, not {metric}")
+        raise Skipped(f"WildlifeNL readings carry temperature and acceleration, not {metric}")
     if not isinstance(value, int | float) or isinstance(value, bool):
         raise Skipped(f"measurement {item.object_id} has no numeric value")
     body = _reading(sensor_id_for(integration, item), item)
     body["temperature"] = float(value)
+    moment = item.data.get("moment") or {}
+    axes = [
+        float(v)
+        for v in (moment.get(key) for key in ACCELERO_METRICS)
+        if isinstance(v, int | float) and not isinstance(v, bool)
+    ]
+    if len(axes) == len(ACCELERO_METRICS):
+        body["accelero"] = {"x": axes[0], "y": axes[1], "z": axes[2]}
     return body
 
 
@@ -421,6 +438,12 @@ class WildlifeNlConnector:
         },
     }
     # The platform's two servers (decision D415). A first integration belongs on Test.
+    # What an integration of this target forwards, whatever a form sends (decision D421):
+    # positions, and a status message's temperature with its accelerometer riding along.
+    forwards: ClassVar[dict[str, list[str]]] = {
+        "object_types": ["position", "measurement"],
+        "metric_keys": list(DEFAULT_TEMPERATURE_METRICS),
+    }
     servers: ClassVar[tuple[dict[str, str], ...]] = (
         {"key": "test", "label": "Test", "base_url": "https://test-api-wildlifenl.uu.nl"},
         {"key": "live", "label": "Live", "base_url": "https://live-api-wildlifenl.uu.nl"},

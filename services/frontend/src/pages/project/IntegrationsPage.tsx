@@ -73,6 +73,8 @@ interface ConnectorInfo {
   servers?: { key: string; label: string; base_url: string }[];
   /** What the integration does, in a sentence for people. */
   intro?: string | null;
+  /** What an integration of this target forwards whatever the form says (D421). */
+  forwards?: { object_types?: string[]; metric_keys?: string[] };
 }
 
 /** A target set up with a name and a choice of server, then its own sign-in (D415). */
@@ -780,10 +782,10 @@ export function IntegrationsPage() {
                       );
                       form.setValue(
                         "object_types",
-                        // the simple setup forwards positions; the rest is the technical
-                        // form's to choose
+                        // a simple target says what it forwards; the rest is the
+                        // technical form's to choose
                         (isSimple(c)
-                          ? ["position"]
+                          ? (c.forwards?.object_types ?? ["position"])
                           : c.supports.filter(
                               (s) => s !== "measurement",
                             )) as Values["object_types"],

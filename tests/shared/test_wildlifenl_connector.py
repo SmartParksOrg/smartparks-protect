@@ -168,6 +168,55 @@ def test_render_readings_by_identity_name_or_entity():
         connector.render(integration(), item(location=None))
 
 
+def test_a_status_message_is_one_reading_without_a_location():
+    """Decision D421: the device's temperature is forwarded, and the accelerometer of the same
+    moment rides along in m/s², so one status message is one request. The other numbers of
+    the moment have no field on the platform and are left out."""
+    connector = WildlifeNlConnector()
+    moment = {
+        "device_temperature": 2.75,
+        "acceleration_x": 1.96,
+        "acceleration_y": 10.59,
+        "acceleration_z": 1.18,
+        "battery_voltage": 3.9,
+        "activity": 12.0,
+    }
+    reading = connector.render(
+        integration(),
+        item(
+            "measurement",
+            location=None,
+            data={"metric_key": "device_temperature", "value": 2.75, "moment": moment},
+        ),
+    )
+    assert reading["body"] == {
+        "sensorID": "70B3D57ED0001234",
+        "timestamp": "2026-09-04T10:00:00+00:00",
+        "temperature": 2.75,
+        "accelero": {"x": 1.96, "y": 10.59, "z": 1.18},
+    }
+    # an axis missing: the temperature alone
+    partial = {k: v for k, v in moment.items() if k != "acceleration_z"}
+    alone = connector.render(
+        integration(),
+        item(
+            "measurement",
+            data={"metric_key": "device_temperature", "value": 2.75, "moment": partial},
+        ),
+    )
+    assert "accelero" not in alone["body"] and "location" not in alone["body"]
+    # the axes themselves are not forwarded: they ride along with the temperature
+    with pytest.raises(Skipped):
+        connector.render(
+            integration(),
+            item("measurement", data={"metric_key": "acceleration_x", "value": 1.96}),
+        )
+    assert WildlifeNlConnector.forwards == {
+        "object_types": ["position", "measurement"],
+        "metric_keys": ["device_temperature", "temperature"],
+    }
+
+
 def test_render_detections_one_per_species():
     connector = WildlifeNlConnector()
     assert species_in_event(detection_item()) == {"wolf": 94, "wild_boar": 70}

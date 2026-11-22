@@ -465,3 +465,41 @@ async def test_an_entity_whose_sensor_is_on_another_animal_is_deployed_before_it
     await deliver_due(db)
     assert await finish_histories(db) == {"registered": 1}
     assert len(registrar.deployed) == 2  # not a second time
+
+
+async def test_a_measurement_carries_the_other_numbers_of_its_moment(db, world):
+    """Decision D421: a target that sends a status message as one reading gets the device's
+    other numbers of the same moment with the measurement it forwards."""
+    from shared.integrations.deliveries import load_item, measurement_ref
+    from shared.models import Measurement
+
+    await _isolate(db, world)
+    for key, value in (("device_temperature", 2.75), ("acceleration_x", 1.96)):
+        db.add(
+            Measurement(
+                time=T0,
+                device_id=world.device.id,
+                project_id=world.project.id,
+                entity_id=world.entity.id,
+                data_source_id=world.source.id,
+                metric_key=key,
+                canonical_key=f"{world.device.id}|{key}|{T0.isoformat()}",
+                value_num=value,
+            )
+        )
+    await db.commit()
+    world.integration.object_types = ["measurement"]
+    CONNECTORS["fake"].supports = frozenset({"position", "event", "measurement"})
+    await enqueue(db, [world.integration], [measurement_ref(world.measurement)], honour_age=False)
+    await db.commit()
+    delivery = await db.scalar(
+        select(IntegrationDelivery).where(
+            IntegrationDelivery.object_id == str(world.measurement.id)
+        )
+    )
+    item = await load_item(db, delivery)
+    assert item.data["moment"] == {
+        "battery_voltage": 3.7,
+        "device_temperature": 2.75,
+        "acceleration_x": 1.96,
+    }

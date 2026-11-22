@@ -106,6 +106,11 @@ async def _integration(
     return integration
 
 
+def _forwards(key: str) -> dict[str, list[str]]:
+    """What an integration of this connector forwards whatever a form sends (decision D421)."""
+    return {k: list(v) for k, v in (getattr(CONNECTORS.get(key), "forwards", {}) or {}).items()}
+
+
 def _check_connector(key: str, object_types: list[Any]) -> None:
     connector = CONNECTORS.get(key)
     if connector is None:
@@ -150,6 +155,7 @@ async def create_integration(
     session: AsyncSession = Depends(get_session),
 ) -> IntegrationRead:
     _check_connector(body.connector_key, body.object_types)
+    forwards = _forwards(body.connector_key)
     integration = Integration(
         project_id=context.project.id,
         name=body.name,
@@ -158,11 +164,11 @@ async def create_integration(
         enabled=body.enabled,
         config=body.config,
         credentials_encrypted=encrypt_json(body.credentials) if body.credentials else None,
-        object_types=[str(t) for t in body.object_types],
+        object_types=forwards.get("object_types") or [str(t) for t in body.object_types],
         entity_ids=[str(i) for i in body.entity_ids],
         device_ids=[str(i) for i in body.device_ids],
         event_types=[t.upper() for t in body.event_types],
-        metric_keys=body.metric_keys,
+        metric_keys=forwards.get("metric_keys", body.metric_keys),
         min_severity=body.min_severity,
         max_object_age_seconds=body.max_object_age_seconds,
         created_by_user_id=context.user.id,
@@ -367,6 +373,10 @@ async def update_integration(
             patch[key] = [str(i) for i in patch[key]]
     if patch.get("event_types") is not None:
         patch["event_types"] = [t.upper() for t in patch["event_types"]]
+    # a target that says what it forwards keeps that, whatever the form sent (D421)
+    for key, value in _forwards(integration.connector_key).items():
+        if key in patch:
+            patch[key] = list(value)
     if patch.get("config") is not None and isinstance(
         CONNECTORS.get(integration.connector_key), CodeLogin
     ):

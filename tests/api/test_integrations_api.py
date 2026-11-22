@@ -237,7 +237,8 @@ class _Registrar:
 
     key = "wildlifenl"
     label = "WildlifeNL"
-    supports = frozenset({"position"})
+    supports = frozenset({"position", "measurement"})
+    forwards = WildlifeNlConnector.forwards
 
     def __init__(self) -> None:
         self.registered: dict[uuid.UUID, dict] = {}
@@ -459,6 +460,16 @@ async def test_a_moved_device_is_confirmed_from_the_entity_or_the_device(client,
             headers=manager.headers,
         )
     ).json()
+    # what such a target forwards is the connector's to say, whatever a form sends (D421)
+    assert integration["object_types"] == ["position", "measurement"]
+    assert integration["metric_keys"] == ["device_temperature", "temperature"]
+    patched = await client.patch(
+        f"{base}/{integration['id']}",
+        json={"object_types": ["position"], "metric_keys": ["battery_voltage"]},
+        headers=manager.headers,
+    )
+    assert patched.json()["object_types"] == ["position", "measurement"]
+    assert patched.json()["metric_keys"] == ["device_temperature", "temperature"]
     chosen = {"species_id": BOS, "species_name": "Bos taurus"}
     by_device = f"{base}/by-device/{device.id}"
     # the device's card: the entity it is on now, not integrated yet
