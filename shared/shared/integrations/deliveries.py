@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -652,22 +652,30 @@ async def backfill(
                 model, make = Measurement, measurement_ref
             else:
                 continue
-            cursor = time_from
-            last_id: Any = None
+            # only what the filters can let through, so a backfill for one entity does not
+            # walk the whole project
+            narrow: list[Any] = []
+            if integration.entity_ids:
+                narrow.append(model.entity_id.in_([uuid.UUID(e) for e in integration.entity_ids]))
+            if object_type == IntegrationObjectType.MEASUREMENT and integration.metric_keys:
+                narrow.append(model.metric_key.in_(integration.metric_keys))
+            after: Any = None
             while True:
-                statement = (
-                    select(model)
-                    .where(
-                        model.project_id == integration.project_id,
-                        model.time >= cursor,
-                        model.time < time_to,
-                    )
-                    .order_by(model.time, model.id)
-                    .limit(batch)
+                statement = select(model).where(
+                    model.project_id == integration.project_id,
+                    model.time >= time_from,
+                    model.time < time_to,
+                    *narrow,
                 )
-                rows = list((await session.scalars(statement)).all())
-                if last_id is not None:
-                    rows = [r for r in rows if not (r.time == cursor and r.id <= last_id)]
+                if after is not None:
+                    # keyset paging on (time, id): rows of one moment are never lost or
+                    # read twice, however many share it
+                    statement = statement.where(tuple_(model.time, model.id) > after)
+                rows = list(
+                    (
+                        await session.scalars(statement.order_by(model.time, model.id).limit(batch))
+                    ).all()
+                )
                 if not rows:
                     break
                 refs = [make(row) for row in rows]
@@ -685,12 +693,9 @@ async def backfill(
                     "scanned": scanned,
                 }
                 await session.commit()
-                last = rows[-1]
-                if len(rows) < batch and last.time == cursor and last_id is not None:
-                    break
-                cursor, last_id = last.time, last.id
                 if len(rows) < batch:
                     break
+                after = tuple_(rows[-1].time, rows[-1].id)
         integration.backfill = {
             **integration.backfill,
             "status": BackfillStatus.DONE,
@@ -735,25 +740,24 @@ async def backfill_entity(
             model, make = Measurement, measurement_ref
         else:
             continue
-        cursor, last_id = time_from, None
+        narrow: list[Any] = []
+        if object_type == IntegrationObjectType.MEASUREMENT and integration.metric_keys:
+            narrow.append(model.metric_key.in_(integration.metric_keys))
+        after: Any = None
         while True:
-            rows = list(
-                (
-                    await session.scalars(
-                        select(model)
-                        .where(
-                            model.project_id == integration.project_id,
-                            model.entity_id == entity_id,
-                            model.time >= cursor,
-                            model.time < time_to,
-                        )
-                        .order_by(model.time, model.id)
-                        .limit(batch)
-                    )
-                ).all()
+            statement = select(model).where(
+                model.project_id == integration.project_id,
+                model.entity_id == entity_id,
+                model.time >= time_from,
+                model.time < time_to,
+                *narrow,
             )
-            if last_id is not None:
-                rows = [r for r in rows if not (r.time == cursor and r.id <= last_id)]
+            if after is not None:
+                # keyset paging on (time, id), as in `backfill`
+                statement = statement.where(tuple_(model.time, model.id) > after)
+            rows = list(
+                (await session.scalars(statement.order_by(model.time, model.id).limit(batch))).all()
+            )
             if not rows:
                 break
             queued += await enqueue(
@@ -764,11 +768,9 @@ async def backfill_entity(
                 honour_age=False,
             )
             await session.flush()
-            if len(rows) < batch and rows[-1].time == cursor:
-                break
-            cursor, last_id = rows[-1].time, rows[-1].id
             if len(rows) < batch:
                 break
+            after = tuple_(rows[-1].time, rows[-1].id)
     return queued
 
 

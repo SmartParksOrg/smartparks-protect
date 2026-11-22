@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from shared.enums import DeliveryOrigin, DeliveryStatus, TraceStatus
 from shared.integrations.deliveries import (
@@ -256,3 +256,67 @@ async def test_what_is_due_goes_oldest_first(db, world):
     assert [d.object_time for d in due] == sorted(d.object_time for d in due)
     assert len(due) == 4
     await db.rollback()
+
+
+async def test_backfill_reads_every_page_and_only_what_passes(db, world):
+    """A backfill goes on until the last page, however many rows share a moment; it stopped
+    after the second page before (2026-11-22, SP051463's status messages never queued). With
+    an entity filter it reads that entity alone."""
+    from geoalchemy2 import WKTElement
+
+    from shared.models import Entity, Position
+
+    other = Entity(
+        project_id=world.project.id, entity_type_id=world.entity.entity_type_id, name="Other"
+    )
+    db.add(other)
+    await db.flush()
+    for n in range(1, 8):
+        # pairs of positions at one moment, so pages end in the middle of a moment
+        at = T0 + timedelta(minutes=n // 2)
+        db.add(
+            Position(
+                time=at,
+                device_id=world.device.id,
+                project_id=world.project.id,
+                entity_id=world.entity.id if n % 3 else other.id,
+                data_source_id=world.source.id,
+                canonical_key=f"{world.device.id}|{n}|page",
+                geom=WKTElement("POINT(31.5 -24.9)", srid=4326),
+            )
+        )
+    await db.commit()
+    world.integration.object_types = ["position"]
+    span = (T0 - timedelta(hours=1), T0 + timedelta(hours=1))
+    assert await backfill(db, world.integration, *span, batch=2) == 8  # the world's one too
+    assert world.integration.backfill["scanned"] == 8
+    await db.execute(delete(IntegrationDelivery))
+    world.integration.entity_ids = [str(other.id)]
+    await db.commit()
+    assert await backfill(db, world.integration, *span, batch=2) == 2
+    assert world.integration.backfill["scanned"] == 2
+
+
+async def test_an_entity_history_reads_every_page(db, world):
+    """The same paging for one entity's history (decision D412)."""
+    from geoalchemy2 import WKTElement
+
+    from shared.integrations.deliveries import backfill_entity
+    from shared.models import Position
+
+    for n in range(1, 8):
+        db.add(
+            Position(
+                time=T0 + timedelta(minutes=n // 2),
+                device_id=world.device.id,
+                project_id=world.project.id,
+                entity_id=world.entity.id,
+                data_source_id=world.source.id,
+                canonical_key=f"{world.device.id}|{n}|history",
+                geom=WKTElement("POINT(31.5 -24.9)", srid=4326),
+            )
+        )
+    await db.commit()
+    world.integration.object_types = ["position"]
+    span = (T0 - timedelta(hours=1), T0 + timedelta(hours=1))
+    assert await backfill_entity(db, world.integration, world.entity.id, *span, batch=2) == 8
