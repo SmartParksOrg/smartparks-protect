@@ -40477,6 +40477,14 @@
       "title": "Blocked",
       "description": "Why it cannot be integrated as it is"
      },
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/SubjectFieldRead"
+      },
+      "type": "array",
+      "title": "Fields",
+      "description": "The entity's fields the target needs, asked in the dialog (D422)"
+     },
      "subject": {
       "anyOf": [
        {
@@ -40641,6 +40649,14 @@
       "type": "string",
       "format": "uuid",
       "title": "Species Id"
+     },
+     "attributes": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Attributes",
+      "description": "Values of the fields the target needs, stored on the entity (D422)"
      },
      "species_name": {
       "anyOf": [
@@ -50363,6 +50379,47 @@
      "name"
     ],
     "title": "SubjectChoiceRead"
+   },
+   "SubjectFieldRead": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "help": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Help"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label"
+    ],
+    "title": "SubjectFieldRead",
+    "description": "A field of the entity that a target needs, such as the ear tag number (D422)."
    },
    "SystemHealth": {
     "properties": {

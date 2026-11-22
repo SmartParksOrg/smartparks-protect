@@ -239,6 +239,7 @@ class _Registrar:
     label = "WildlifeNL"
     supports = frozenset({"position", "measurement"})
     forwards = WildlifeNlConnector.forwards
+    subject_fields = WildlifeNlConnector.subject_fields
 
     def __init__(self) -> None:
         self.registered: dict[uuid.UUID, dict] = {}
@@ -328,10 +329,25 @@ async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch
     assert offered["species"] == [{"id": BOS, "name": "Bos taurus", "common_name": "Rund"}]
     assert offered["proposed_species_id"] is None and offered["subject"] is None
     assert offered["sensor_id"] == "70B3D57ED0000012" and offered["target"]["registered"] is False
+    # the target needs the ear tag number, asked in the dialog (D422)
+    assert [(f["key"], f["label"], f["value"]) for f in offered["fields"]] == [
+        ("ear_tag", "Ear tag number", None)
+    ]
     assert (await client.get(f"{subject}/options", headers=viewer.headers)).status_code == 403
     chosen = {"species_id": BOS, "species_name": "Bos taurus"}
     assert (await client.put(subject, json=chosen, headers=viewer.headers)).status_code == 403
     assert (await client.put(subject, json={}, headers=manager.headers)).status_code == 422
+    untagged = await client.put(subject, json=chosen, headers=manager.headers)
+    assert untagged.status_code == 422 and "Ear tag number" in untagged.text
+    bad = await client.put(
+        subject, json={**chosen, "attributes": {"ear_tag": "x!"}}, headers=manager.headers
+    )
+    assert bad.status_code == 422 and "4 to 20" in bad.text
+    stray = await client.put(
+        subject, json={**chosen, "attributes": {"breed": "Fries"}}, headers=manager.headers
+    )
+    assert stray.status_code == 422 and "Not asked here" in stray.text
+    chosen = {**chosen, "attributes": {"ear_tag": "nl 1234 5678 9012"}}
 
     # with its history first: asked on the bus, registered by the worker afterwards
     bus = RedisStreamsBus()
@@ -354,6 +370,14 @@ async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch
     stored = await db.get(Integration, uuid.UUID(integration["id"]))
     await db.refresh(stored)
     assert stored.entity_ids == [entity["id"]]  # forwarded from now on
+    # the ear tag given in the dialog is the entity's own, in its standard form
+    from shared.models import Entity
+
+    cow_12 = await db.get(Entity, uuid.UUID(entity["id"]))
+    await db.refresh(cow_12)
+    assert cow_12.attributes["ear_tag"] == "NL123456789012"
+    again = (await client.get(f"{subject}/options", headers=manager.headers)).json()
+    assert again["fields"][0]["value"] == "NL123456789012"
     busy = await client.put(subject, json=chosen, headers=manager.headers)
     assert busy.status_code == 422 and "history is being sent" in busy.text
 
@@ -377,7 +401,9 @@ async def test_an_entity_is_integrated_from_its_own_page(client, db, monkeypatch
     now = await client.put(subject, json=chosen, headers=manager.headers)
     assert now.status_code == 200, now.text
     assert now.json()["state"] == "registered" and now.json()["external_id"] == "animal-1"
-    assert registrar.registered == {uuid.UUID(entity["id"]): chosen}
+    assert registrar.registered == {
+        uuid.UUID(entity["id"]): {"species_id": BOS, "species_name": "Bos taurus"}
+    }
 
     # an integration that registers nothing has no subjects
     hook = next(
@@ -478,10 +504,10 @@ async def test_a_moved_device_is_confirmed_from_the_entity_or_the_device(client,
     assert seen["deployments"] == []
     assert (await client.get(by_device, headers=stranger.headers)).status_code in (403, 404)
 
-    for cow_row in cows:
+    for n, cow_row in enumerate(cows):
         made = await client.put(
             f"{base}/{integration['id']}/subjects/{cow_row['id']}",
-            json=chosen,
+            json={**chosen, "attributes": {"ear_tag": f"NL00000000001{n}"}},
             headers=manager.headers,
         )
         assert made.json()["state"] == "registered", made.text

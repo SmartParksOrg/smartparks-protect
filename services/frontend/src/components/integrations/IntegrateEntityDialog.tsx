@@ -152,6 +152,12 @@ function IntegrateForm({
     return day(since > earliest ? since : earliest);
   });
   const [error, setError] = useState<string | null>(null);
+  // the entity's fields the target needs, such as the ear tag number (decision D422)
+  const [fields, setFields] = useState<Record<string, string>>(() =>
+    Object.fromEntries((data.fields ?? []).map((f) => [f.key, f.value ?? ""])),
+  );
+  const missing = (data.fields ?? []).some((f) => !fields[f.key]?.trim());
+  const animalMade = Boolean(data.subject?.external_id);
   const chosen = data.species.find((s) => s.id === species);
   const save = useMutationToast({
     mutationFn: () =>
@@ -159,6 +165,7 @@ function IntegrateForm({
         body: {
           species_id: species,
           species_name: chosen?.name ?? null,
+          attributes: fields,
           history_from: history
             ? new Date(`${from}T00:00:00`).toISOString()
             : null,
@@ -230,6 +237,34 @@ function IntegrateForm({
             </SelectContent>
           </Select>
         </Field>
+        {(data.fields ?? []).map((f) => (
+          <Field
+            key={f.key}
+            label={f.label}
+            htmlFor={`subject-field-${f.key}`}
+            hint={
+              animalMade
+                ? t(
+                    "{{target}} keeps the identifier the animal was made with; a change here stays in Protect.",
+                    { target },
+                  )
+                : t(
+                    "{{target}} uses it as the animal's identifier. It is saved on the entity.",
+                    { target },
+                  )
+            }
+          >
+            <Input
+              id={`subject-field-${f.key}`}
+              required
+              value={fields[f.key] ?? ""}
+              placeholder={f.help ?? undefined}
+              onChange={(e) =>
+                setFields((v) => ({ ...v, [f.key]: e.target.value }))
+              }
+            />
+          </Field>
+        ))}
         <dl className="grid grid-cols-[fit-content(45%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
           <dt className="text-muted-foreground">{t("Device")}</dt>
           <dd>{data.device_name ?? t("none")}</dd>
@@ -279,6 +314,7 @@ function IntegrateForm({
           disabled={
             Boolean(data.blocked) ||
             !species ||
+            missing ||
             (history && !from) ||
             save.isPending
           }

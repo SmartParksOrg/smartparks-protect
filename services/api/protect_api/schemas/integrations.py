@@ -236,13 +236,30 @@ class IntegrationSubjectOptions(BaseModel):
     species: list[SubjectChoiceRead]
     proposed_species_id: str | None = None
     blocked: str | None = Field(default=None, description="Why it cannot be integrated as it is")
+    fields: list["SubjectFieldRead"] = Field(
+        default_factory=list,
+        description="The entity's fields the target needs, asked in the dialog (D422)",
+    )
     subject: IntegrationSubjectRead | None = Field(
         default=None, description="What was chosen before, when the entity is integrated"
     )
 
 
+class SubjectFieldRead(BaseModel):
+    """A field of the entity that a target needs, such as the ear tag number (D422)."""
+
+    key: str
+    label: str
+    help: str | None = None
+    value: str | None = None
+
+
 class IntegrationSubjectWrite(BaseModel):
     species_id: uuid.UUID
+    attributes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Values of the fields the target needs, stored on the entity (D422)",
+    )
     species_name: str | None = Field(default=None, max_length=200)
     history_from: AwareDatetime | None = Field(
         default=None,

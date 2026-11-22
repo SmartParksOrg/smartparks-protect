@@ -3558,5 +3558,7 @@
   "This sensor had {{count}} finished deployments on {{target}} before. {{target}} sets the end of those to this start as well, so their animals' tracks will be wrong after it. This is a fault in {{target}}._other": "Deze sensor had eerder {{count}} afgelopen deployments bij {{target}}. {{target}} zet ook het einde daarvan op deze start, dus de sporen van die dieren kloppen daarna niet meer. Dit is een fout in {{target}}.",
   "Try again": "Opnieuw proberen",
   "Waits for you": "Wacht op u",
-  "This account may not send data to {{target}} yet. Ask its administrator for the rights; nothing reaches {{target}} until then.": "Dit account mag nog geen data naar {{target}} sturen. Vraag de beheerder om de rechten; tot dan bereikt niets {{target}}."
+  "This account may not send data to {{target}} yet. Ask its administrator for the rights; nothing reaches {{target}} until then.": "Dit account mag nog geen data naar {{target}} sturen. Vraag de beheerder om de rechten; tot dan bereikt niets {{target}}.",
+  "{{target}} keeps the identifier the animal was made with; a change here stays in Protect.": "{{target}} houdt de identificatie waarmee het dier is aangemaakt; een wijziging hier blijft in Protect.",
+  "{{target}} uses it as the animal's identifier. It is saved on the entity.": "{{target}} gebruikt het als identificatie van het dier. Het wordt bij de entiteit opgeslagen."
 }

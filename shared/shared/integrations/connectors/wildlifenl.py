@@ -54,6 +54,11 @@ the asked period, not over each deployment's own; a reading moves the animal who
 covers its time. A call is allowed when one of the account's roles is among the scopes the
 server's own API document lists for it; no role passes everything by its name. Which device
 is on which animal is followed in `shared/integrations/deployments.py`.
+
+Read again on 2026-11-22 at ec927bf (API 20261122 on both servers): an animal has an
+`identifier` (at least two characters) where it had a `name`, and the platform wants the ear
+tag number there; Protect sends the entity's `ear_tag` (decision D422). LIVE takes
+`speciesName` for a detection now, like TEST. There is no call to change an animal.
 """
 
 import uuid
@@ -108,6 +113,19 @@ SPECIES_FIELDS = ("speciesName", "speciesID")
 # The keys of an entity's own document that name its species, as the Movebank export reads
 # them (decision D411).
 SPECIES_ATTRIBUTES = ("taxon", "species", "scientific_name")
+# The entity's field that is the animal's identifier on the platform (decision D422).
+IDENTIFIER_ATTRIBUTE = "ear_tag"
+NO_IDENTIFIER = (
+    "WildlifeNL takes the animal's ear tag number as its identifier. Fill in the entity's "
+    "Ear tag number first"
+)
+
+
+def identifier_of(subject: Subject) -> str | None:
+    """The animal's identifier on the platform: the entity's ear tag number (decision D422,
+    Tim, 2026-11-22). The platform asks for at least two characters."""
+    value = str(subject.attributes.get(IDENTIFIER_ATTRIBUTE) or "").strip()
+    return value if len(value) >= 2 else None
 
 
 def sensor_id(integration: IntegrationContext, source: DeliveryItem | Subject) -> str | None:
@@ -438,6 +456,8 @@ class WildlifeNlConnector:
         },
     }
     # The platform's two servers (decision D415). A first integration belongs on Test.
+    # The entity's fields the target needs, asked when integrating (decision D422).
+    subject_fields: ClassVar[tuple[str, ...]] = (IDENTIFIER_ATTRIBUTE,)
     # What an integration of this target forwards, whatever a form sends (decision D421):
     # positions, and a status message's temperature with its accelerometer riding along.
     forwards: ClassVar[dict[str, list[str]]] = {
@@ -634,7 +654,8 @@ class WildlifeNlConnector:
         found = deployment.get("animal")
         animal: dict[str, Any] = found if isinstance(found, dict) else {}
         on = str(animal.get("ID") or deployment.get("animalID") or "") or None
-        name = str(animal.get("name") or "") or None
+        # `identifier` since the platform's API of 2026-11-22, `name` before (D422)
+        name = str(animal.get("identifier") or animal.get("name") or "") or None
         if animal_id is None or on != animal_id:
             return SubjectStatus(
                 registered=False,
@@ -696,8 +717,6 @@ class WildlifeNlConnector:
             ),
             proposed_species_id=str(proposal["ID"]) if proposal else None,
         )
-        if len(subject.entity_name) < 2:
-            options.blocked = "WildlifeNL asks for a name of at least two characters"
         return options
 
     async def register_animal(
@@ -710,8 +729,11 @@ class WildlifeNlConnector:
         species = str(settings.get("species_id") or "")
         if not _is_uuid(species):
             raise PermanentFailure("Choose the entity's species on WildlifeNL first")
+        identifier = identifier_of(subject)
+        if identifier is None:
+            raise PermanentFailure(NO_IDENTIFIER)
         made = await self._client(integration).request(
-            "POST", "/animal/", {"name": subject.entity_name, "speciesID": species}
+            "POST", "/animal/", {"identifier": identifier, "speciesID": species}
         )
         body = made.get("body")
         if not isinstance(body, dict) or not body.get("ID"):

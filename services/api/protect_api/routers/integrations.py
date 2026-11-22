@@ -36,9 +36,17 @@ from protect_api.schemas.integrations import (
     LoginRead,
     LoginRequest,
     SubjectChoiceRead,
+    SubjectFieldRead,
     TargetStatus,
 )
 from shared.bus import RedisStreamsBus, Topic
+from shared.catalog.entity_fields import (
+    FieldDefinition,
+    FieldError,
+    FieldKind,
+    fields_of,
+    validate_attributes,
+)
 from shared.database import get_session
 from shared.enums import (
     BackfillStatus,
@@ -77,6 +85,7 @@ from shared.models import (
     DeviceProjectAssignment,
     Entity,
     EntityCurrentState,
+    EntityType,
     Integration,
     IntegrationDelivery,
     IntegrationDeployment,
@@ -715,6 +724,73 @@ async def _deployment_reads(
 MAX_DEPLOYMENT_ROWS = 200
 
 
+async def _subject_fields(
+    session: AsyncSession, integration: Integration, entity: Entity
+) -> list[FieldDefinition]:
+    """The entity's fields the integration's target needs (decision D422), as the entity's
+    type defines them, else as plain text fields with the standard form of their key."""
+    keys = tuple(getattr(CONNECTORS.get(integration.connector_key), "subject_fields", ()))
+    if not keys:
+        return []
+    entity_type = await session.get(EntityType, entity.entity_type_id)
+    parent = (
+        await session.get(EntityType, entity_type.parent_id)
+        if entity_type is not None and entity_type.parent_id
+        else None
+    )
+    defined = (
+        {
+            f.key: f
+            for f in fields_of(
+                entity_type.key,
+                entity_type.attribute_schema,
+                (parent.key, parent.attribute_schema) if parent else None,
+            )
+        }
+        if entity_type is not None
+        else {}
+    )
+    return [
+        defined.get(key)
+        or FieldDefinition(key=key, label=key.replace("_", " ").capitalize(), kind=FieldKind.TEXT)
+        for key in keys
+    ]
+
+
+async def _store_subject_fields(
+    session: AsyncSession, integration: Integration, entity_id: uuid.UUID, given: dict[str, str]
+) -> dict[str, Any]:
+    """The values a user gave for the fields the target needs, checked as the entity's own
+    fields and stored on the entity; every one of them must have a value (decision D422).
+    Answers what changed, for the audit."""
+    entity = await session.get(Entity, entity_id)
+    if entity is None or entity.project_id != integration.project_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entity not found")
+    fields = await _subject_fields(session, integration, entity)
+    keys = {f.key for f in fields}
+    stray = sorted(set(given) - keys)
+    if stray:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"Not asked here: {', '.join(stray)}"
+        )
+    current = dict(entity.attributes or {})
+    try:
+        checked = validate_attributes(fields, {k: (v.strip() or None) for k, v in given.items()})
+    except FieldError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    changed = {k: v for k, v in checked.items() if current.get(k) != v}
+    merged = {**current, **checked}
+    missing = [f.label for f in fields if not merged.get(f.key)]
+    if missing:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"{CONNECTORS[integration.connector_key].label} needs it: {', '.join(missing)}",
+        )
+    if changed:
+        entity.attributes = merged
+    return changed
+
+
 def _target_refused(exc: Exception) -> HTTPException:
     """A target that refuses or cannot be reached is not our caller's malformed request."""
     code = (
@@ -986,6 +1062,17 @@ async def subject_options(
         ],
         proposed_species_id=options.proposed_species_id,
         blocked=options.blocked,
+        fields=[
+            SubjectFieldRead(
+                key=f.key,
+                label=f.label,
+                help=f.help,
+                value=(str(entity.attributes.get(f.key)) if entity.attributes.get(f.key) else None),
+            )
+            for entity in [await session.get(Entity, entity_id)]
+            if entity is not None
+            for f in await _subject_fields(session, integration, entity)
+        ],
         subject=reads[0] if reads else None,
     )
 
@@ -1015,6 +1102,17 @@ async def integrate_entity(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 f"A history covers at most {MAX_BACKFILL_DAYS} days",
             )
+    changed = await _store_subject_fields(session, integration, entity_id, body.attributes)
+    if changed:
+        await record_audit(
+            session,
+            user=context.user,
+            action="entity.updated",
+            object_type="entity",
+            object_id=str(entity_id),
+            project_id=context.project.id,
+            details={"attributes": changed, "via": "integration"},
+        )
     try:
         row = await integrate(
             session,

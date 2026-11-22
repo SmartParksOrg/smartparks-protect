@@ -213,8 +213,27 @@ describe("IntegrateEntityDialog", () => {
       body: {
         species_id: "s1",
         species_name: "Bos taurus",
+        attributes: {},
         history_from: null,
       },
+    });
+  });
+
+  it("asks the ear tag number when the target needs it (D422)", async () => {
+    const put = open({
+      ...options,
+      proposed_species_id: "s1",
+      fields: [{ key: "ear_tag", label: "Ear tag number", value: null }],
+    });
+    const input = await screen.findByLabelText("Ear tag number");
+    expect(screen.getByText(/uses it as the animal's identifier/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("switch"));
+    expect(screen.getByRole("button", { name: "Integrate" })).toBeDisabled();
+    fireEvent.change(input, { target: { value: "NL123456789012" } });
+    fireEvent.click(screen.getByRole("button", { name: "Integrate" }));
+    await waitFor(() => expect(put).toHaveBeenCalled());
+    expect(put.mock.calls[0]![1]).toMatchObject({
+      body: { attributes: { ear_tag: "NL123456789012" } },
     });
   });
 

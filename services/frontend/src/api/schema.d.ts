@@ -11889,6 +11889,11 @@ export interface components {
              * @description Why it cannot be integrated as it is
              */
             blocked?: string | null;
+            /**
+             * Fields
+             * @description The entity's fields the target needs, asked in the dialog (D422)
+             */
+            fields?: components["schemas"]["SubjectFieldRead"][];
             /** @description What was chosen before, when the entity is integrated */
             subject?: components["schemas"]["IntegrationSubjectRead"] | null;
         };
@@ -11959,6 +11964,13 @@ export interface components {
              * Format: uuid
              */
             species_id: string;
+            /**
+             * Attributes
+             * @description Values of the fields the target needs, stored on the entity (D422)
+             */
+            attributes?: {
+                [key: string]: string;
+            };
             /** Species Name */
             species_name?: string | null;
             /**
@@ -15554,6 +15566,20 @@ export interface components {
             name: string;
             /** Common Name */
             common_name?: string | null;
+        };
+        /**
+         * SubjectFieldRead
+         * @description A field of the entity that a target needs, such as the ear tag number (D422).
+         */
+        SubjectFieldRead: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Help */
+            help?: string | null;
+            /** Value */
+            value?: string | null;
         };
         /** SystemHealth */
         SystemHealth: {

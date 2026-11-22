@@ -62,6 +62,10 @@ others.
 2. Choose **Integrate**. Protect asks the platform and shows:
    - **Species on WildlifeNL**: the platform's own list. When the entity's type matches one of
      its names, that one is chosen already; otherwise pick it.
+   - **Ear tag number**: required. The platform takes it as the animal's identifier (decision
+     D422). Filled in when the entity has one; typed here when it has none, and then saved on
+     the entity as its Ear tag number. Once the animal is made, a change here stays in Protect:
+     the platform cannot change an animal.
    - **Device** and **Sensor id**: how the platform will know this entity's readings.
    - What the platform has for that sensor: on this entity's animal already, or on another
      animal. In the second case integrating moves the sensor here, and the history is sent
@@ -153,7 +157,7 @@ nobody. Before a project goes to LIVE, read the note under "Known limits".
 | --- | --- |
 | position | `POST /borne-sensor-reading/` with `sensorID`, `timestamp`, `location` and `altitude` |
 | status message (device temperature and accelerometer) | `POST /borne-sensor-reading/` without a location: `sensorID`, `timestamp`, `temperature` (the temperature inside the device, °C) and `accelero` (x, y, z in m/s², as Protect stores them) when the device measured all three axes. One request per status message. It moves no animal and raises no alarm. The platform keeps one reading per sensor and timestamp, so a position of the same moment joins it |
-| integrated entity | `POST /animal/` (`name`, the species chosen), then `POST /borne-sensor-deployment/` (`animalID`, `sensorID`, `start` at the start of the device's time on the entity) |
+| integrated entity | `POST /animal/` (`identifier`: the entity's ear tag number, since the platform's API of 2026-11-22; `speciesID`: the species chosen), then `POST /borne-sensor-deployment/` (`animalID`, `sensorID`, `start` at the start of the device's time on the entity) |
 | `SPECIES_DETECTION` event (AddaxAI Connect) | `POST /detection/` per species: `speciesName` or `speciesID` as the server's own API document asks, `deploymentID`, `sensorType`, `location`, `start`, `end`, `uri`, `animals` with the confidence as a percentage |
 | other events | skipped: WildlifeNL has no free-form events |
 | corrected position | a new reading; a reading at the same timestamp replaces the earlier one |
@@ -192,7 +196,9 @@ used for the readings and for the deployment.
   body and the air temperature; read it as such.
 - **Another server is another integration.** The server of an integration cannot change while
   entities are integrated with it, and changing it signs the integration out.
-- **Accelerometer values** are not sent.
+- **An animal cannot be changed.** The platform has no call for it, so an animal keeps the
+  identifier it was made with. A corrected ear tag number reaches the platform only with a new
+  animal.
 - Protect never ends or deletes an animal or a deployment on the platform.
 
 ## Troubleshooting

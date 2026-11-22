@@ -419,7 +419,10 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
                 return httpx.Response(422, json={"title": "Unprocessable Entity"})
             # the platform's own rule: the sensor's deployment before it ends at this start
             active[:] = [d for d in active if d["sensorID"] != body["sensorID"]]
-            active.append({**body, "animal": {"ID": body["animalID"], "name": "Konik 9"}})
+            # the platform's answer since 2026-11-22 names the animal by its identifier
+            active.append(
+                {**body, "animal": {"ID": body["animalID"], "identifier": "NL123456789012"}}
+            )
             return httpx.Response(200, json=body)
         return httpx.Response(404)
 
@@ -432,9 +435,14 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
         entity_name="Konik 9",
         entity_type_label="Konik",
         device_identity="70B3D57ED0009999",
+        attributes={"ear_tag": "NL123456789012"},
     )
     no_device = subject(
-        entity_id=uuid.UUID(int=10), device_identity=None, device_serial=None, device_name=None
+        entity_id=uuid.UUID(int=10),
+        device_identity=None,
+        device_serial=None,
+        device_name=None,
+        attributes={"ear_tag": "NL123456789099"},
     )
     # Konik 3's device moved to Konik 10 in Protect: the platform still has it on Konik 3
     moved = subject(entity_id=uuid.UUID(int=11), entity_name="Konik 10")
@@ -443,6 +451,8 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
     # every species of the platform, by the name a person reads, and the one Protect proposes
     assert [c.common_name for c in options.species] == ["Konik", "Wild boar", "Wolf"]
     assert options.proposed_species_id == HORSE["ID"] and options.blocked is None
+    # the platform calls the animal by its ear tag number, asked when integrating (D422)
+    assert WildlifeNlConnector.subject_fields == ("ear_tag",)
     assert options.sensor_id == "70B3D57ED0009999" and not options.status.registered
     unknown = await connector.options(integration(), subject(entity_type_label="Horse"))
     assert unknown.proposed_species_id is None  # never a guess (D411); the user picks
@@ -468,7 +478,11 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
     animal_id = await connector.register_animal(integration(), new, chosen)
     assert animal_id == "bbbbbbbb-0000-4000-8000-000000000002"
     animals = [c for c in calls if c[:2] == ("POST", "/animal/")]
-    assert animals == [("POST", "/animal/", {"name": "Konik 9", "speciesID": HORSE["ID"]})]
+    assert animals == [
+        ("POST", "/animal/", {"identifier": "NL123456789012", "speciesID": HORSE["ID"]})
+    ]
+    with pytest.raises(PermanentFailure, match="ear tag number"):
+        await connector.register_animal(integration(), subject(entity_id=uuid.UUID(int=12)), chosen)
 
     start = datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
     with pytest.raises(PermanentFailure):
@@ -493,7 +507,7 @@ async def test_an_entity_is_offered_its_species_and_registered_as_chosen(monkeyp
     await connector.deploy(integration(), animal_id, "70B3D57ED0001234", start)
     assert len([c for c in calls if c[0] == "POST"]) == posts + 1
     moved_status = await connector.statuses(integration(), [moved, known])
-    assert moved_status[known.entity_id].elsewhere == "Konik 9"
+    assert moved_status[known.entity_id].elsewhere == "NL123456789012"
 
 
 async def test_an_account_without_the_rights_is_told(monkeypatch):
