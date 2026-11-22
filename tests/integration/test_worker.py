@@ -17,7 +17,7 @@ from protect_integration.worker import (
 )
 from shared.bus import Message, Topic
 from shared.enums import DeliveryStatus, SubjectState
-from shared.integrations.base import PermanentFailure, SubjectOptions, SubjectStatus
+from shared.integrations.base import PermanentFailure, RateLimited, SubjectOptions, SubjectStatus
 from shared.integrations.deliveries import _position_ref as position_ref
 from shared.integrations.deliveries import enqueue, event_ref, matches
 from shared.integrations.deployments import compare, confirm, decline, rewritten_by
@@ -293,6 +293,38 @@ async def test_an_entity_is_integrated_with_its_history_first(db, world):
     await db.commit()
     assert integration.entity_ids == [] and not matches(integration, position_ref(world.position))
     assert await stop(db, integration, world.entity.id) is False
+
+
+async def test_a_rate_limit_on_the_animal_does_not_stop_the_history(db, world):
+    """Decisions D424 and D425: the animal shares the target's pace with the readings. A 429
+    on it queues the history anyway and makes the integration wait; the animal is made on a
+    later cycle, and the deployment still follows the last old object."""
+    await _isolate(db, world)
+    registrar = Registrar()
+    CONNECTORS["fake"] = registrar
+    integration = world.integration
+    chosen = {"species_id": "s1", "species_name": "Diceros bicornis"}
+    row = await integrate(db, integration, world.entity.id, chosen, T0 - timedelta(hours=1), None)
+    await db.commit()
+
+    async def busy(integration, subject, settings):
+        raise RateLimited("fake answered 429", retry_after=20)
+
+    registrar.register_animal = busy
+    assert await handle_backfill(db, {"subject_id": str(row.id)}) == 2
+    await db.refresh(row)
+    assert row.state == SubjectState.SENDING_HISTORY and row.external_id is None
+    assert integration.rate_limited_until is not None
+    assert await finish_histories(db) == {}  # the target asked to wait: not called again
+    del registrar.register_animal
+    integration.rate_limited_until = None
+    await db.commit()
+    assert await finish_histories(db) == {}  # the history still goes, the animal is made
+    await db.refresh(row)
+    assert row.external_id == "animal-1" and not registrar.deployed
+    await deliver_due(db)
+    assert await finish_histories(db) == {"registered": 1}
+    assert registrar.made == 1 and len(registrar.deployed) == 1
 
 
 async def _entity(db, world, name):

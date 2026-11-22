@@ -5,8 +5,9 @@ The row in `integration_subjects` is Protect's own account of it; what the targe
 from the target when somebody asks.
 """
 
+import math
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -15,12 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.enums import DeliveryOrigin, DeliveryStatus, DeploymentState, SubjectState
 from shared.integrations.base import (
     PermanentFailure,
+    RateLimited,
     Subject,
     SubjectDevice,
     SubjectRegistrar,
     TransientFailure,
 )
 from shared.integrations.deliveries import (
+    BACKOFF_BASE_SECONDS,
+    BACKOFF_MAX_SECONDS,
     backfill_entity,
     integration_context,
     primary_identities,
@@ -397,6 +401,28 @@ async def stop(session: AsyncSession, integration: Integration, entity_id: uuid.
     return True
 
 
+async def _animal_while_sending(
+    session: AsyncSession, integration: Integration, row: IntegrationSubject
+) -> bool:
+    """Make the animal of an entity whose history goes (decision D425), without letting the
+    target's pace stop the history: a target that asked to wait is not called, a 429 makes
+    the integration wait (D424) and a target that cannot be reached is asked again on a later
+    cycle. False only when the target refused the animal, which fails the row."""
+    if row.external_id is not None:
+        return True
+    now = utc_now()
+    if integration.rate_limited_until is not None and integration.rate_limited_until > now:
+        return True
+    try:
+        return await make_animal(session, integration, row)
+    except RateLimited as exc:
+        wait = min(math.ceil(exc.retry_after or BACKOFF_BASE_SECONDS), BACKOFF_MAX_SECONDS)
+        integration.rate_limited_until = now + timedelta(seconds=wait)
+    except TransientFailure:
+        pass
+    return True
+
+
 async def send_history(session: AsyncSession, subject_id: uuid.UUID) -> int:
     """The worker's part of a history request: make the entity's animal, so people see it on
     the target at once (decision D425), then queue the entity's old objects, oldest first, and
@@ -410,7 +436,7 @@ async def send_history(session: AsyncSession, subject_id: uuid.UUID) -> int:
     integration = await session.get(Integration, row.integration_id)
     if integration is None:
         return 0
-    if not await make_animal(session, integration, row):
+    if not await _animal_while_sending(session, integration, row):
         await session.commit()
         return 0
     row.history_started_at = utc_now()
@@ -450,6 +476,8 @@ async def finish_histories(session: AsyncSession) -> dict[str, int]:
             .where(*mine, IntegrationDelivery.status == DeliveryStatus.QUEUED)
         )
         if waiting:
+            if row.external_id is None and await _animal_while_sending(session, integration, row):
+                await session.commit()
             continue
         failed = await session.scalar(
             select(func.count())
