@@ -316,6 +316,9 @@ export interface Transport {
 export class TimeoutError extends Error {}
 
 export interface FlashDownload { frames: Uint8Array[]; confirmed: boolean; status: number | null }
+/** A read of all settings: the bytes by catalogue id, whether the device confirmed the end of
+ * the report, the firmware the session's status named, and when. */
+export interface SettingsRead { values: Map<number, Uint8Array>; complete: boolean; firmware: string | null; at: Date }
 
 /** The protocol on top of a transport: requests with matching answers, collectors for streams. */
 export class OpenCollarSession {
@@ -323,6 +326,8 @@ export class OpenCollarSession {
   /** Whether the device's settings come as `[family][id][len][value]`: set from the firmware
    * the status message names (`requestStatus`), the newest until one was read. */
   families = true;
+  /** The firmware the last status of this session named; none until one was read. */
+  firmwareVersion: string | null = null;
   private readonly listeners = new Set<(frame: Frame) => void>();
   private readonly unsubscribe: () => void;
   private queue: Promise<unknown> = Promise.resolve();
@@ -371,6 +376,7 @@ export class OpenCollarSession {
     const frame = await this.request(commandFrame(CMD.sendStatus), (f) => f.port === PORT.status && f.msgId === MSG.status);
     const status = decodeStatus(frame.data);
     this.families = usesFamilies(status.firmwareVersion);
+    this.firmwareVersion = status.firmwareVersion ?? null;
     return status;
   }
 
@@ -389,12 +395,18 @@ export class OpenCollarSession {
    * 3.3), read in the format of the firmware the status named (`families`); the keys are the
    * catalogue's ids of that generation. */
   async requestSettings(timeoutMs = 10000): Promise<Map<number, Uint8Array>> {
+    return (await this.readSettings(timeoutMs)).values;
+  }
+
+  /** All settings with whether the device confirmed the end of its report: only a whole read
+   * is kept as a snapshot of the device's settings (decision D428). */
+  async readSettings(timeoutMs = 10000): Promise<SettingsRead> {
     const values = new Map<number, Uint8Array>();
-    await this.collect(commandFrame(CMD.sendAllSettings), (f) => {
+    const confirmation = await this.collect(commandFrame(CMD.sendAllSettings), (f) => {
       if (f.port === PORT.settings) for (const item of parseTlv(f.raw.slice(1), this.families)) values.set(item.id, item.value);
       return isConfirmation(f, CMD.sendAllSettings);
     }, timeoutMs, 1500);
-    return values;
+    return { values, complete: confirmation !== null, firmware: this.firmwareVersion, at: new Date() };
   }
 
   /** Write one setting; a confirmation is optional, so a quiet second counts as accepted. */

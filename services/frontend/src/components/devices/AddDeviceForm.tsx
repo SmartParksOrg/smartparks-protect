@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { keepSettingsRead } from "@/hooks/useWebBle";
 import {
   type Catalog,
   connectWebBluetooth,
@@ -35,6 +36,7 @@ import {
   hex,
   OpenCollarSession,
   readIdentity,
+  type SettingsRead,
   webBluetoothAvailable,
 } from "@/lib/opencollar-ble";
 
@@ -113,6 +115,9 @@ export function AddDeviceForm({
   // the Bluetooth session lives as long as the form: its frames are synced to the device once
   // it exists, then it is closed
   const session = useRef<OpenCollarSession | null>(null);
+  // the settings read while the device was identified: kept as the new device's first
+  // settings file once it exists (decisions D427 and D428)
+  const settingsRead = useRef<SettingsRead | null>(null);
   useEffect(
     () => () => {
       void session.current?.disconnect();
@@ -163,7 +168,9 @@ export function AddDeviceForm({
           ? { query: { firmware: status.firmwareVersion } }
           : undefined,
       );
-      const values = await active.requestSettings();
+      const read = await active.readSettings();
+      settingsRead.current = read;
+      const values = read.values;
       const found = readIdentity(
         catalog.catalog as unknown as Catalog,
         values,
@@ -245,6 +252,13 @@ export function AddDeviceForm({
               ),
             );
           }
+        }
+        if (settingsRead.current) {
+          // a failure here loses nothing: the frames above hold the same settings
+          await keepSettingsRead(device.id, settingsRead.current).catch(
+            () => null,
+          );
+          settingsRead.current = null;
         }
         await active.disconnect();
         session.current = null;

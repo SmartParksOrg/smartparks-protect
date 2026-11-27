@@ -340,7 +340,7 @@ def test_short_channel_frames_are_decode_failures():
 
 
 def test_catalog_lists_the_protocol_tables():
-    catalog = OpenCollarDriver.catalog("7.3")  # the newest without a version is 8.1.0 (D346)
+    catalog = OpenCollarDriver.catalog("7.3")  # the newest without a version is 8.2.0 (D346)
     settings = {s["name"]: s for s in catalog["settings"]}
     interval = settings["ublox_send_interval"]
     assert {k: interval[k] for k in ("id", "name", "length", "type", "default", "min", "max")} == {

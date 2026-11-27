@@ -20275,6 +20275,351 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/settings-files": {
+   "get": {
+    "tags": [
+     "settings files"
+    ],
+    "summary": "List Settings Files",
+    "description": "The device's settings files, newest first, at most 200.",
+    "operationId": "list_settings_files_api_v1_devices__device_id__settings_files_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettingsFileList"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "settings files"
+    ],
+    "summary": "Upload Settings File",
+    "description": "Keep a file the ble-settings-app exported. A file that names another device's DevEUI is\nrefused. What it says becomes known where it is newer than what Protect has; without an\nexport time it only fills in what Protect does not know.",
+    "operationId": "upload_settings_file_api_v1_devices__device_id__settings_files_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SettingsFileUpload"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettingsFileStored"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/settings-files/snapshot": {
+   "post": {
+    "tags": [
+     "settings files"
+    ],
+    "summary": "Snapshot Settings",
+    "description": "What the browser read from the device over Web Bluetooth (decision D427): every value\nbecomes known at once, and a whole read that differs from the device's newest file is kept\nas a snapshot in the app's format (D428).",
+    "operationId": "snapshot_settings_api_v1_devices__device_id__settings_files_snapshot_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SettingsSnapshotRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettingsSnapshotStored"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/settings-files/current/download": {
+   "get": {
+    "tags": [
+     "settings files"
+    ],
+    "summary": "Download Current Settings",
+    "description": "What Protect knows of the device's settings now, as a file the ble-settings-app\nimports. Settings Protect does not know are left out, as the app leaves out what the\ndevice did not report.",
+    "operationId": "download_current_settings_api_v1_devices__device_id__settings_files_current_download_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "credentials",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "With the device credentials",
+       "default": false,
+       "title": "Credentials"
+      },
+      "description": "With the device credentials"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/settings-files/{file_id}/download": {
+   "get": {
+    "tags": [
+     "settings files"
+    ],
+    "summary": "Download Settings File",
+    "description": "A stored file as it was kept; without `credentials`, or for a person who may not\ncontrol the device, without the credential keys (decision D429).",
+    "operationId": "download_settings_file_api_v1_devices__device_id__settings_files__file_id__download_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "File Id"
+      }
+     },
+     {
+      "name": "credentials",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "With the device credentials",
+       "default": false,
+       "title": "Credentials"
+      },
+      "description": "With the device credentials"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/settings-files/{file_id}": {
+   "delete": {
+    "tags": [
+     "settings files"
+    ],
+    "summary": "Delete Settings File",
+    "description": "Remove a stored file. The settings Protect knows stay as they are.",
+    "operationId": "delete_settings_file_api_v1_devices__device_id__settings_files__file_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "File Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/lp0-credentials": {
    "get": {
     "tags": [
@@ -49709,6 +50054,292 @@
     "type": "object",
     "title": "ServerInvitationResult",
     "description": "What a server admin's invitation did: an invitation mailed (or its link to share), or\nfor an address that already has an account, the memberships added straight away."
+   },
+   "SettingsFileList": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/SettingsFileRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "can_download_credentials": {
+      "type": "boolean",
+      "title": "Can Download Credentials",
+      "description": "The caller may control the device, so a download may hold the credentials"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "can_download_credentials"
+    ],
+    "title": "SettingsFileList"
+   },
+   "SettingsFileRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "description": "upload (a file from the app) or ble (a snapshot)"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "settings_count": {
+      "type": "integer",
+      "title": "Settings Count"
+     },
+     "has_credentials": {
+      "type": "boolean",
+      "title": "Has Credentials"
+     },
+     "firmware_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware Version"
+     },
+     "observed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Observed At"
+     },
+     "uploaded_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Uploaded By User Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "source",
+     "filename",
+     "settings_count",
+     "has_credentials",
+     "firmware_version",
+     "observed_at",
+     "uploaded_by_user_id",
+     "created_at"
+    ],
+    "title": "SettingsFileRead"
+   },
+   "SettingsFileStored": {
+    "properties": {
+     "file": {
+      "$ref": "#/components/schemas/SettingsFileRead"
+     },
+     "created": {
+      "type": "boolean",
+      "title": "Created",
+      "description": "False when the device held the same file already"
+     },
+     "recorded": {
+      "type": "integer",
+      "title": "Recorded",
+      "description": "Settings whose known value changed"
+     },
+     "unknown": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Unknown",
+      "description": "Names the catalogue of the device's firmware lacks"
+     },
+     "invalid": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Invalid",
+      "description": "Names whose value does not fit, with the reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file",
+     "created",
+     "recorded",
+     "unknown",
+     "invalid"
+    ],
+    "title": "SettingsFileStored"
+   },
+   "SettingsFileUpload": {
+    "properties": {
+     "filename": {
+      "type": "string",
+      "maxLength": 255,
+      "minLength": 1,
+      "title": "Filename"
+     },
+     "document": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Document",
+      "description": "The file's JSON: setting name to value"
+     },
+     "exported_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exported At",
+      "description": "When the file was exported, read by the browser from the app's file name; without it the file only fills in settings Protect does not know yet"
+     }
+    },
+    "type": "object",
+    "required": [
+     "filename",
+     "document"
+    ],
+    "title": "SettingsFileUpload",
+    "description": "A file exported by the ble-settings-app, as the browser read it."
+   },
+   "SettingsReadValue": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "maximum": 65535.0,
+      "minimum": 0.0,
+      "title": "Id",
+      "description": "The catalogue id of the firmware named"
+     },
+     "hex": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^([0-9A-Fa-f]{2})*$",
+      "title": "Hex"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "hex"
+    ],
+    "title": "SettingsReadValue"
+   },
+   "SettingsSnapshotRequest": {
+    "properties": {
+     "values": {
+      "items": {
+       "$ref": "#/components/schemas/SettingsReadValue"
+      },
+      "type": "array",
+      "maxItems": 512,
+      "title": "Values"
+     },
+     "firmware": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 32
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware",
+      "description": "The firmware the status of this session named"
+     },
+     "read_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Read At"
+     },
+     "complete": {
+      "type": "boolean",
+      "title": "Complete",
+      "description": "The device confirmed the end of the report; only then a snapshot is kept"
+     }
+    },
+    "type": "object",
+    "required": [
+     "values",
+     "read_at",
+     "complete"
+    ],
+    "title": "SettingsSnapshotRequest",
+    "description": "A read of the device's settings over Web Bluetooth, as the browser got it."
+   },
+   "SettingsSnapshotStored": {
+    "properties": {
+     "recorded": {
+      "type": "integer",
+      "title": "Recorded"
+     },
+     "file": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SettingsFileRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The snapshot, when the read was whole; the newest file when it equals it"
+     },
+     "created": {
+      "type": "boolean",
+      "title": "Created"
+     }
+    },
+    "type": "object",
+    "required": [
+     "recorded",
+     "file",
+     "created"
+    ],
+    "title": "SettingsSnapshotStored"
    },
    "Severity": {
     "type": "string",

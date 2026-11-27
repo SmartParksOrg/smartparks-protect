@@ -7,13 +7,14 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, String, Uuid
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.models.base import Base, TimestampMixin
+from shared.models.base import Base, TimestampMixin, UuidPrimaryKeyMixin
 
-SETTING_SOURCES = ("frame", "ble", "command", "manual")
+SETTING_SOURCES = ("frame", "ble", "command", "manual", "file")
+SETTINGS_FILE_SOURCES = ("upload", "ble")
 SETTING_STATUSES = ("observed", "sent")
 
 
@@ -35,7 +36,7 @@ class DeviceSetting(TimestampMixin, Base):
         String(128), comment="The bytes as the device sent them"
     )
     source: Mapped[str] = mapped_column(
-        String(16), nullable=False, comment="frame, ble, command or manual"
+        String(16), nullable=False, comment="frame, ble, command, manual or file"
     )
     status: Mapped[str] = mapped_column(
         String(16),
@@ -49,5 +50,46 @@ class DeviceSetting(TimestampMixin, Base):
         Uuid, ForeignKey("commands.id", ondelete="SET NULL")
     )
     set_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class DeviceSettingsFile(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """A device's settings as one file in the format of the ble-settings-app (decisions D426
+    and D428): a file a person uploaded from the app, or a snapshot Protect made from a whole
+    read over Web Bluetooth. The document is kept as it came, credentials included; who may
+    download those is decided on the way out (D429)."""
+
+    __tablename__ = "device_settings_files"
+    __table_args__ = (Index("ix_device_settings_files_device_created", "device_id", "created_at"),)
+
+    device_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False
+    )
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, comment="upload (a file from the app) or ble (a snapshot)"
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    document: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        comment="The file: setting name to value, as the app writes it; json, not jsonb, "
+        "so the keys keep the file's order",
+    )
+    sha256: Mapped[str] = mapped_column(
+        String(64), nullable=False, comment="Of the document with sorted keys"
+    )
+    settings_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    has_credentials: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, comment="The document holds at least one credential key"
+    )
+    firmware_version: Mapped[str | None] = mapped_column(
+        String(32), comment="The firmware the device reported when the file arrived"
+    )
+    observed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="When the values were the device's: the read, or the export the browser named",
+    )
+    uploaded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL")
     )

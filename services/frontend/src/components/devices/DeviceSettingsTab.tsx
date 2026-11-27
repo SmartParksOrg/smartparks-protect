@@ -13,6 +13,7 @@ import type {
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { SettingsFilesCard } from "@/components/devices/SettingsFilesCard";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,12 +28,14 @@ import { Switch } from "@/components/ui/switch";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useWebBle } from "@/hooks/useWebBle";
 import { formatAgo } from "@/lib/format";
+import { t } from "@/lib/i18nMark";
 
 const SOURCE_LABELS: Record<string, string> = {
-  frame: "the device reported it",
-  ble: "read over Bluetooth",
-  command: "sent by Protect",
-  manual: "entered by a person",
+  frame: t("the device reported it"),
+  ble: t("read over Bluetooth"),
+  command: t("sent by Protect"),
+  manual: t("entered by a person"),
+  file: t("from a settings file"),
 };
 
 /** A setting's value as words, with its unit. */
@@ -56,10 +59,13 @@ export function DeviceSettingsTab({
   deviceId,
   canControl,
   canRecord,
+  settingsFiles,
 }: {
   deviceId: string;
   canControl: boolean;
   canRecord: boolean;
+  /** The type's driver has settings files (OpenCollar: the ble-settings-app's format). */
+  settingsFiles: boolean;
 }) {
   const { t } = useTranslation();
   const settings = useQuery({
@@ -85,15 +91,11 @@ export function DeviceSettingsTab({
       const session = ble.session;
       if (!session)
         throw new Error(t("The device is not connected over Bluetooth"));
-      const values = await session.requestSettings();
-      await ble.sync("settings", session);
-      return values.size;
+      const read = await ble.readSettings(session);
+      return read?.values.size ?? 0;
     },
     success: (n: number) =>
-      t(
-        "{{count}} settings read over Bluetooth; they are decoded in the background",
-        { count: n },
-      ),
+      t("{{count}} settings read over Bluetooth", { count: n }),
     invalidate: [queryKeys.deviceSettings(deviceId)],
   });
   const request = useMutationToast({
@@ -187,6 +189,9 @@ export function DeviceSettingsTab({
       )}
       {settings.isError && (
         <Callout kind="error">{settings.error.message}</Callout>
+      )}
+      {settingsFiles && (
+        <SettingsFilesCard deviceId={deviceId} settings={s?.items ?? []} />
       )}
       {s && s.items.length === 0 && (
         <Callout kind="info">

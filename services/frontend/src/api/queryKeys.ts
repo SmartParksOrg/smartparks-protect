@@ -62,6 +62,7 @@ export const queryKeys = {
   deviceReporting: (id: string) => ["devices", id, "reporting"] as const,
   deviceBattery: (id: string) => ["devices", id, "battery"] as const,
   deviceSettings: (id: string) => ["devices", id, "settings"] as const,
+  settingsFiles: (id: string) => ["devices", id, "settings-files"] as const,
   deviceSpan: (id: string) => ["devices", id, "span"] as const,
   attributionJobs: (id: string) => ["devices", id, "attribution-jobs"] as const,
   decoding: (id: string) => ["devices", id, "decoding"] as const,

@@ -50,7 +50,7 @@ def test_the_firmware_8_catalogue_addresses_every_setting_by_family_and_id():
     catalogue keeps the address as one id, the two bytes beside it, and the firmware the
     device reports picks the generation (unknown is the newest)."""
     document = driver_catalog_document("opencollar", "8.1")
-    assert document["firmware"] == "8.1.0" and document["applies_from"] == "7.4.0"
+    assert document["firmware"] == "8.2.0" and document["applies_from"] == "7.4.0"
     assert document["families"] is True and "8.1.0" in document["versions"]
     assert document["settings_family"]["lora"] == 5 and document["settings_family"]["gps"] == 6
     by_name = {s["name"]: s for s in document["settings"]}
@@ -66,21 +66,28 @@ def test_the_firmware_8_catalogue_addresses_every_setting_by_family_and_id():
     assert interval["since_firmware"] == "4.4.2" and "disables" in interval["description"]
     assert by_name["lp0_master_key"]["since_firmware"] == "8.1.0"
     assert by_name["lp0_master_key"]["group"] == "LP0 companion"
+    # the pre-release of 8.2.0 (D433): four settings and a command more, the addresses kept
+    assert by_name["lr_enabled"]["id"] == 0x0528 and by_name["lr_enabled"]["type"] == "bool"
+    assert by_name["lr_enabled"]["group"] == "LoRa GNSS and LoRaWAN"
+    assert by_name["ublox_require_time"]["id"] == 0x0619
+    assert by_name["lp0_gps_before_start"]["since_firmware"] == "8.2.0"
+    assert by_name["lp0_discovery_retry_count"]["max"] == 255
     assert len({s["id"] for s in document["settings"]}) == len(document["settings"])
     commands = {c["name"]: c for c in document["commands"]}
     assert commands["cmd_send_single_setting"]["argument_length"] == 2  # family and id
     assert commands["cmd_offload_start"]["since_firmware"] == "8.1.0"
+    assert commands["cmd_recover_sd"]["id"] == 0xD3
     assert all("family" not in c for c in document["commands"])
     # the generations by the firmware a device reports: 7.4 and up are the new one
     assert driver_catalog_document("opencollar", "7.3")["firmware"] == "7.3.0"
     assert driver_catalog_document("opencollar", "6.15")["firmware"] == "7.3.0"
-    assert driver_catalog_document("opencollar", "7.4")["firmware"] == "8.1.0"
-    assert driver_catalog_document("opencollar", "8.0")["firmware"] == "8.1.0"
-    assert driver_catalog_document("opencollar", None)["firmware"] == "8.1.0"
-    assert driver_catalog_document("opencollar", "garbage")["firmware"] == "8.1.0"
+    assert driver_catalog_document("opencollar", "7.4")["firmware"] == "8.2.0"
+    assert driver_catalog_document("opencollar", "8.0")["firmware"] == "8.2.0"
+    assert driver_catalog_document("opencollar", None)["firmware"] == "8.2.0"
+    assert driver_catalog_document("opencollar", "garbage")["firmware"] == "8.2.0"
     assert uses_families("7.3") is False and uses_families("8.1") and uses_families(None)
     assert OpenCollarDriver.catalog("7.2")["firmware"] == "7.3.0"
-    assert OpenCollarDriver.catalog()["firmware"] == "8.1.0"
+    assert OpenCollarDriver.catalog()["firmware"] == "8.2.0"
     # the same names on both sides, bar what 8 added
     older = {s["name"] for s in driver_catalog("opencollar", "7.3")}
     assert older <= set(by_name)
@@ -89,6 +96,10 @@ def test_the_firmware_8_catalogue_addresses_every_setting_by_family_and_id():
         "lp0_signal_checks",
         "lp0_focus_offloading",
         "lp0_statistics_interval",
+        "lp0_gps_before_start",
+        "lp0_discovery_retry_count",
+        "lr_enabled",
+        "ublox_require_time",
     }
 
 

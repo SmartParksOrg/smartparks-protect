@@ -48,6 +48,7 @@ from protect_api.routers.projects import router as projects_router
 from protect_api.routers.records import router as records_router
 from protect_api.routers.rules import router as rules_router
 from protect_api.routers.search import router as search_router
+from protect_api.routers.settings_files import router as settings_files_router
 
 v1_router = APIRouter()
 for router in (
@@ -83,6 +84,7 @@ for router in (
     control_router,
     curation_router,
     log_files_router,
+    settings_files_router,
     offload_router,
     field_bundle_router,
     layers_router,

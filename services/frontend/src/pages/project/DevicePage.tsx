@@ -44,7 +44,7 @@ import { DeviceIntegrationsCard } from "@/components/integrations/DeviceIntegrat
 import { ContactsCard } from "@/components/devices/ContactsCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
 import { UploadLogButton } from "@/components/devices/UploadLogButton";
-import { supportsRawLogs } from "@/lib/capabilities";
+import { hasCapability, supportsRawLogs } from "@/lib/capabilities";
 import { DeviceTraffic } from "@/components/devices/DeviceTraffic";
 import {
   RecordDeliveriesDialog,
@@ -761,6 +761,7 @@ export function DevicePage() {
               deviceId={d.id}
               canControl={can("devices:control")}
               canRecord={Boolean(user?.is_superuser) || can("project:write")}
+              settingsFiles={hasCapability(type, "settings_files")}
             />
           </TabsContent>
           <TabsContent value="connectivity">

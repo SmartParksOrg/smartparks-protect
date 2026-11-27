@@ -8,7 +8,7 @@ Every uplink is `[msg_id][len][data]` on an FPort that selects the message type;
 
 The same messages arrive over other paths (architecture 25, phase 11) and the driver reads them by the delivery's acquisition channel: over Web Bluetooth and in raw log files a frame carries the port in front, `[port][msg_id][len][data]`, and on port 29 the rest of the frame is the stored record stream; over Iridium the payload is the satellite buffer, a stored record stream in the flash storage format. A record's own timestamp stays canonical whichever path delivered it, which is what makes the same fix over LoRaWAN, from a file and over Bluetooth one position with three deliveries. See [OpenCollar over Web Bluetooth](opencollar-webble.md), [raw log files](raw-log-files.md) and [Cloudloop](../integrations/cloudloop/index.md).
 
-The protocol catalogue (settings, commands and readable values, research sections 4.2 to 4.4) ships with the driver in two generations (decision D346): `catalog.json` describes firmware 7.3.0, generated from the research document, and `catalog-v8.json` firmware 8.1.0, built by `scripts/opencollar_catalog_v8.py` from the firmware's own settings table. Firmware 7.4 and later address every setting by a family byte and an id inside it, and a settings record on the wire is `[family][id][len][value]` instead of `[id][len][value]`; the firmware a device reports in its status picks the generation, in the decoder, in the command encoders and in the browser, and an unknown firmware is read as the newest. `GET /devices/{id}/driver-catalog` and `GET /device-types/{id}/driver-catalog` serve it, with `?firmware=` for a version read over Bluetooth just now.
+The protocol catalogue (settings, commands and readable values, research sections 4.2 to 4.4) ships with the driver in two generations (decision D346): `catalog.json` describes firmware 7.3.0, generated from the research document, and `catalog-v8.json` firmware 8.2.0 (its pre-release, decision D433), built by `scripts/opencollar_catalog_v8.py` from the firmware's own settings table. Firmware 7.4 and later address every setting by a family byte and an id inside it, and a settings record on the wire is `[family][id][len][value]` instead of `[id][len][value]`; the firmware a device reports in its status picks the generation, in the decoder, in the command encoders and in the browser, and an unknown firmware is read as the newest. `GET /devices/{id}/driver-catalog` and `GET /device-types/{id}/driver-catalog` serve it, with `?firmware=` for a version read over Bluetooth just now.
 
 ## What the driver produces
 
@@ -77,3 +77,21 @@ Downlinks follow protocol research section 4: commands on FPort 32 as `cmd_id le
 | `RESET` | port 32, `A1 00` (`cmd_reset`) | `devices:control_high_impact` | a rejoin, or a status uplink with the software reset reason |
 
 Commands and settings must not be mixed in one downlink; each action produces one.
+
+## Settings files
+
+The Smart Parks settings app (github.com/SmartParksOrg/ble-settings-app) exports and imports a device's settings as one JSON file. Protect reads and writes that file as it is (decisions D426 to D429), so a device's Settings tab is the place where its files are kept.
+
+The file is a flat object of setting name to value: `true` or `false` for an on/off setting, a number for a number, upper-case hex without separators for a byte array, and four digits for `device_pin` where its bytes are digits. It never holds `tracker_type` or `ble_adv`. It names no firmware, no device and no date; it is keyed by name, so a file of firmware 7 reads on a device with firmware 8 and the other way round.
+
+On the Settings tab, the card "Settings files":
+
+- **Upload** keeps a file you exported in the app. A file with credentials names its device by `device_eui`; a file of another device is refused. A name the catalogue of the device's firmware lacks is skipped and named. What the file says becomes known in Protect where it is newer than what Protect has; the time is read from the app's file name (`SP051463_20261127_101500.json`). A file with another name only fills in the settings Protect does not know yet.
+- **Export current** downloads what Protect knows of the device now, in the same format, for the app's Import.
+- **Download** gives a stored file back as it was.
+- **Compare** shows a file beside what Protect knows now: only the settings that differ.
+- Protect adds a file by itself when it reads all settings over Bluetooth and something differs from the newest file, so the list is the history of the device's settings.
+
+The credentials (`app_key`, `device_eui`, `app_eui`, `device_name`, `device_pin`, the LP0 keys and the S-Band keys, the app's own list) are kept in the stored file. A download holds them only for a person who may control the device and leaves the switch "Downloads with device credentials" on; every such download is in the audit log. Anyone else who may read the device gets the file without them.
+
+The API: `GET` and `POST /devices/{id}/settings-files`, `POST .../settings-files/snapshot` (the browser's Bluetooth read), `GET .../settings-files/current/download`, `GET .../settings-files/{file_id}/download` (both with `?credentials=true`), `DELETE .../settings-files/{file_id}`. At most 200 files are listed and a file is at most 64 kB.

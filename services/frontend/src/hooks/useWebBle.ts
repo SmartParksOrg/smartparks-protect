@@ -9,9 +9,40 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DeviceLogFile, RouteOption } from "@/api/types";
-import { hex, type OpenCollarSession } from "@/lib/opencollar-ble";
+import type {
+  DeviceLogFile,
+  RouteOption,
+  SettingsSnapshotStored,
+} from "@/api/types";
+import {
+  hex,
+  type OpenCollarSession,
+  type SettingsRead,
+} from "@/lib/opencollar-ble";
 import { useWebBleStore, webBleSession } from "@/stores/webble";
+
+/** A settings read as the snapshot endpoint takes it; also used where the device was made
+ * a moment ago and has no session in the store (the Add device form). */
+export async function keepSettingsRead(
+  deviceId: string,
+  read: SettingsRead,
+): Promise<SettingsSnapshotStored | null> {
+  if (read.values.size === 0) return null;
+  return api.post<SettingsSnapshotStored>(
+    `/api/v1/devices/${deviceId}/settings-files/snapshot`,
+    {
+      body: {
+        values: [...read.values].map(([id, value]) => ({
+          id,
+          hex: hex(value),
+        })),
+        firmware: read.firmware,
+        read_at: read.at.toISOString(),
+        complete: read.complete,
+      },
+    },
+  );
+}
 
 export function useWebBle(deviceId: string) {
   const client = useQueryClient();
@@ -61,6 +92,29 @@ export function useWebBle(deviceId: string) {
     [client, deviceId],
   );
 
+  /** Read every setting and hand it to Protect (decisions D427 and D428): the frames as a
+   * sync like any other, the values as known at once, and a whole read as a snapshot in the
+   * device's settings files when it differs from the newest one. */
+  const readSettings = useCallback(
+    async (session?: OpenCollarSession): Promise<SettingsRead | null> => {
+      const active = session ?? webBleSession(deviceId);
+      if (!active) return null;
+      const read = await active.readSettings();
+      await sync("settings", active);
+      await keepSettingsRead(deviceId, read);
+      await Promise.all([
+        client.invalidateQueries({
+          queryKey: queryKeys.deviceSettings(deviceId),
+        }),
+        client.invalidateQueries({
+          queryKey: queryKeys.settingsFiles(deviceId),
+        }),
+      ]);
+      return read;
+    },
+    [client, deviceId, sync],
+  );
+
   const connect = useCallback(
     async (namePrefix?: string): Promise<OpenCollarSession> => {
       const session = await store.connect(deviceId, namePrefix);
@@ -95,6 +149,7 @@ export function useWebBle(deviceId: string) {
     connect,
     disconnect,
     sync,
+    readSettings,
     setStatus: store.setStatus,
     setFlash: store.setFlash,
   };

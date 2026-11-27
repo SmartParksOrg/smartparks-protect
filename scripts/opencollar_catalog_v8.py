@@ -26,17 +26,18 @@ DRIVER = ROOT / "shared" / "shared" / "device_drivers" / "opencollar"
 OLD = DRIVER / "catalog.json"
 OUT = DRIVER / "catalog-v8.json"
 
-FIRMWARE = "8.1.0"
+FIRMWARE = "8.2.0"
 #: The oldest firmware this catalogue applies to: the family format arrived in development
 #: build 7.4 and shipped in 8.0.0 (the settings app's note "Open Collar 8.0.0 settings
 #: migration").
 APPLIES_FROM = "7.4.0"
 SOURCE = (
     "scripts/settings/settings.json of the firmware branch fix/existing-lp0-implementation at "
-    "7bae042 (2026-10-20), as the public ble-settings-app bundles it (settings-v8.1.0.json); "
-    "group, unit, since_firmware and descriptions carried over from catalog.json (firmware "
-    "7.3.0) by name; the additions of 8.0.0 and 8.1.0 described from the firmware's LP0 "
-    "documentation and the settings app's release note"
+    "4b58e4f (2026-11-04), as the public ble-settings-app bundles it (settings-v8.2.0.json, the "
+    "pre-release of 8.2.0; the line was called 8.1 until then); group, unit, since_firmware and "
+    "descriptions carried over from catalog.json (firmware 7.3.0) by name; the additions of "
+    "8.1.0 described from the firmware's LP0 documentation and the settings app's release "
+    "note, those of 8.2.0 from the settings app's settings-meta.json (decision D433)"
 )
 #: What came after the settings app's 7.2.0 file, and when: one setting of 7.3.0 the older
 #: catalogue carries without a version (its table lists it, the app's 7.2.0 file lacks it), and
@@ -50,6 +51,16 @@ SINCE: dict[str, str] = {
     "cmd_flash_clear_confirmed": "8.1.0",
     "cmd_offload_start": "8.1.0",
     "cmd_offload_cancel": "8.1.0",
+    "lr_enabled": "8.2.0",
+    "ublox_require_time": "8.2.0",
+    "lp0_gps_before_start": "8.2.0",
+    "lp0_discovery_retry_count": "8.2.0",
+    "cmd_recover_sd": "8.2.0",
+}
+#: The group of a setting the 7.3.0 catalogue lacks and whose name does not start with `lp0_`.
+GROUPS: dict[str, str] = {
+    "lr_enabled": "LoRa GNSS and LoRaWAN",
+    "ublox_require_time": "u-blox GNSS",
 }
 DESCRIPTIONS: dict[str, str] = {
     "lp0_master_key": (
@@ -81,6 +92,27 @@ DESCRIPTIONS: dict[str, str] = {
     ),
     "cmd_offload_cancel": (
         "Cancel the running offload: the job id as uint32, or 0 for whatever runs. Firmware 8.1."
+    ),
+    "lr_enabled": (
+        "Master switch of the LoRaWAN stack, on by default. The firmware documentation does "
+        "not describe what switching it off does yet. Firmware 8.2."
+    ),
+    "ublox_require_time": (
+        "Not described in the firmware documentation yet; off by default. Firmware 8.2."
+    ),
+    "lp0_gps_before_start": (
+        "Take a u-blox fix before an LP0 offload session starts, so the clock is set from "
+        "the receiver. Meant for offload stations, which timestamp the records they store on "
+        "the SD card. Off by default. Firmware 8.2."
+    ),
+    "lp0_discovery_retry_count": (
+        "Extra discovery attempts a tracker may make inside one discovery interval after a "
+        "failed attempt, 0 to 255; 0 means one attempt per interval. Firmware 8.2."
+    ),
+    "cmd_recover_sd": (
+        "Ask an offload station to check its SD card now: a healthy station sends a fresh "
+        "statistics report on port 23, one with a failed card runs its recovery test. "
+        "Firmware 8.2."
     ),
 }
 LP0_GROUP = "LP0 companion"
@@ -118,7 +150,9 @@ def build(source: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:
             "default": _default(conversion, item.get("default")),
             "min": None if conversion in ("byte_array", "string") else item.get("min"),
             "max": None if conversion in ("byte_array", "string") else item.get("max"),
-            "group": before.get("group") or (LP0_GROUP if name.startswith("lp0_") else None),
+            "group": before.get("group")
+            or GROUPS.get(name)
+            or (LP0_GROUP if name.startswith("lp0_") else None),
             "unit": before.get("unit"),
             "since_firmware": before.get("since_firmware") or SINCE.get(name),
         }
@@ -167,7 +201,7 @@ def build(source: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:
         "settings": settings,
         "commands": commands,
         "values": values,
-        "versions": [*old["versions"], "8.0.0", "8.0.1", "8.0.2", "8.0.3", "8.1.0"],
+        "versions": [*old["versions"], "8.0.0", "8.0.1", "8.0.2", "8.0.3", "8.1.0", "8.2.0"],
     }
 
 

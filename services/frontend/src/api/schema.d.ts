@@ -4873,6 +4873,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/settings-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Settings Files
+         * @description The device's settings files, newest first, at most 200.
+         */
+        get: operations["list_settings_files_api_v1_devices__device_id__settings_files_get"];
+        put?: never;
+        /**
+         * Upload Settings File
+         * @description Keep a file the ble-settings-app exported. A file that names another device's DevEUI is
+         *     refused. What it says becomes known where it is newer than what Protect has; without an
+         *     export time it only fills in what Protect does not know.
+         */
+        post: operations["upload_settings_file_api_v1_devices__device_id__settings_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/settings-files/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snapshot Settings
+         * @description What the browser read from the device over Web Bluetooth (decision D427): every value
+         *     becomes known at once, and a whole read that differs from the device's newest file is kept
+         *     as a snapshot in the app's format (D428).
+         */
+        post: operations["snapshot_settings_api_v1_devices__device_id__settings_files_snapshot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/settings-files/current/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Current Settings
+         * @description What Protect knows of the device's settings now, as a file the ble-settings-app
+         *     imports. Settings Protect does not know are left out, as the app leaves out what the
+         *     device did not report.
+         */
+        get: operations["download_current_settings_api_v1_devices__device_id__settings_files_current_download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/settings-files/{file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Settings File
+         * @description A stored file as it was kept; without `credentials`, or for a person who may not
+         *     control the device, without the credential keys (decision D429).
+         */
+        get: operations["download_settings_file_api_v1_devices__device_id__settings_files__file_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/settings-files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Settings File
+         * @description Remove a stored file. The settings Protect knows stay as they are.
+         */
+        delete: operations["delete_settings_file_api_v1_devices__device_id__settings_files__file_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/lp0-credentials": {
         parameters: {
             query?: never;
@@ -15371,6 +15482,141 @@ export interface components {
             user_id?: string | null;
             /** Added Projects */
             added_projects?: string[];
+        };
+        /** SettingsFileList */
+        SettingsFileList: {
+            /** Items */
+            items: components["schemas"]["SettingsFileRead"][];
+            /** Total */
+            total: number;
+            /**
+             * Can Download Credentials
+             * @description The caller may control the device, so a download may hold the credentials
+             */
+            can_download_credentials: boolean;
+        };
+        /** SettingsFileRead */
+        SettingsFileRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Source
+             * @description upload (a file from the app) or ble (a snapshot)
+             */
+            source: string;
+            /** Filename */
+            filename: string;
+            /** Settings Count */
+            settings_count: number;
+            /** Has Credentials */
+            has_credentials: boolean;
+            /** Firmware Version */
+            firmware_version: string | null;
+            /** Observed At */
+            observed_at: string | null;
+            /** Uploaded By User Id */
+            uploaded_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SettingsFileStored */
+        SettingsFileStored: {
+            file: components["schemas"]["SettingsFileRead"];
+            /**
+             * Created
+             * @description False when the device held the same file already
+             */
+            created: boolean;
+            /**
+             * Recorded
+             * @description Settings whose known value changed
+             */
+            recorded: number;
+            /**
+             * Unknown
+             * @description Names the catalogue of the device's firmware lacks
+             */
+            unknown: string[];
+            /**
+             * Invalid
+             * @description Names whose value does not fit, with the reason
+             */
+            invalid: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * SettingsFileUpload
+         * @description A file exported by the ble-settings-app, as the browser read it.
+         */
+        SettingsFileUpload: {
+            /** Filename */
+            filename: string;
+            /**
+             * Document
+             * @description The file's JSON: setting name to value
+             */
+            document: {
+                [key: string]: unknown;
+            };
+            /**
+             * Exported At
+             * @description When the file was exported, read by the browser from the app's file name; without it the file only fills in settings Protect does not know yet
+             */
+            exported_at?: string | null;
+        };
+        /** SettingsReadValue */
+        SettingsReadValue: {
+            /**
+             * Id
+             * @description The catalogue id of the firmware named
+             */
+            id: number;
+            /** Hex */
+            hex: string;
+        };
+        /**
+         * SettingsSnapshotRequest
+         * @description A read of the device's settings over Web Bluetooth, as the browser got it.
+         */
+        SettingsSnapshotRequest: {
+            /** Values */
+            values: components["schemas"]["SettingsReadValue"][];
+            /**
+             * Firmware
+             * @description The firmware the status of this session named
+             */
+            firmware?: string | null;
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /**
+             * Complete
+             * @description The device confirmed the end of the report; only then a snapshot is kept
+             */
+            complete: boolean;
+        };
+        /** SettingsSnapshotStored */
+        SettingsSnapshotStored: {
+            /** Recorded */
+            recorded: number;
+            /** @description The snapshot, when the read was whole; the newest file when it equals it */
+            file: components["schemas"]["SettingsFileRead"] | null;
+            /** Created */
+            created: boolean;
         };
         /**
          * Severity
@@ -26715,6 +26961,206 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceLogFileRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_settings_files_api_v1_devices__device_id__settings_files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsFileList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_settings_file_api_v1_devices__device_id__settings_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsFileUpload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsFileStored"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    snapshot_settings_api_v1_devices__device_id__settings_files_snapshot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsSnapshotRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsSnapshotStored"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_current_settings_api_v1_devices__device_id__settings_files_current_download_get: {
+        parameters: {
+            query?: {
+                /** @description With the device credentials */
+                credentials?: boolean;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_settings_file_api_v1_devices__device_id__settings_files__file_id__download_get: {
+        parameters: {
+            query?: {
+                /** @description With the device credentials */
+                credentials?: boolean;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_settings_file_api_v1_devices__device_id__settings_files__file_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

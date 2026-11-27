@@ -80,13 +80,13 @@ async def test_the_catalogue_shows_what_is_known_and_a_person_records_a_value(cl
     )
     assert moved.status_code == 200, moved.text
     newer = (await client.get(f"/api/v1/devices/{device['id']}/settings", headers=h)).json()
-    assert newer["firmware"] == "8.1.0" and newer["device_firmware"] == "8.1"
+    assert newer["firmware"] == "8.2.0" and newer["device_firmware"] == "8.1"
     assert (
         next(i for i in newer["items"] if i["key"] == "ublox_send_interval")["setting_id"] == 0x0600
     )
     assert any(i["key"] == "lp0_master_key" for i in newer["items"])
     catalog = (await client.get(f"/api/v1/devices/{device['id']}/driver-catalog", headers=h)).json()
-    assert catalog["catalog"]["firmware"] == "8.1.0" and catalog["catalog"]["families"] is True
+    assert catalog["catalog"]["firmware"] == "8.2.0" and catalog["catalog"]["families"] is True
     older = (
         await client.get(
             f"/api/v1/devices/{device['id']}/driver-catalog",
@@ -102,7 +102,7 @@ async def test_the_catalogue_shows_what_is_known_and_a_person_records_a_value(cl
             headers=h,
         )
     ).json()
-    assert by_type["catalog"]["firmware"] == "8.1.0"
+    assert by_type["catalog"]["firmware"] == "8.2.0"
     back = await client.patch(
         f"/api/v1/devices/{device['id']}", json={"firmware_version": "7.3"}, headers=h
     )

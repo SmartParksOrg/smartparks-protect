@@ -26,9 +26,9 @@ Open the device page of an OpenCollar and use the card "Nearby over Bluetooth".
 
 | Action | Frames | What happens with the answer |
 | --- | --- | --- |
-| Connect | the chooser, then `cmd_send_status` (`20 A4 00`) and `cmd_get_flash_status` (`20 B3 00`) | Battery, temperature, versions, errors and the stored message count are shown; the frames are synced |
+| Connect | the chooser, then `cmd_send_status` (`20 A4 00`), `cmd_get_flash_status` (`20 B3 00`) and `cmd_send_all_settings` (`20 A7 00`) | Battery, temperature, versions, errors and the stored message count are shown; the frames are synced. Every connect reads all settings (decision D427): they are known in Protect at once, and a whole read that differs from the device's newest settings file is kept as a new one (see [settings files](opencollar.md#settings-files)) |
 | Status | the same two commands | Refreshes the card |
-| Settings | `cmd_send_all_settings` (`20 A7 00`); the device answers with several port 3 frames and a confirmation | Every setting of the protocol catalogue of the device's firmware (research 4.4; the 7.3.0 table up to firmware 7.3, the family-addressed 8.1.0 table from 7.4 on, decision D346) with the device's current value; keys and the PIN are masked |
+| Settings | `cmd_send_all_settings` (`20 A7 00`); the device answers with several port 3 frames and a confirmation | Every setting of the protocol catalogue of the device's firmware (research 4.4; the 7.3.0 table up to firmware 7.3, the family-addressed 8.2.0 table from 7.4 on, decision D346) with the device's current value; keys and the PIN are masked |
 | Write a setting | `[03][id][len][value]`, little-endian per the catalogue type; from firmware 7.4 `[03][family][id][len][value]` | The confirmation on port 31 when the firmware sends one; the settings are read again |
 | Logs | `cmd_flash_get_all` port 0 (`20 BB 01 00`); the device streams port 29 frames and confirms | The frames become a log file of channel `webble` on the server (see [raw log files](raw-log-files.md)); the card shows the counts when the decoder is done |
 | Erase | `cmd_flash_clear` (`20 BA 00`) after a confirmation dialog | The flash count is read again |
@@ -64,6 +64,6 @@ page; see [raw log files](raw-log-files.md).
 - `services/frontend/src/components/devices/WebBleCard.tsx`: the card.
 - `shared/device_drivers/opencollar/catalog.json` and `catalog-v8.json`: the settings, commands
   and values of the protocol for firmware 7.3.0 (generated from the research document) and
-  8.1.0 (`scripts/opencollar_catalog_v8.py`), served by `GET /devices/{id}/driver-catalog` for
+  8.2.0 (`scripts/opencollar_catalog_v8.py`), served by `GET /devices/{id}/driver-catalog` for
   the firmware the device's status named. The browser reads the status first: it says whether
   the settings come with a family byte, and which catalogue names them.

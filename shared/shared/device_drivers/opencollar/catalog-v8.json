@@ -1,8 +1,8 @@
 {
- "firmware": "8.1.0",
+ "firmware": "8.2.0",
  "applies_from": "7.4.0",
  "families": true,
- "source": "scripts/settings/settings.json of the firmware branch fix/existing-lp0-implementation at 7bae042 (2026-10-20), as the public ble-settings-app bundles it (settings-v8.1.0.json); group, unit, since_firmware and descriptions carried over from catalog.json (firmware 7.3.0) by name; the additions of 8.0.0 and 8.1.0 described from the firmware's LP0 documentation and the settings app's release note",
+ "source": "scripts/settings/settings.json of the firmware branch fix/existing-lp0-implementation at 4b58e4f (2026-11-04), as the public ble-settings-app bundles it (settings-v8.2.0.json, the pre-release of 8.2.0; the line was called 8.1 until then); group, unit, since_firmware and descriptions carried over from catalog.json (firmware 7.3.0) by name; the additions of 8.1.0 described from the firmware's LP0 documentation and the settings app's release note, those of 8.2.0 from the settings app's settings-meta.json (decision D433)",
  "settings_family": {
   "old": 0,
   "reserved_special": 1,
@@ -1027,7 +1027,7 @@
    "name": "lp0_signal_checks",
    "length": 6,
    "type": "byte_array",
-   "default": "010101640114",
+   "default": "010101640014",
    "min": null,
    "max": null,
    "group": "LP0 companion",
@@ -1049,6 +1049,51 @@
    "unit": null,
    "since_firmware": "8.1.0",
    "description": "Seconds between an offload station's reports of itself on port 23; 0 disables them. Firmware 8.1."
+  },
+  {
+   "id": 1320,
+   "family": 5,
+   "wire_id": 40,
+   "name": "lr_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": true,
+   "min": false,
+   "max": true,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "8.2.0",
+   "description": "Master switch of the LoRaWAN stack, on by default. The firmware documentation does not describe what switching it off does yet. Firmware 8.2."
+  },
+  {
+   "id": 1321,
+   "family": 5,
+   "wire_id": 41,
+   "name": "lp0_gps_before_start",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "8.2.0",
+   "description": "Take a u-blox fix before an LP0 offload session starts, so the clock is set from the receiver. Meant for offload stations, which timestamp the records they store on the SD card. Off by default. Firmware 8.2."
+  },
+  {
+   "id": 1322,
+   "family": 5,
+   "wire_id": 42,
+   "name": "lp0_discovery_retry_count",
+   "length": 1,
+   "type": "uint8",
+   "default": 0,
+   "min": 0,
+   "max": 255,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "8.2.0",
+   "description": "Extra discovery attempts a tracker may make inside one discovery interval after a failed attempt, 0 to 255; 0 means one attempt per interval. Firmware 8.2."
   },
   {
    "id": 1536,
@@ -1404,6 +1449,21 @@
    "group": "u-blox GNSS",
    "unit": null,
    "since_firmware": "6.15.0"
+  },
+  {
+   "id": 1561,
+   "family": 6,
+   "wire_id": 25,
+   "name": "ublox_require_time",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true,
+   "group": "u-blox GNSS",
+   "unit": null,
+   "since_firmware": "8.2.0",
+   "description": "Not described in the firmware documentation yet; off by default. Firmware 8.2."
   },
   {
    "id": 1792,
@@ -2145,6 +2205,13 @@
    "argument_length": 1,
    "description": "Erase whole flash sectors from the oldest records on, as long as every record in them was confirmed delivered over the given medium (or any). Firmware 8.1.",
    "since_firmware": "8.1.0"
+  },
+  {
+   "id": 211,
+   "name": "cmd_recover_sd",
+   "argument_length": 0,
+   "description": "Ask an offload station to check its SD card now: a healthy station sends a fresh statistics report on port 23, one with a failed card runs its recovery test. Firmware 8.2.",
+   "since_firmware": "8.2.0"
   }
  ],
  "values": [
@@ -2347,6 +2414,7 @@
   "8.0.1",
   "8.0.2",
   "8.0.3",
-  "8.1.0"
+  "8.1.0",
+  "8.2.0"
  ]
 }

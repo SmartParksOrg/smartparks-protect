@@ -236,6 +236,18 @@ export function WebBleCard({
         );
       }
       await ble.sync("connect", session);
+      // every connect brings the device's settings to Protect (decision D427); a device
+      // that does not answer (PIN locked) stays connected without them
+      try {
+        const read = await ble.readSettings(session);
+        if (read) setSettings(read.values);
+      } catch (error) {
+        toast.info(
+          t("Connected; the settings could not be read ({{reason}}).", {
+            reason: describe(error),
+          }),
+        );
+      }
     });
   }
 
@@ -267,8 +279,8 @@ export function WebBleCard({
     const session = ble.session;
     if (!session) return;
     await run("Settings", async () => {
-      setSettings(await session.requestSettings());
-      await ble.sync("settings", session);
+      const read = await ble.readSettings(session);
+      if (read) setSettings(read.values);
     });
   }
 
@@ -283,8 +295,8 @@ export function WebBleCard({
         toast.success(
           `${setting.name} written${confirmed === null ? " (no confirmation from the device)" : ""}`,
         );
-      setSettings(await session.requestSettings());
-      await ble.sync("settings", session);
+      const read = await ble.readSettings(session);
+      if (read) setSettings(read.values);
     });
   }
 

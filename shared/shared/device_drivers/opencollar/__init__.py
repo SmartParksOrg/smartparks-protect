@@ -38,6 +38,7 @@ from shared.device_drivers.base import (
     SourceEventData,
     TimestampSemantics,
 )
+from shared.device_drivers.opencollar import settings_file
 from shared.device_drivers.opencollar.control import CONTROL_ACTIONS
 from shared.enums import AcquisitionChannel, ErrorCode, Severity
 from shared.trace import ApplicationError
@@ -48,7 +49,7 @@ DECODER_VERSION = "fw7.3.0"
 #: byte and an id inside it, and a settings record on the wire is `[family][id][len][value]`;
 #: that catalogue keeps the address as one `id` (family << 8 | id) with `family` and
 #: `wire_id` beside it, so every lookup by id works on both. `catalog.json` is firmware 7.3.0,
-#: `catalog-v8.json` is 8.1.0, built by `scripts/opencollar_catalog_v8.py`.
+#: `catalog-v8.json` is 8.2.0, built by `scripts/opencollar_catalog_v8.py`.
 CATALOG_PATH = Path(__file__).with_name("catalog.json")
 CATALOG_V8_PATH = Path(__file__).with_name("catalog-v8.json")
 #: Where the family format starts: development build 7.4, shipped in 8.0.0.
@@ -481,6 +482,7 @@ class OpenCollarDriver:
             "accelerometer",
             "flash_logging",
             "remote_settings",
+            "settings_files",
             "fence",
             "external_switch",
             "ble_scanner",
@@ -938,12 +940,15 @@ class OpenCollarDriver:
             DecodedState(time=time, state={"open_sky": results}, record_type="open_sky")
         )
 
+    #: The settings file of the ble-settings-app, read and written (decision D426).
+    settings_file: ClassVar[Any] = settings_file
+
     @staticmethod
     def catalog(firmware: str | None = None) -> dict[str, Any]:
         """Settings, commands and values of the protocol (research sections 4.2 to 4.4) for the
         firmware a device reports, for the WebBLE settings editor, the device's settings tab and
         the documentation: `catalog.json` (7.3.0, generated from the research document) up to
-        7.3, `catalog-v8.json` (8.1.0, `scripts/opencollar_catalog_v8.py`) from 7.4 on, the
+        7.3, `catalog-v8.json` (8.2.0, `scripts/opencollar_catalog_v8.py`) from 7.4 on, the
         newest for an unknown version (decision D346)."""
         return dict(catalog_for(firmware))
 
