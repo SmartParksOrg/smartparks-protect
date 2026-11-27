@@ -79,7 +79,8 @@ def test_what_the_app_reads_on_import_is_read_too():
         "app_key": "{0x8B, 0xCD, 0x49, 0x42, 0x11, 0x67, 0xDD, 0x03, "
         "0xBA, 0xD3, 0xAE, 0xEA, 0x98, 0xEF, 0xE4, 0x09}",
         "device_pin": "0A0B0C0D",
-        "tracker_type": 5,  # never imported by the app
+        "tracker_type": 5,  # in a file since the app's 9109e1f
+        "ble_adv": True,
     }
     values = read_settings_file(loose, catalog).values
     assert values == {
@@ -88,10 +89,15 @@ def test_what_the_app_reads_on_import_is_read_too():
         "ublox_send_interval": 600,
         "app_key": "8bcd49421167dd03bad3aeea98efe409",
         "device_pin": "0a0b0c0d",
+        "tracker_type": 5,
+        "ble_adv": True,
     }
     # a PIN that is no four digits goes back as its hex
     assert write_settings_file(values, catalog)["device_pin"] == "0A0B0C0D"
-    assert "tracker_type" not in write_settings_file({"tracker_type": 5}, catalog)
+    assert write_settings_file({"tracker_type": 5, "ble_adv": False}, catalog) == {
+        "tracker_type": 5,
+        "ble_adv": False,
+    }
 
 
 def test_unknown_names_and_values_that_do_not_fit_are_named():

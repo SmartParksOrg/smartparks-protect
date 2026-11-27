@@ -195,7 +195,8 @@ async def test_a_bluetooth_read_becomes_known_and_a_snapshot_when_it_changed(cli
         )
     ).json()
     assert document["ublox_send_interval"] == 900 and document["device_name"] == "SP051463"
-    assert "tracker_type" not in document and isinstance(document["led_enabled"], bool)
+    assert "tracker_type" in document and "ble_adv" in document  # the whole table
+    assert isinstance(document["led_enabled"], bool)
 
     # a second read without a change keeps the one file
     body["read_at"] = (now + timedelta(seconds=30)).isoformat()

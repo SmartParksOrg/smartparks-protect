@@ -225,8 +225,8 @@ describe("a device's settings by topic", () => {
     expect(groups.map((g) => g.title)).toContain("Advanced fix settings");
   });
 
-  it("does not wait for the settings a settings file never holds", () => {
-    // a device known from an uploaded file: everything but tracker_type and ble_adv
+  it("does not wait for the two settings older settings files lack", () => {
+    // a device known from a file of before 2026-11-27: all but tracker_type and ble_adv
     const fromFile = context("catalog-v8.json", "8.2", {
       tracker_type: null,
       ble_adv: null,

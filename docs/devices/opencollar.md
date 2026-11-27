@@ -82,7 +82,7 @@ Commands and settings must not be mixed in one downlink; each action produces on
 
 The Smart Parks settings app (github.com/SmartParksOrg/ble-settings-app) exports and imports a device's settings as one JSON file. Protect reads and writes that file as it is (decisions D426 to D429), so a device's Settings tab is the place where its files are kept.
 
-The file is a flat object of setting name to value: `true` or `false` for an on/off setting, a number for a number, upper-case hex without separators for a byte array, and four digits for `device_pin` where its bytes are digits. It never holds `tracker_type` or `ble_adv`. It names no firmware, no device and no date; it is keyed by name, so a file of firmware 7 reads on a device with firmware 8 and the other way round.
+The file is a flat object of setting name to value: `true` or `false` for an on/off setting, a number for a number, upper-case hex without separators for a byte array, and four digits for `device_pin` where its bytes are digits. It holds every setting the device reported; a file exported before 27 November 2026 lacks `tracker_type` and `ble_adv`, which the app left out until then. It names no firmware, no device and no date; it is keyed by name, so a file of firmware 7 reads on a device with firmware 8 and the other way round.
 
 On the Settings tab, the card "Settings files":
 

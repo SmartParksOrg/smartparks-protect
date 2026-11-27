@@ -1,6 +1,6 @@
 """The settings file of the Smart Parks ble-settings-app, read and written as the app does
 (decision D426). The file is a flat JSON object of setting name to value, read from the app at
-b94d3be (2026-11-26): `exportToJson` and `importFromJson` in `index.html`, `exportSettingValue`,
+9109e1f (2026-11-27): `exportToJson` and `importFromJson` in `index.html`, `exportSettingValue`,
 `normalizeDevicePinStorageValue` and `credentialSettingKeys` in `functions.js`.
 
 - an on/off setting is `true` or `false`, a number is a number;
@@ -8,7 +8,9 @@ b94d3be (2026-11-26): `exportToJson` and `importFromJson` in `index.html`, `expo
   commas, so those are read too);
 - `device_pin` is its four digits where every byte is a digit ("1234" for 01 02 03 04), the
   hex otherwise;
-- `tracker_type` and `ble_adv` are never in a file;
+- every setting the device reported is in a file. Until the app's 9109e1f (2026-11-27)
+  `tracker_type` and `ble_adv` were left out of every export and skipped on import; a file
+  from before that day lacks the two;
 - the file names no firmware, no device and no date. It is keyed by name, so a file of
   firmware 7 reads against the catalogue of firmware 8 and the other way round.
 
@@ -44,8 +46,11 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
         "s_band_dev_adr",
     }
 )
-#: Never exported and never imported by the app (`excludeFromImportExport`).
-EXCLUDED_KEYS: frozenset[str] = frozenset({"tracker_type", "ble_adv"})
+#: Switching Bluetooth advertising off leaves a device nothing finds over Bluetooth again
+#: until a downlink switches it back on. The app imports the setting like any other but
+#: leaves such a change unticked in its preview and asks before writing it; whatever writes
+#: a file to a device in Protect must do the same.
+BLUETOOTH_SWITCH_KEY = "ble_adv"
 #: The setting that names the device a file with credentials was exported from.
 IDENTITY_KEY = "device_eui"
 PIN_KEY = "device_pin"
@@ -133,8 +138,6 @@ def read_settings_file(document: Any, catalog: list[dict[str, Any]]) -> ParsedSe
     parsed = ParsedSettingsFile()
     for key, value in document.items():
         name = str(key)
-        if name in EXCLUDED_KEYS:
-            continue
         item = by_name.get(name)
         if item is None:
             parsed.unknown.append(name)
@@ -182,7 +185,7 @@ def write_settings_file(
     document: dict[str, Any] = {}
     for item in catalog:
         name = str(item.get("name"))
-        if name in EXCLUDED_KEYS or name not in values or values[name] is None:
+        if name not in values or values[name] is None:
             continue
         if not include_credentials and name in CREDENTIAL_KEYS:
             continue

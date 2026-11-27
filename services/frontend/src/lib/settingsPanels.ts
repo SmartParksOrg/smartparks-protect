@@ -46,8 +46,9 @@ export const KNOWN_CONTROLS = new Set([
   "vhf-preview",
 ]);
 
-/** Settings the app never puts in a settings file (`tracker_type`, `ble_adv`): a device
- * known from a file never has them, so a topic does not wait for them to say its sentence. */
+/** Settings the app left out of every settings file until 2026-11-27 (its 9109e1f): a device
+ * known from an older file does not have them, so a topic does not wait for them to say its
+ * sentence. */
 const NEVER_IN_A_FILE = new Set(["tracker_type", "ble_adv"]);
 
 /** Ports that carry no message type a flag can switch (the app's `skipPorts`). */

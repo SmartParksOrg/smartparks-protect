@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/SmartParksOrg/ble-settings-app",
-  "commit": "4e7292e07a36b2161ff3f36e820b2ed5ca17889c",
-  "committed": "2026-11-27T12:44:44+01:00",
+  "commit": "9109e1f957239aa64e8785725879c5fcaa41bf47",
+  "committed": "2026-11-27T14:22:48+01:00",
   "files": {
     "settings-meta.json": "51a3ee38f7354da727ad63abbecb8dc5e7cb720c143c31278221f1c5817374aa",
     "panel-definitions.js": "9d03293758292c9a9d4c95a264cc62da7b3acb44cb75f8882407de9750be37d7",
