@@ -46,6 +46,10 @@ export const KNOWN_CONTROLS = new Set([
   "vhf-preview",
 ]);
 
+/** Settings the app never puts in a settings file (`tracker_type`, `ble_adv`): a device
+ * known from a file never has them, so a topic does not wait for them to say its sentence. */
+const NEVER_IN_A_FILE = new Set(["tracker_type", "ble_adv"]);
+
 /** Ports that carry no message type a flag can switch (the app's `skipPorts`). */
 const SKIP_PORTS = new Set([
   "port_lr_messaging",
@@ -418,7 +422,9 @@ export function buildPanels(context: PanelContext): PanelView[] {
       advanced: false,
     });
     if (rows.length === 0) continue;
-    const keys = allKeys(panel.fields);
+    const keys = allKeys(panel.fields).filter(
+      (key) => knows(key) || !NEVER_IN_A_FILE.has(key),
+    );
     const known = keys.filter(knows).length;
     // a topic the app gives no sentence says its first setting, which is its switch
     const first = rows[0];

@@ -225,6 +225,21 @@ describe("a device's settings by topic", () => {
     expect(groups.map((g) => g.title)).toContain("Advanced fix settings");
   });
 
+  it("does not wait for the settings a settings file never holds", () => {
+    // a device known from an uploaded file: everything but tracker_type and ble_adv
+    const fromFile = context("catalog-v8.json", "8.2", {
+      tracker_type: null,
+      ble_adv: null,
+      device_name: "SP051307",
+    });
+    const device = buildPanels(fromFile).find((v) => v.id === "device")!;
+    expect(device.summary).toContain("SP051307.");
+    expect(device.known).toBe(device.total);
+    expect(
+      fields(device.rows).find((f) => f.label === "Tracker type")!.value,
+    ).toBeNull();
+  });
+
   it("does not wait for settings that came after the device's firmware", () => {
     const settings = [
       { key: "lr_region", type: "uint8", value: 1, since_firmware: "4.4.2" },
