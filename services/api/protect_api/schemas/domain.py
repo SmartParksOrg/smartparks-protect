@@ -798,6 +798,14 @@ class DeviceSettingsRead(BaseModel):
         default=None, description="The firmware the device reported"
     )
     known: int
+    families: bool = Field(
+        default=False,
+        description="The catalogue addresses settings by family and id (firmware 7.4 and later)",
+    )
+    ports: dict[str, int] = Field(
+        default_factory=dict,
+        description="The message ports by name, for the settings that hold a bit per port",
+    )
     items: list[DeviceSettingRead]
 
 

@@ -66,6 +66,7 @@ async def test_the_catalogue_shows_what_is_known_and_a_person_records_a_value(cl
     device_id = uuid.UUID(device["id"])
     listed = (await client.get(f"/api/v1/devices/{device['id']}/settings", headers=h)).json()
     assert listed["driver_key"] == "opencollar" and listed["firmware"] == "7.3.0"
+    assert listed["families"] is False and listed["ports"]["port_status"] == 4
     assert listed["known"] == 0 and len(listed["items"]) >= 120
     interval = next(i for i in listed["items"] if i["key"] == "ublox_send_interval")
     assert (

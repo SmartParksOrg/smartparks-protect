@@ -1095,6 +1095,8 @@ async def device_settings(
         firmware=str(document.get("firmware")) if document.get("firmware") else None,
         device_firmware=device.firmware_version,
         known=len([i for i in items if i.value is not None]),
+        families=bool(document.get("families")),
+        ports={str(k): int(v) for k, v in (document.get("ports") or {}).items()},
         items=items,
     )
 

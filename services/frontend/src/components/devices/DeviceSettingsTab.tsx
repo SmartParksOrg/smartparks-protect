@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Bluetooth, Check, Pencil, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -14,6 +14,7 @@ import type {
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { SettingsFilesCard } from "@/components/devices/SettingsFilesCard";
+import { SettingsPanels } from "@/components/devices/SettingsPanels";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,11 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { useWebBle } from "@/hooks/useWebBle";
 import { formatAgo } from "@/lib/format";
 import { t } from "@/lib/i18nMark";
+import {
+  buildPanels,
+  displayName,
+  settingsOfFirmware,
+} from "@/lib/settingsPanels";
 
 const SOURCE_LABELS: Record<string, string> = {
   frame: t("the device reported it"),
@@ -83,6 +89,7 @@ export function DeviceSettingsTab({
   const [filter, setFilter] = useState("");
   const [unknownToo, setUnknownToo] = useState(true);
   const [editing, setEditing] = useState<DeviceSetting | null>(null);
+  const [allOpen, setAllOpen] = useState(false);
   // a device connected in this browser reports its whole table over Bluetooth for free;
   // over LoRaWAN or satellite a full report costs power and arrives in one part only
   const ble = useWebBle(deviceId);
@@ -116,11 +123,28 @@ export function DeviceSettingsTab({
     (actions.data ?? []).filter((a) => a.available).map((a) => a.key),
   );
   const s = settings.data;
+  // the topics, names and rules are those of the Smart Parks settings app, which knows
+  // OpenCollar devices alone (decision D432)
+  const named = s?.driver_key === "opencollar";
+  const topics = useMemo(
+    () =>
+      s && named
+        ? buildPanels({
+            settings: settingsOfFirmware(s.items, s.device_firmware ?? null),
+            families: s.families ?? false,
+            ports: s.ports ?? {},
+            firmware: s.device_firmware ?? null,
+          })
+        : [],
+    [s, named],
+  );
   const rows = (s?.items ?? []).filter(
     (row) =>
       (unknownToo || row.value !== null) &&
       (!filter ||
         row.key.includes(filter.toLowerCase()) ||
+        (named &&
+          displayName(row.key).toLowerCase().includes(filter.toLowerCase())) ||
         (row.description ?? "").toLowerCase().includes(filter.toLowerCase()) ||
         (row.group ?? "").toLowerCase().includes(filter.toLowerCase())),
   );
@@ -128,16 +152,6 @@ export function DeviceSettingsTab({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder={t("Filter settings")}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="h-8 max-w-xs"
-        />
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={unknownToo} onCheckedChange={setUnknownToo} />
-          {t("Show unknown settings")}
-        </label>
         <span className="text-xs text-muted-foreground">
           {s &&
             t(
@@ -190,6 +204,7 @@ export function DeviceSettingsTab({
       {settings.isError && (
         <Callout kind="error">{settings.error.message}</Callout>
       )}
+      {topics.length > 0 && <SettingsPanels views={topics} />}
       {settingsFiles && (
         <SettingsFilesCard deviceId={deviceId} settings={s?.items ?? []} />
       )}
@@ -198,6 +213,32 @@ export function DeviceSettingsTab({
           {t("This device type's driver publishes no settings catalogue.")}
         </Callout>
       )}
+      {s && s.items.length > 0 && (
+        <details
+          className="group/all space-y-3"
+          open={topics.length === 0 || allOpen}
+          onToggle={(e) => setAllOpen(e.currentTarget.open)}
+        >
+          <summary className="cursor-pointer text-sm font-medium">
+            {t("All settings")}
+            <span className="ml-2 font-normal text-muted-foreground">
+              {t(
+                "every setting by its firmware name, with where its value came from; change one with the pencil",
+              )}
+            </span>
+          </summary>
+          <div className="flex flex-wrap items-center gap-2 pt-3">
+            <Input
+              placeholder={t("Filter settings")}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="h-8 max-w-xs"
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={unknownToo} onCheckedChange={setUnknownToo} />
+              {t("Show unknown settings")}
+            </label>
+          </div>
       {groups.map((group) => (
         <div key={group} className="rounded-md border">
           <div className="border-b bg-muted/40 px-3 py-1.5 text-sm font-medium">
@@ -214,6 +255,7 @@ export function DeviceSettingsTab({
                     className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-t px-3 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.6fr)_auto] sm:items-start ${known ? "" : "text-muted-foreground"}`}
                   >
                     <div className="min-w-0 sm:col-start-1 sm:row-start-1">
+                      {named && <div>{displayName(row.key)}</div>}
                       <div className="font-mono text-xs break-all">
                         {row.key}
                       </div>
@@ -273,6 +315,8 @@ export function DeviceSettingsTab({
           </div>
         </div>
       ))}
+        </details>
+      )}
       <SettingDialog
         deviceId={deviceId}
         setting={editing}

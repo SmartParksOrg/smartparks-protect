@@ -9438,6 +9438,19 @@ export interface components {
             device_firmware?: string | null;
             /** Known */
             known: number;
+            /**
+             * Families
+             * @description The catalogue addresses settings by family and id (firmware 7.4 and later)
+             * @default false
+             */
+            families: boolean;
+            /**
+             * Ports
+             * @description The message ports by name, for the settings that hold a bit per port
+             */
+            ports?: {
+                [key: string]: number;
+            };
             /** Items */
             items: components["schemas"]["DeviceSettingRead"][];
         };

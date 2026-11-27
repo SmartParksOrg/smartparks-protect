@@ -1,0 +1,1778 @@
+{
+  "version": 2,
+  "categories": {
+    "device": {
+      "title": "Device",
+      "order": 10,
+      "settings": [
+        "device_name",
+        "device_pin",
+        "led_enabled",
+        "tracker_type",
+        "init_time",
+        "check_error_interval"
+      ]
+    },
+    "status": {
+      "title": "Status reports",
+      "order": 20,
+      "settings": [
+        "status_send_interval"
+      ]
+    },
+    "gps": {
+      "title": "Positioning (GPS)",
+      "order": 30,
+      "settings": [
+        "ublox_send_interval",
+        "ublox_multiple_intervals",
+        "ublox_interval1_start",
+        "ublox_send_interval_2",
+        "ublox_interval2_start",
+        "ublox_active_tracking",
+        "gps_resend_interval",
+        "enable_motion_trig_gps",
+        "motion_ths",
+        "gps_skipped_triggered_interval",
+        "gps_triggered_interval",
+        "gps_motion_triggered_min_num_of_triggers_per_interval",
+        "horizontal_accuracy",
+        "cold_fix_timeout",
+        "cold_fix_retry",
+        "hot_fix_timeout",
+        "hot_fix_retry",
+        "ublox_min_satellites",
+        "ublox_min_satellites_timer",
+        "ublox_min_fix_time",
+        "ublox_require_time",
+        "ublox_leave_on",
+        "gps_backoff_factor",
+        "ublox_cold_fix_hour_interval",
+        "gps_init_lat",
+        "gps_init_lon",
+        "ublox_switch_interval"
+      ]
+    },
+    "outdoor": {
+      "title": "Outdoor detection",
+      "order": 40,
+      "settings": [
+        "outdoor_detection_enabled",
+        "outdoor_detection_tau",
+        "outdoor_detection_parameters"
+      ]
+    },
+    "lorawan": {
+      "title": "Network (LoRaWAN)",
+      "order": 50,
+      "settings": [
+        "lr_enabled",
+        "lr_region",
+        "lr_adr",
+        "lr_adr_profile",
+        "rejoin_interval",
+        "device_eui",
+        "app_eui",
+        "app_key",
+        "lr_max_confirm_fail",
+        "lr_join_flag",
+        "lr_confirm_flag",
+        "lr_send_flag"
+      ]
+    },
+    "lr_messaging": {
+      "title": "Messaging",
+      "order": 60,
+      "settings": [
+        "lr_messaging_retry_interval",
+        "lr_messaging_retry_count"
+      ]
+    },
+    "logs": {
+      "title": "Data storage (flash)",
+      "order": 70,
+      "settings": [
+        "data_log",
+        "flash_store_flag",
+        "flash_status_interval"
+      ]
+    },
+    "satellite": {
+      "title": "Iridium satellite",
+      "order": 80,
+      "settings": [
+        "satellite_enabled",
+        "satellite_send_interval",
+        "satellite_multiple_intervals",
+        "satellite_interval1_start",
+        "satellite_send_interval2",
+        "satellite_send_interval2_start",
+        "satellite_retry",
+        "sat_send_flag",
+        "satellite_max_messages_per_interval",
+        "satellite_min_signal_strength"
+      ]
+    },
+    "s_band": {
+      "title": "S-Band satellite",
+      "order": 90,
+      "settings": [
+        "s_band_send_mode",
+        "s_band_send_interval",
+        "s_band_rf_frequency_hz",
+        "s_band_app_key",
+        "s_band_dev_adr",
+        "s_band_network_key"
+      ]
+    },
+    "vhf": {
+      "title": "VHF beacon",
+      "order": 100,
+      "settings": [
+        "vhf_enabled",
+        "vhf_interval1",
+        "vhf_multiple_intervals",
+        "vhf_interval1_start",
+        "vhf_interval2",
+        "vhf_interval2_start",
+        "vhf_tx_frequency_khz",
+        "vhf_num_of_packets_per_burst",
+        "vhf_time_between_packets_ms",
+        "vhf_single_pulse_duration_ms",
+        "vhf_external_path"
+      ]
+    },
+    "ble": {
+      "title": "Bluetooth",
+      "order": 110,
+      "settings": [
+        "ble_adv",
+        "ble_advertisement_interval",
+        "ble_auto_disconnect"
+      ]
+    },
+    "ble_scan": {
+      "title": "BLE scan",
+      "order": 120,
+      "settings": [
+        "ble_scan_interval",
+        "ble_scan_aggregated_interval",
+        "ble_scan_duration",
+        "ble_scan_filter",
+        "ble_scan_manufacturer_id",
+        "ble_scan_report_zero_connections_found"
+      ]
+    },
+    "wifi_scan": {
+      "title": "WiFi scan",
+      "order": 130,
+      "settings": [
+        "wifi_scan_interval",
+        "wifi_scan_aggregated_interval",
+        "wifi_scan_report_zero_connections_found"
+      ]
+    },
+    "cmdq": {
+      "title": "CMDQ",
+      "order": 140,
+      "settings": [
+        "cmdq_enabled",
+        "cmdq_searched_mac_address",
+        "cmdq_scan_duration",
+        "cmdq_search_interval",
+        "cmdq_reporting_interval",
+        "cmdq_on_no_detection_wait_duration",
+        "cmdq_report_zero_messages_to_be_sent"
+      ]
+    },
+    "fence": {
+      "title": "Fence monitor",
+      "order": 150,
+      "settings": [
+        "fence_enabled",
+        "fence_interval",
+        "fence_sampling_length",
+        "fence_mv_scaling_factor",
+        "fence_led_blink"
+      ]
+    },
+    "switch": {
+      "title": "External switch",
+      "order": 160,
+      "settings": [
+        "external_switch_detection_enabled",
+        "external_switch_detection_trigger_type",
+        "external_switch_input_pull",
+        "external_switch_detection_gpio_pin_power_enabled",
+        "external_switch_detection_trigger_debounce_ms",
+        "external_switch_minimal_report_duration_ms",
+        "external_switch_detection_reporting_interval",
+        "external_switch_send_inactivity_report",
+        "external_switch_counter_enabled"
+      ]
+    },
+    "air": {
+      "title": "Air quality",
+      "order": 170,
+      "settings": [
+        "air_quality_enabled",
+        "air_quality_interval"
+      ]
+    },
+    "accel": {
+      "title": "Accelerometer",
+      "order": 180,
+      "settings": [
+        "accel_odr_hz",
+        "accel_g_scale",
+        "accel_movement_data_fifo_enabled"
+      ]
+    },
+    "lr_gps": {
+      "title": "LR GPS (LoRa Edge)",
+      "order": 190,
+      "settings": [
+        "lr_gps_interval",
+        "gnss_constellation_to_use",
+        "gnss_assisted_scan",
+        "lr_sat_data"
+      ]
+    },
+    "lp0": {
+      "title": "LP0",
+      "order": 200,
+      "settings": [
+        "lp0_send_flag",
+        "lp0_tx_frequency_hz",
+        "lp0_rx_frequency_hz",
+        "lp0_dev_addr",
+        "lp0_network_key",
+        "lp0_app_key",
+        "lp0_communication_params",
+        "lp0_node_params",
+        "lp0_discovery_retry_count",
+        "lp0_master_key",
+        "lp0_signal_checks",
+        "lp0_focus_offloading",
+        "lp0_gps_before_start",
+        "lp0_statistics_interval"
+      ]
+    },
+    "rf_scan": {
+      "title": "RF scan (older firmware)",
+      "order": 210,
+      "settings": []
+    },
+    "rf_open_sky_detection": {
+      "title": "RF open sky detection (older firmware)",
+      "order": 220,
+      "settings": []
+    },
+    "gps_open_sky_detection": {
+      "title": "GPS open sky detection (older firmware)",
+      "order": 230,
+      "settings": []
+    },
+    "memfault": {
+      "title": "Memfault diagnostics",
+      "order": 240,
+      "settings": [
+        "memfault_send_interval"
+      ]
+    }
+  },
+  "settings": {
+    "accel_g_scale": {
+      "category": "accel",
+      "label": "accelerometer range (g)",
+      "description": "Accelerometer measurement range in g.",
+      "display_name": "accelerometer range (g)"
+    },
+    "accel_movement_data_fifo_enabled": {
+      "category": "accel",
+      "label": "accelerometer movement FIFO enabled",
+      "description": "Enable the accelerometer movement data FIFO.",
+      "display_name": "accelerometer movement FIFO enabled"
+    },
+    "accel_odr_hz": {
+      "category": "accel",
+      "label": "accelerometer sample rate (Hz)",
+      "description": "Output data rate in Hertz.",
+      "display_name": "accelerometer sample rate (Hz)"
+    },
+    "air_quality_enabled": {
+      "category": "air",
+      "label": "air quality sensor enabled",
+      "description": "Enable the air quality sensors (BME690 and BMV080). Only available on rangeredge boards running the air quality firmware.",
+      "display_name": "air quality sensor enabled"
+    },
+    "air_quality_interval": {
+      "category": "air",
+      "label": "air quality interval",
+      "description": "Seconds between checks for new air quality data. The sensors themselves sample on a fixed 5-minute duty cycle; each check packs available data into a message for the enabled recipients.",
+      "display_name": "air quality interval"
+    },
+    "app_eui": {
+      "category": "lorawan",
+      "label": "app EUI (join EUI)",
+      "description": "The app ID used when joining the network.",
+      "display_name": "app EUI (join EUI)"
+    },
+    "app_key": {
+      "category": "lorawan",
+      "label": "app key",
+      "description": "The key used to join the network.",
+      "display_name": "app key"
+    },
+    "ble_adv": {
+      "category": "ble",
+      "label": "BLE advertising enabled",
+      "description": "Bluetooth advertising setting.",
+      "display_name": "BLE advertising enabled"
+    },
+    "ble_advertisement_interval": {
+      "category": "ble",
+      "label": "BLE advertisement interval",
+      "description": "Bluetooth advertising interval in milliseconds.",
+      "display_name": "BLE advertisement interval"
+    },
+    "ble_auto_disconnect": {
+      "category": "ble",
+      "label": "BLE auto disconnect",
+      "description": "Auto disconnect timeout in milliseconds.",
+      "display_name": "BLE auto disconnect"
+    },
+    "ble_scan_aggregated_interval": {
+      "category": "ble_scan",
+      "label": "BLE scan aggregated interval",
+      "description": "Controls how often aggregated BLE scan results are produced.",
+      "display_name": "BLE scan aggregated interval"
+    },
+    "ble_scan_duration": {
+      "category": "ble_scan",
+      "label": "BLE scan duration",
+      "description": "Scan duration in milliseconds.",
+      "display_name": "BLE scan duration"
+    },
+    "ble_scan_filter": {
+      "category": "ble_scan",
+      "label": "BLE scan filter",
+      "description": "Filtering applied to scanned data before storing or sending.",
+      "display_name": "BLE scan filter",
+      "familyOptions": [
+        {
+          "value": 0,
+          "label": "No filter"
+        },
+        {
+          "value": 1,
+          "label": "Only configured manufacturer ID"
+        },
+        {
+          "value": 2,
+          "label": "MAC address (not implemented in firmware)"
+        },
+        {
+          "value": 3,
+          "label": "Smartphones"
+        },
+        {
+          "value": 4,
+          "label": "Exclude configured manufacturer ID"
+        }
+      ],
+      "options": [
+        {
+          "value": 0,
+          "label": "No filter"
+        },
+        {
+          "value": 1,
+          "label": "Smart Parks manufacturer ID (0x0A61)"
+        },
+        {
+          "value": 2,
+          "label": "Configured manufacturer ID"
+        },
+        {
+          "value": 3,
+          "label": "Smartphones"
+        }
+      ]
+    },
+    "ble_scan_interval": {
+      "category": "ble_scan",
+      "label": "BLE scan interval",
+      "description": "Seconds between Bluetooth scans.",
+      "display_name": "BLE scan interval"
+    },
+    "ble_scan_manufacturer_id": {
+      "category": "ble_scan",
+      "label": "BLE scan manufacturer ID",
+      "description": "Manufacturer ID used for filtering; hex value (e.g., 0x0A61).",
+      "display_name": "BLE scan manufacturer ID"
+    },
+    "ble_scan_report_zero_connections_found": {
+      "category": "ble_scan",
+      "label": "BLE scan report empty results",
+      "description": "Send a report (empty message) even when the Bluetooth scan found nothing.",
+      "display_name": "BLE scan report empty results"
+    },
+    "check_error_interval": {
+      "category": "device",
+      "label": "error check interval",
+      "description": "Seconds between checks for error conditions.",
+      "display_name": "error check interval"
+    },
+    "cmdq_enabled": {
+      "category": "cmdq",
+      "label": "CMDQ enabled",
+      "description": "Enable the CMDQ module. Disabling it while a scan is running stops the scan.",
+      "display_name": "CMDQ enabled"
+    },
+    "cmdq_on_no_detection_wait_duration": {
+      "category": "cmdq",
+      "label": "CMDQ wait after failed long scan",
+      "description": "Seconds to wait after a LONG scan fails before trying again.",
+      "display_name": "CMDQ wait after failed long scan"
+    },
+    "cmdq_report_zero_messages_to_be_sent": {
+      "category": "cmdq",
+      "label": "CMDQ report when nothing detected",
+      "description": "Send an empty report when no CMDQ detection was made between two reporting intervals.",
+      "display_name": "CMDQ report when nothing detected"
+    },
+    "cmdq_reporting_interval": {
+      "category": "cmdq",
+      "label": "CMDQ reporting interval",
+      "description": "Seconds between composing/sending CMDQ detections to other queues.",
+      "display_name": "CMDQ reporting interval"
+    },
+    "cmdq_scan_duration": {
+      "category": "cmdq",
+      "label": "CMDQ short scan duration",
+      "description": "Milliseconds spent actively scanning during a SHORT scan.",
+      "display_name": "CMDQ short scan duration"
+    },
+    "cmdq_search_interval": {
+      "category": "cmdq",
+      "label": "CMDQ search interval",
+      "description": "Seconds between scans. For IMMEDIATE/LONG scans this is the active scan duration; set near the device advertisement interval.",
+      "display_name": "CMDQ search interval"
+    },
+    "cmdq_searched_mac_address": {
+      "category": "cmdq",
+      "label": "CMDQ searched MAC address",
+      "description": "Bluetooth MAC address (hex byte array) of the device to search for.",
+      "display_name": "CMDQ searched MAC address"
+    },
+    "cold_fix_retry": {
+      "category": "gps",
+      "label": "cold fix retries",
+      "description": "Extra cold fix attempts after the first failed one, one per interval. After the last unsuccessful attempt the GPS module is turned off.",
+      "display_name": "cold fix retries"
+    },
+    "cold_fix_timeout": {
+      "category": "gps",
+      "label": "cold fix timeout",
+      "description": "Maximum time in seconds for one cold fix attempt.",
+      "display_name": "cold fix timeout"
+    },
+    "data_log": {
+      "category": "logs",
+      "label": "flash logging enabled",
+      "description": "Enable the flash data log.",
+      "display_name": "flash logging enabled"
+    },
+    "device_eui": {
+      "category": "lorawan",
+      "label": "device EUI",
+      "description": "The unique ID for this device.",
+      "display_name": "device EUI"
+    },
+    "device_name": {
+      "category": "device",
+      "label": "device name",
+      "description": "Device name shown in Bluetooth scans (up to 8 characters).",
+      "display_name": "device name"
+    },
+    "device_pin": {
+      "category": "device",
+      "label": "Bluetooth PIN",
+      "description": "Four-digit PIN required to connect over Bluetooth. 0000 means no PIN is checked.",
+      "display_name": "Bluetooth PIN"
+    },
+    "enable_motion_trig_gps": {
+      "category": "gps",
+      "label": "motion-triggered GPS enabled",
+      "description": "Enables motion-triggered GPS. When enabled, motion is checked using the accelerometer and motion_ths threshold. This feature supports two behaviors: the default skip-fix mode based on ublox_send_interval, and an optional trigger-window mode based on gps_triggered_interval plus gps_motion_triggered_min_num_of_triggers_per_interval.",
+      "display_name": "motion-triggered GPS enabled"
+    },
+    "external_switch_counter_enabled": {
+      "category": "switch",
+      "label": "external switch counter enabled",
+      "description": "Toggle between switch activity detection and impulse counter. When enabled, the device counts transitions from inactivity to activity (respecting debounce) within the reporting interval.",
+      "display_name": "external switch counter enabled"
+    },
+    "external_switch_detection_enabled": {
+      "category": "switch",
+      "label": "external switch detection enabled",
+      "description": "Turns on external switch detection. Must not be enabled at the same time as fence_enabled; firmware will disable external switch functionality if both are enabled.",
+      "display_name": "external switch detection enabled"
+    },
+    "external_switch_detection_gpio_pin_power_enabled": {
+      "category": "switch",
+      "label": "external switch GPIO pin power",
+      "description": "Use the GPIO output of the fence port to enable (power) the external switch.",
+      "display_name": "external switch GPIO pin power"
+    },
+    "external_switch_detection_reporting_interval": {
+      "category": "switch",
+      "label": "external switch reporting interval",
+      "description": "Reporting interval for periodic status reports over LoRa. 0 disables periodic reports; activity/inactivity transitions still send immediately.",
+      "display_name": "external switch reporting interval"
+    },
+    "external_switch_detection_trigger_debounce_ms": {
+      "category": "switch",
+      "label": "external switch debounce (ms)",
+      "description": "Debounce time in ms after a state change; additional changes are ignored during this period. After debounce, the input is re-read to confirm. 0 disables debouncing (not recommended for floating or mismatched pulls).",
+      "display_name": "external switch debounce (ms)"
+    },
+    "external_switch_detection_trigger_type": {
+      "category": "switch",
+      "label": "external switch trigger type",
+      "description": "Controls how the device interprets AN (GPIO input) activity.",
+      "display_name": "external switch trigger type",
+      "options": [
+        {
+          "value": 0,
+          "label": "Logical 0 = activity"
+        },
+        {
+          "value": 1,
+          "label": "Logical 1 = activity (default)"
+        }
+      ]
+    },
+    "external_switch_input_pull": {
+      "category": "switch",
+      "label": "external switch input pull",
+      "description": "Set the pull of the AN (GPIO input) line. If the external switch already provides a pull, setting this incorrectly can increase power consumption or cause undefined behavior.",
+      "display_name": "external switch input pull",
+      "options": [
+        {
+          "value": 0,
+          "label": "No pull"
+        },
+        {
+          "value": 1,
+          "label": "Pull up"
+        },
+        {
+          "value": 2,
+          "label": "Pull down"
+        }
+      ]
+    },
+    "external_switch_minimal_report_duration_ms": {
+      "category": "switch",
+      "label": "external switch minimal report duration (ms)",
+      "description": "Minimum activity duration required before sending a report to avoid flooding the LoRa queue with short detections.",
+      "display_name": "external switch minimal report duration (ms)"
+    },
+    "external_switch_send_inactivity_report": {
+      "category": "switch",
+      "label": "external switch inactivity report",
+      "description": "When enabled, send an inactivity report when external_switch_detection_reporting_interval expires.",
+      "display_name": "external switch inactivity report"
+    },
+    "fence_enabled": {
+      "category": "fence",
+      "label": "fence monitor enabled",
+      "description": "Enable/disable fence functionality (requires supported hardware).",
+      "display_name": "fence monitor enabled"
+    },
+    "fence_interval": {
+      "category": "fence",
+      "label": "fence measurement interval",
+      "description": "Seconds between fence measurements. 0 disables measurements.",
+      "display_name": "fence measurement interval"
+    },
+    "fence_led_blink": {
+      "category": "fence",
+      "label": "fence LED blink",
+      "description": "Blink the LED during fence measurements.",
+      "display_name": "fence LED blink"
+    },
+    "fence_mv_scaling_factor": {
+      "category": "fence",
+      "label": "fence mV scaling factor",
+      "description": "Scaling factor applied to measured mV. Default 10000 (1000 mV -> 10 kV).",
+      "display_name": "fence mV scaling factor"
+    },
+    "fence_sampling_length": {
+      "category": "fence",
+      "label": "fence sampling length",
+      "description": "Measurement length in seconds (min 1, max 60).",
+      "display_name": "fence sampling length"
+    },
+    "flash_status_interval": {
+      "category": "logs",
+      "label": "flash status interval",
+      "description": "Seconds between flash status messages (port 14: percentage used and number of stored messages). 0 means the message is not sent or stored.",
+      "display_name": "flash status interval"
+    },
+    "flash_store_flag": {
+      "category": "logs",
+      "label": "messages stored in flash",
+      "description": "Which message types are stored in the flash log. Each bit is a port number: bit 1 = port 1, bit 2 = port 2, and so on.",
+      "display_name": "messages stored in flash"
+    },
+    "gnss_assisted_scan": {
+      "category": "lr_gps",
+      "label": "GNSS assisted scan",
+      "description": "GNSS assisted scan setting (LR GNSS).",
+      "display_name": "GNSS assisted scan"
+    },
+    "gnss_constellation_to_use": {
+      "category": "lr_gps",
+      "label": "GNSS constellation",
+      "description": "GNSS constellation used by the LR GNSS scan.",
+      "display_name": "GNSS constellation"
+    },
+    "gps_backoff_factor": {
+      "category": "gps",
+      "label": "GPS backoff factor",
+      "description": "Delay applied to the next GNSS fix after an unsuccessful fix attempt.",
+      "display_name": "GPS backoff factor"
+    },
+    "gps_init_lat": {
+      "category": "gps",
+      "label": "initial latitude",
+      "description": "Initial latitude in decimal degrees. Raw value is degrees * 1e7 (int32).",
+      "display_name": "initial latitude"
+    },
+    "gps_init_lon": {
+      "category": "gps",
+      "label": "initial longitude",
+      "description": "Initial longitude in decimal degrees. Raw value is degrees * 1e7 (int32).",
+      "display_name": "initial longitude"
+    },
+    "gps_motion_triggered_min_num_of_triggers_per_interval": {
+      "category": "gps",
+      "label": "motion triggers needed per window",
+      "description": "Used by motion-triggered GPS window mode. A fresh GPS fix is performed when this many motion events are detected within gps_triggered_interval seconds. Default is 5. Set this to 0, or set gps_triggered_interval to 0, to disable window mode and fall back to the default skip-fix behavior. Motion events are still counted during the fixed 30-second failsafe between GPS fixes, but no new fix is started during that failsafe.",
+      "display_name": "motion triggers needed per window"
+    },
+    "gps_open_sky_detection_avg_rssi_threshold_dbm": {
+      "category": "gps_open_sky_detection",
+      "label": "open sky detection avg rssi threshold dbm",
+      "description": "Average RSSI threshold (dBm). Must be exceeded along with the max RSSI threshold to trigger a GPS fix.",
+      "display_name": "open sky detection avg rssi threshold dbm"
+    },
+    "gps_open_sky_detection_bitmask": {
+      "category": "gps_open_sky_detection",
+      "label": "open sky detection bitmask",
+      "description": "Bitmask for open sky scan bands. Bit 7 enables the feature; bits 6–0 select bands 100–200, 400–500, 800–1000, 1200–1400, 1500–1600, 1800–2100, 2400–2500 MHz.",
+      "display_name": "open sky detection bitmask"
+    },
+    "gps_open_sky_detection_max_rssi_threshold_dbm": {
+      "category": "gps_open_sky_detection",
+      "label": "open sky detection max rssi threshold dbm",
+      "description": "Max RSSI threshold (dBm). Must be exceeded along with the average RSSI threshold to trigger a GPS fix.",
+      "display_name": "open sky detection max rssi threshold dbm"
+    },
+    "gps_resend_interval": {
+      "category": "gps",
+      "label": "last position resend interval",
+      "description": "Controls how often the device sends the last known GNSS position.",
+      "display_name": "last position resend interval"
+    },
+    "gps_skipped_triggered_interval": {
+      "category": "gps",
+      "label": "max skipped fix intervals",
+      "description": "In default motion-triggered GPS mode, this sets how many consecutive ublox_send_interval periods may be skipped when no motion is detected before the device performs a fresh GPS fix anyway. Set to 0 to perform a fix on every ublox_send_interval.",
+      "display_name": "max skipped fix intervals"
+    },
+    "gps_triggered_interval": {
+      "category": "gps",
+      "label": "motion trigger window",
+      "description": "Used by motion-triggered GPS window mode. Each detected motion event temporarily increases an internal trigger counter for this many seconds. When the counter reaches gps_motion_triggered_min_num_of_triggers_per_interval, the device performs a fresh GPS fix independently of ublox_send_interval. Default is 60 seconds. Set this to 0, or set gps_motion_triggered_min_num_of_triggers_per_interval to 0, to disable window mode and use the default skip-fix behavior.",
+      "display_name": "motion trigger window"
+    },
+    "horizontal_accuracy": {
+      "category": "gps",
+      "label": "required horizontal accuracy",
+      "description": "Horizontal accuracy in meters.",
+      "display_name": "required horizontal accuracy"
+    },
+    "hot_fix_retry": {
+      "category": "gps",
+      "label": "hot fix retries",
+      "description": "Extra hot fix attempts after the first failed one, one per interval. After the last unsuccessful one the next fix is cold.",
+      "display_name": "hot fix retries"
+    },
+    "hot_fix_timeout": {
+      "category": "gps",
+      "label": "hot fix timeout",
+      "description": "Maximum time in seconds for one hot fix attempt.",
+      "display_name": "hot fix timeout"
+    },
+    "init_time": {
+      "category": "device",
+      "label": "initial device time",
+      "description": "Initial time setting.",
+      "display_name": "initial device time"
+    },
+    "led_enabled": {
+      "category": "device",
+      "label": "LED enabled",
+      "description": "Enable the status LED.",
+      "display_name": "LED enabled"
+    },
+    "lp0_app_key": {
+      "category": "lp0",
+      "label": "LP0 app key",
+      "description": "AppSKey (16 bytes) used to encode LP0 messages.",
+      "display_name": "LP0 app key"
+    },
+    "lp0_communication_params": {
+      "category": "lp0",
+      "label": "LP0 communication parameters",
+      "description": "LP0 modulation parameters (byte array). See the firmware LP0 documentation for the byte layout.",
+      "display_name": "LP0 communication parameters"
+    },
+    "lp0_dev_addr": {
+      "category": "lp0",
+      "label": "LP0 device address",
+      "description": "Device address (4 bytes) used to encode LP0 messages.",
+      "display_name": "LP0 device address"
+    },
+    "lp0_network_key": {
+      "category": "lp0",
+      "label": "LP0 network key",
+      "description": "NwkSKey (16 bytes) used to encode LP0 messages.",
+      "display_name": "LP0 network key"
+    },
+    "lp0_node_params": {
+      "category": "lp0",
+      "label": "LP0 node parameters",
+      "description": "LP0 node configuration (byte array). See the firmware LP0 documentation for the byte layout.",
+      "display_name": "LP0 node parameters"
+    },
+    "lp0_master_key": {
+      "category": "lp0",
+      "label": "LP0 cluster master key",
+      "description": "16-byte key shared by every tracker and offload station in one LP0 cluster. Devices with different master keys cannot discover each other. The all-zero default is accepted but public; use one random key per cluster. Firmware 8.2 (beta).",
+      "display_name": "LP0 cluster master key"
+    },
+    "lp0_signal_checks": {
+      "category": "lp0",
+      "label": "LP0 signal checks",
+      "description": "Six bytes: master switch, CAD veto, minimum RSSI check, minimum RSSI magnitude (100 = -100 dBm), background margin check, minimum margin in dB. Default 1 1 1 100 0 20: the background margin check is off by default since the 2026-11-03 schema, its threshold stays stored at 20 dB. A change applies to the next offload visit. Firmware 8.2 (beta).",
+      "display_name": "LP0 signal checks"
+    },
+    "lp0_focus_offloading": {
+      "category": "lp0",
+      "label": "LP0 focus on offloading",
+      "description": "When on, routine GPS fixes, scans and scheduled radio sends wait while an offload is prepared and running. Enable it on both the tracker and the station for a dedicated offload session. Firmware 8.2 (beta).",
+      "display_name": "LP0 focus on offloading"
+    },
+    "lp0_gps_before_start": {
+      "category": "lp0",
+      "label": "LP0 GPS fix before offloading",
+      "description": "Take a u-blox GPS fix before an LP0 offload session starts so the device's clock is set from the receiver. Meant for offload stations, which timestamp the records they store on the SD card. Off by default. Firmware 8.2 (beta).",
+      "display_name": "LP0 GPS fix before offloading"
+    },
+    "lr_enabled": {
+      "category": "lorawan",
+      "label": "LoRaWAN enabled",
+      "description": "Master switch for the LoRaWAN stack, on by default. Firmware 8.2 (beta); the firmware documentation does not describe the effect of switching it off yet, so leave it on unless the firmware team asks otherwise.",
+      "display_name": "LoRaWAN enabled"
+    },
+    "ublox_require_time": {
+      "category": "gps",
+      "label": "GPS fix requires valid time",
+      "description": "Firmware 8.2 (beta). Not yet described in the firmware documentation; leave it at the default (off) unless the firmware team asks for it.",
+      "display_name": "GPS fix requires valid time"
+    },
+    "lp0_discovery_retry_count": {
+      "category": "lp0",
+      "label": "LP0 discovery retries",
+      "description": "Extra automatic discovery attempts a tracker may make within one discovery interval after a failed attempt, 0 to 255. 0 (the default) means one attempt per interval; a failed attempt then waits for the next interval. Retries use a short randomised delay. Firmware 8.2 (beta).",
+      "display_name": "LP0 discovery retries"
+    },
+    "lp0_statistics_interval": {
+      "category": "lp0",
+      "label": "LP0 station statistics interval",
+      "description": "How often an offload station generates its statistics report (port 23). 0 disables it; enabled values must be 60 to 604800 seconds. Only the station role generates reports; port 23 must also be ticked in the send or store flags. Firmware 8.2 (beta).",
+      "display_name": "LP0 station statistics interval"
+    },
+    "lp0_rx_frequency_hz": {
+      "category": "lp0",
+      "label": "LP0 RX frequency (Hz)",
+      "description": "LP0 receive frequency in Hz.",
+      "display_name": "LP0 RX frequency (Hz)"
+    },
+    "lp0_send_flag": {
+      "category": "lp0",
+      "label": "LP0 messages sent",
+      "description": "Which message types are sent over LP0. Each bit is a port number: bit 1 = port 1, bit 2 = port 2, and so on.",
+      "display_name": "LP0 messages sent"
+    },
+    "lp0_tx_frequency_hz": {
+      "category": "lp0",
+      "label": "LP0 TX frequency (Hz)",
+      "description": "LP0 transmit frequency in Hz.",
+      "display_name": "LP0 TX frequency (Hz)"
+    },
+    "lr_adr": {
+      "category": "lorawan",
+      "label": "data rate (custom ADR)",
+      "description": "Data rate (DR0-DR15) used when the adaptive data rate profile is Custom. EU 868 allows DR0-DR7; US 915 allows DR0-DR4 and DR8-DR13.",
+      "display_name": "data rate (custom ADR)"
+    },
+    "lr_adr_profile": {
+      "category": "lorawan",
+      "label": "ADR profile",
+      "description": "Adaptive data rate profile: network controlled (static devices), mobile long range, mobile low power, or custom (uses the data rate setting).",
+      "display_name": "ADR profile",
+      "options": [
+        {
+          "value": 0,
+          "label": "Network controlled (static devices)"
+        },
+        {
+          "value": 1,
+          "label": "Mobile, long range"
+        },
+        {
+          "value": 2,
+          "label": "Mobile, low power"
+        },
+        {
+          "value": 3,
+          "label": "Custom data rate"
+        }
+      ]
+    },
+    "lr_confirm_flag": {
+      "category": "lorawan",
+      "label": "confirmed messages (message types)",
+      "description": "Which message types are sent as confirmed LoRaWAN uplinks. Each bit is a port number: bit 1 = port 1.",
+      "display_name": "confirmed messages (message types)"
+    },
+    "lr_gps_interval": {
+      "category": "lr_gps",
+      "label": "LR GPS interval",
+      "description": "Seconds between LR GNSS scans.",
+      "display_name": "LR GPS interval"
+    },
+    "lr_join_flag": {
+      "category": "lorawan",
+      "label": "join before sending (message types)",
+      "description": "Which message types make the device attempt a join first when it is not joined. Each bit is a port number: bit 1 = port 1.",
+      "display_name": "join before sending (message types)"
+    },
+    "lr_max_confirm_fail": {
+      "category": "lorawan",
+      "label": "max confirmed send failures",
+      "description": "Maximum number of failed confirmed LoRaWAN messages.",
+      "display_name": "max confirmed send failures"
+    },
+    "lr_messaging_retry_count": {
+      "category": "lr_messaging",
+      "label": "messaging retry count",
+      "description": "Number of retry attempts for messages sent from the Messenger card.",
+      "display_name": "messaging retry count"
+    },
+    "lr_messaging_retry_interval": {
+      "category": "lr_messaging",
+      "label": "messaging retry interval",
+      "description": "Controls how long the device waits between LR messaging retry attempts.",
+      "display_name": "messaging retry interval"
+    },
+    "lr_region": {
+      "category": "lorawan",
+      "label": "LoRaWAN region",
+      "description": "LoRaWAN frequency region.",
+      "display_name": "LoRaWAN region",
+      "options": [
+        {
+          "value": 1,
+          "label": "EU 868"
+        },
+        {
+          "value": 3,
+          "label": "US 915"
+        },
+        {
+          "value": 4,
+          "label": "AU 915"
+        },
+        {
+          "value": 6,
+          "label": "WW 2.4 GHz"
+        },
+        {
+          "value": 2,
+          "label": "AS 923 group 1"
+        },
+        {
+          "value": 7,
+          "label": "AS 923 group 2"
+        },
+        {
+          "value": 8,
+          "label": "AS 923 group 3"
+        },
+        {
+          "value": 13,
+          "label": "AS 923 group 4"
+        },
+        {
+          "value": 9,
+          "label": "IN 865"
+        },
+        {
+          "value": 10,
+          "label": "KR 920"
+        },
+        {
+          "value": 11,
+          "label": "RU 864"
+        },
+        {
+          "value": 5,
+          "label": "CN 470"
+        },
+        {
+          "value": 12,
+          "label": "CN 470 RP 1.0"
+        }
+      ]
+    },
+    "lr_sat_data": {
+      "category": "lr_gps",
+      "label": "sat data",
+      "description": "LoRaWAN satellite data setting.",
+      "display_name": "sat data"
+    },
+    "lr_send_flag": {
+      "category": "lorawan",
+      "label": "messages sent over LoRaWAN",
+      "description": "Which message types are sent over LoRaWAN. Each bit is a port number: bit 1 = port 1, bit 2 = port 2, and so on.",
+      "display_name": "messages sent over LoRaWAN"
+    },
+    "memfault_send_interval": {
+      "category": "memfault",
+      "label": "Memfault send interval",
+      "description": "Seconds between Memfault diagnostic uploads.",
+      "display_name": "Memfault send interval"
+    },
+    "motion_ths": {
+      "category": "gps",
+      "label": "motion threshold",
+      "description": "Accelerometer sensitivity threshold used by motion-triggered GPS to detect movement. Default is 6. Refer to the LIS2DW12 datasheet for the detailed threshold behavior.",
+      "display_name": "motion threshold"
+    },
+    "outdoor_detection_enabled": {
+      "category": "outdoor",
+      "label": "outdoor detection enabled",
+      "description": "Enable outdoor detection and disable the standard GPS fix interval. Used to trigger GPS fixes only when the device is likely outside.",
+      "display_name": "outdoor detection enabled"
+    },
+    "outdoor_detection_parameters": {
+      "category": "outdoor",
+      "label": "outdoor detection parameters",
+      "description": "Weights for outdoor probability: bias (2B), temperature (2B), accelerometer (2B), hour (2B), time-zone offset seconds (4B). Little-endian signed ints, multiply values by 1000 before encoding. Default TZ offset is GMT+2.",
+      "display_name": "outdoor detection parameters"
+    },
+    "outdoor_detection_tau": {
+      "category": "outdoor",
+      "label": "outdoor detection tau",
+      "description": "Probability threshold required to trigger a GPS fix.",
+      "display_name": "outdoor detection tau"
+    },
+    "rejoin_interval": {
+      "category": "lorawan",
+      "label": "rejoin interval",
+      "description": "How often the device tries to rejoin the network.",
+      "display_name": "rejoin interval"
+    },
+    "rf_open_sky_detection_duration": {
+      "category": "rf_open_sky_detection",
+      "label": "duration",
+      "description": "How long this stays active.",
+      "display_name": "duration"
+    },
+    "rf_open_sky_detection_enabled": {
+      "category": "rf_open_sky_detection",
+      "label": "enabled",
+      "description": "Radio scan related setting.",
+      "display_name": "enabled"
+    },
+    "rf_open_sky_detection_interval1": {
+      "category": "rf_open_sky_detection",
+      "label": "interval1",
+      "description": "Primary RF open sky detection interval.",
+      "display_name": "interval1"
+    },
+    "rf_open_sky_detection_interval1_start": {
+      "category": "rf_open_sky_detection",
+      "label": "interval1 start",
+      "description": "Radio scan related setting.",
+      "display_name": "interval1 start"
+    },
+    "rf_open_sky_detection_interval2": {
+      "category": "rf_open_sky_detection",
+      "label": "interval2",
+      "description": "Secondary RF open sky detection interval.",
+      "display_name": "interval2"
+    },
+    "rf_open_sky_detection_interval2_start": {
+      "category": "rf_open_sky_detection",
+      "label": "interval2 start",
+      "description": "Radio scan related setting.",
+      "display_name": "interval2 start"
+    },
+    "rf_open_sky_detection_multiple_intervals": {
+      "category": "rf_open_sky_detection",
+      "label": "multiple intervals",
+      "description": "Radio scan related setting.",
+      "display_name": "multiple intervals"
+    },
+    "rf_scan_config": {
+      "category": "rf_scan",
+      "label": "config",
+      "description": "Radio scan related setting.",
+      "display_name": "config"
+    },
+    "rf_scan_duration": {
+      "category": "rf_scan",
+      "label": "duration",
+      "description": "How long this stays active.",
+      "display_name": "duration"
+    },
+    "rf_scan_enabled": {
+      "category": "rf_scan",
+      "label": "enabled",
+      "description": "Radio scan related setting.",
+      "display_name": "enabled"
+    },
+    "rf_scan_interval": {
+      "category": "rf_scan",
+      "label": "interval",
+      "description": "Seconds between RF scans.",
+      "display_name": "interval"
+    },
+    "rf_scan_interval1": {
+      "category": "rf_scan",
+      "label": "interval1",
+      "description": "Primary RF scan interval.",
+      "display_name": "interval1"
+    },
+    "rf_scan_interval1_start": {
+      "category": "rf_scan",
+      "label": "interval1 start",
+      "description": "Radio scan related setting.",
+      "display_name": "interval1 start"
+    },
+    "rf_scan_interval2": {
+      "category": "rf_scan",
+      "label": "interval2",
+      "description": "Secondary RF scan interval.",
+      "display_name": "interval2"
+    },
+    "rf_scan_interval2_start": {
+      "category": "rf_scan",
+      "label": "interval2 start",
+      "description": "Radio scan related setting.",
+      "display_name": "interval2 start"
+    },
+    "rf_scan_multiple_intervals": {
+      "category": "rf_scan",
+      "label": "multiple intervals",
+      "description": "Radio scan related setting.",
+      "display_name": "multiple intervals"
+    },
+    "s_band_app_key": {
+      "category": "s_band",
+      "label": "app key",
+      "description": "AppSKey (16 bytes) used to encode S-Band messages.",
+      "display_name": "app key"
+    },
+    "s_band_dev_adr": {
+      "category": "s_band",
+      "label": "dev adr",
+      "description": "Device address (4 bytes) used to encode S-Band messages.",
+      "display_name": "dev adr"
+    },
+    "s_band_network_key": {
+      "category": "s_band",
+      "label": "network key",
+      "description": "NwkSKey (16 bytes) used to encode S-Band messages.",
+      "display_name": "network key"
+    },
+    "s_band_rf_frequency_hz": {
+      "category": "s_band",
+      "label": "S-Band frequency (Hz)",
+      "description": "Frequency in Hz on which S-Band LoRa operates.",
+      "display_name": "S-Band frequency (Hz)"
+    },
+    "s_band_send_interval": {
+      "category": "s_band",
+      "label": "S-Band send interval",
+      "description": "Seconds between S-Band sends of the status and short position message. 0 disables S-Band sending.",
+      "display_name": "S-Band send interval"
+    },
+    "s_band_send_mode": {
+      "category": "s_band",
+      "label": "S-Band send mode",
+      "description": "S-Band send mode: 0 = send without FHSS, 1 = send with FHSS, 2 = both.",
+      "display_name": "S-Band send mode",
+      "options": [
+        {
+          "value": 0,
+          "label": "Without FHSS"
+        },
+        {
+          "value": 1,
+          "label": "With FHSS"
+        },
+        {
+          "value": 2,
+          "label": "Both"
+        }
+      ]
+    },
+    "sat_send_flag": {
+      "category": "satellite",
+      "label": "messages sent over satellite",
+      "description": "Which message types are sent over the satellite modem. Each bit is a port number: bit 1 = port 1, bit 2 = port 2, and so on.",
+      "display_name": "messages sent over satellite"
+    },
+    "satellite_enabled": {
+      "category": "satellite",
+      "label": "satellite enabled",
+      "description": "Enable satellite support (Iridium modem) when the hardware has one.",
+      "display_name": "satellite enabled"
+    },
+    "satellite_interval1_start": {
+      "category": "satellite",
+      "label": "satellite day window start (UTC hour)",
+      "description": "UTC hour (0-23) when the primary Iridium satellite send interval starts. When satellite_multiple_intervals is enabled, satellite_send_interval is used from this hour until satellite_send_interval2_start.",
+      "display_name": "satellite day window start (UTC hour)"
+    },
+    "satellite_max_messages_per_interval": {
+      "category": "satellite",
+      "label": "max messages per interval",
+      "description": "Maximum number of Iridium satellite messages allowed within each send interval.",
+      "display_name": "max messages per interval"
+    },
+    "satellite_min_signal_strength": {
+      "category": "satellite",
+      "label": "min signal strength",
+      "description": "Minimum satellite signal strength.",
+      "display_name": "min signal strength"
+    },
+    "satellite_multiple_intervals": {
+      "category": "satellite",
+      "label": "satellite day/night schedule",
+      "description": "Enables two UTC-based Iridium satellite send schedules. When disabled, only satellite_send_interval is used. When enabled, satellite_send_interval applies from satellite_interval1_start until satellite_send_interval2_start, and satellite_send_interval2 applies outside that window.",
+      "display_name": "satellite day/night schedule"
+    },
+    "satellite_retry": {
+      "category": "satellite",
+      "label": "satellite send retries",
+      "description": "Number of send attempts per satellite session. The delay between retries is random: 1 to 5 s for the first 3, 5 to 20 s up to the 6th, 20 to 40 s after that.",
+      "display_name": "satellite send retries"
+    },
+    "satellite_send_interval": {
+      "category": "satellite",
+      "label": "satellite send interval",
+      "description": "Primary Iridium satellite send interval. When satellite_multiple_intervals is disabled, this is the only interval used. When enabled, this interval applies from satellite_interval1_start until satellite_send_interval2_start (UTC).",
+      "display_name": "satellite send interval"
+    },
+    "satellite_send_interval2": {
+      "category": "satellite",
+      "label": "satellite night send interval",
+      "description": "Secondary Iridium satellite send interval. Only used when satellite_multiple_intervals is enabled. This interval applies from satellite_send_interval2_start until satellite_interval1_start on the next day (UTC).",
+      "display_name": "satellite night send interval"
+    },
+    "satellite_send_interval2_start": {
+      "category": "satellite",
+      "label": "satellite night window start (UTC hour)",
+      "description": "UTC hour (0-23) when the secondary Iridium satellite send interval starts. When satellite_multiple_intervals is enabled, satellite_send_interval2 is used from this hour until satellite_interval1_start on the next day.",
+      "display_name": "satellite night window start (UTC hour)"
+    },
+    "status_send_interval": {
+      "category": "status",
+      "label": "status send interval",
+      "description": "Seconds between device status messages.",
+      "display_name": "status send interval"
+    },
+    "tracker_type": {
+      "category": "device",
+      "label": "tracker type",
+      "description": "Tracker model type.",
+      "display_name": "tracker type",
+      "options": [
+        {
+          "value": 0,
+          "label": "default_tracker"
+        },
+        {
+          "value": 1,
+          "label": "rhinoedge_tracker"
+        },
+        {
+          "value": 2,
+          "label": "elephantedge_tracker"
+        },
+        {
+          "value": 3,
+          "label": "wisentedge_tracker"
+        },
+        {
+          "value": 4,
+          "label": "cattracker_tracker"
+        },
+        {
+          "value": 5,
+          "label": "rangeredge_tracker"
+        },
+        {
+          "value": 6,
+          "label": "rhinopuck_tracker"
+        }
+      ]
+    },
+    "ublox_active_tracking": {
+      "category": "gps",
+      "label": "GPS active tracking",
+      "description": "Keep the u-blox GNSS receiver on between fixes. When enabled, position reports on port 2 also include course over ground and speed over ground when available. Uses considerably more battery.",
+      "display_name": "GPS active tracking"
+    },
+    "ublox_cold_fix_hour_interval": {
+      "category": "gps",
+      "label": "cold fix hour interval",
+      "description": "Controls how often a cold u-blox fix attempt is allowed, in hours.",
+      "display_name": "cold fix hour interval"
+    },
+    "ublox_interval1_start": {
+      "category": "gps",
+      "label": "GPS day window start (UTC hour)",
+      "description": "UTC hour (0-23) when the primary u-blox GNSS fix interval starts. Only used when ublox_multiple_intervals is enabled; ublox_send_interval then applies from this hour until ublox_interval2_start.",
+      "display_name": "GPS day window start (UTC hour)"
+    },
+    "ublox_interval2_start": {
+      "category": "gps",
+      "label": "GPS night window start (UTC hour)",
+      "description": "UTC hour (0-23) when the secondary u-blox GNSS fix interval starts. Only used when ublox_multiple_intervals is enabled; ublox_send_interval_2 then applies from this hour until ublox_interval1_start on the next day.",
+      "display_name": "GPS night window start (UTC hour)"
+    },
+    "ublox_leave_on": {
+      "category": "gps",
+      "label": "GPS leave on",
+      "description": "How long, in seconds, the u-blox receiver stays on after a fix completes.",
+      "display_name": "GPS leave on"
+    },
+    "ublox_min_fix_time": {
+      "category": "gps",
+      "label": "minimum fix time",
+      "description": "Minimum time, in seconds, the u-blox receiver keeps searching for GNSS satellites in order to perform a fix.",
+      "display_name": "minimum fix time"
+    },
+    "ublox_min_satellites": {
+      "category": "gps",
+      "label": "minimum satellites",
+      "description": "Minimum number of satellites that must be visible at the check to continue a fix attempt. 0 turns the check off.",
+      "display_name": "minimum satellites"
+    },
+    "ublox_min_satellites_timer": {
+      "category": "gps",
+      "label": "minimum satellites check timeout",
+      "description": "Seconds into a fix attempt at which the satellite count is checked (firmware default 30). Only used while the minimum satellites check is on.",
+      "display_name": "minimum satellites check timeout"
+    },
+    "ublox_multiple_intervals": {
+      "category": "gps",
+      "label": "GPS day/night schedule",
+      "description": "Enables two UTC-based u-blox GNSS fix schedules. When disabled, only ublox_send_interval is used. When enabled, ublox_send_interval applies from ublox_interval1_start until ublox_interval2_start, and ublox_send_interval_2 applies outside that window.",
+      "display_name": "GPS day/night schedule"
+    },
+    "ublox_send_interval": {
+      "category": "gps",
+      "label": "GPS fix interval",
+      "description": "Primary u-blox GNSS fix interval. When ublox_multiple_intervals is disabled, this is the only interval used. When enabled, this interval applies from ublox_interval1_start until ublox_interval2_start (UTC).",
+      "display_name": "GPS fix interval"
+    },
+    "ublox_send_interval_2": {
+      "category": "gps",
+      "label": "GPS night fix interval",
+      "description": "Secondary u-blox GNSS fix interval. Only used when ublox_multiple_intervals is enabled. This interval applies from ublox_interval2_start until ublox_interval1_start on the next day (UTC).",
+      "display_name": "GPS night fix interval"
+    },
+    "ublox_switch_interval": {
+      "category": "gps",
+      "label": "switch interval",
+      "description": "Controls how often the device switches its u-blox operating mode or schedule.",
+      "display_name": "switch interval"
+    },
+    "vhf_enabled": {
+      "category": "vhf",
+      "label": "VHF enabled",
+      "description": "Enable the VHF beacon transmitter.",
+      "display_name": "VHF enabled"
+    },
+    "vhf_external_path": {
+      "category": "vhf",
+      "label": "VHF external path",
+      "description": "Send VHF transmissions over the external VHF antenna connector instead of the on-board LoRaWAN antenna. Only applies to boards with the VHF connector; Rhino Edge Cube, Puck50 and Puck35 have none, so enabling it there changes nothing.",
+      "display_name": "VHF external path"
+    },
+    "vhf_interval1": {
+      "category": "vhf",
+      "label": "VHF day interval",
+      "description": "Primary VHF transmit interval. When vhf_multiple_intervals is disabled, this is the only interval used. When enabled, this interval applies from vhf_interval1_start until vhf_interval2_start (UTC).",
+      "display_name": "VHF day interval"
+    },
+    "vhf_interval1_start": {
+      "category": "vhf",
+      "label": "VHF day window start (UTC hour)",
+      "description": "UTC hour (0-23) when the primary VHF interval starts. When vhf_multiple_intervals is enabled, vhf_interval1 is used from this hour until vhf_interval2_start.",
+      "display_name": "VHF day window start (UTC hour)"
+    },
+    "vhf_interval2": {
+      "category": "vhf",
+      "label": "VHF night interval",
+      "description": "Secondary VHF transmit interval. Only used when vhf_multiple_intervals is enabled. This interval applies from vhf_interval2_start until vhf_interval1_start on the next day (UTC).",
+      "display_name": "VHF night interval"
+    },
+    "vhf_interval2_start": {
+      "category": "vhf",
+      "label": "VHF night window start (UTC hour)",
+      "description": "UTC hour (0-23) when the secondary VHF interval starts. When vhf_multiple_intervals is enabled, vhf_interval2 is used from this hour until vhf_interval1_start on the next day.",
+      "display_name": "VHF night window start (UTC hour)"
+    },
+    "vhf_multiple_intervals": {
+      "category": "vhf",
+      "label": "VHF day/night schedule",
+      "description": "Enables two UTC-based VHF transmit schedules. When disabled, only vhf_interval1 is used. When enabled, vhf_interval1 applies from vhf_interval1_start until vhf_interval2_start, and vhf_interval2 applies outside that window.",
+      "display_name": "VHF day/night schedule"
+    },
+    "vhf_num_of_packets_per_burst": {
+      "category": "vhf",
+      "label": "VHF packets per burst",
+      "description": "Number of VHF beeps (pulses) per burst.",
+      "display_name": "VHF packets per burst"
+    },
+    "vhf_single_pulse_duration_ms": {
+      "category": "vhf",
+      "label": "VHF pulse duration (ms)",
+      "description": "Duration in milliseconds of each pulse inside a burst.",
+      "display_name": "VHF pulse duration (ms)"
+    },
+    "vhf_time_between_packets_ms": {
+      "category": "vhf",
+      "label": "VHF time between packets (ms)",
+      "description": "Time in milliseconds between beeps within a single burst. Only applies when more than one packet is sent per burst.",
+      "display_name": "VHF time between packets (ms)"
+    },
+    "vhf_tx_frequency_khz": {
+      "category": "vhf",
+      "label": "VHF TX frequency (kHz)",
+      "description": "VHF transmit frequency in kHz.",
+      "display_name": "VHF TX frequency (kHz)"
+    },
+    "wifi_scan_aggregated_interval": {
+      "category": "wifi_scan",
+      "label": "WiFi scan aggregated interval",
+      "description": "Controls how often aggregated WiFi scan results are produced.",
+      "display_name": "WiFi scan aggregated interval"
+    },
+    "wifi_scan_interval": {
+      "category": "wifi_scan",
+      "label": "WiFi scan interval",
+      "description": "Seconds between WiFi scans.",
+      "display_name": "WiFi scan interval"
+    },
+    "wifi_scan_report_zero_connections_found": {
+      "category": "wifi_scan",
+      "label": "WiFi scan report empty results",
+      "description": "Send a report (empty message) even when the WiFi scan found nothing.",
+      "display_name": "WiFi scan report empty results"
+    }
+  },
+  "commands": {
+    "cmd_aggregated_bt_scan": {
+      "category": "commands",
+      "label": "aggregated bt scan",
+      "description": "Internal: initiate periodic aggregated BT scan between threads.",
+      "display_name": "aggregated bt scan"
+    },
+    "cmd_almanac_update": {
+      "category": "commands",
+      "label": "almanac update",
+      "description": "Update almanac in chunks. Send cmd on port 32 with cmd id, length, and 20-byte chunks; header id 128 triggers update if newer.",
+      "display_name": "almanac update"
+    },
+    "cmd_bt_disconnect": {
+      "category": "commands",
+      "label": "bt disconnect",
+      "description": "Disconnect a Bluetooth device if connected.",
+      "display_name": "bt disconnect"
+    },
+    "cmd_check_pin": {
+      "category": "commands",
+      "label": "check pin",
+      "description": "Validate PIN code before allowing BT connection. Format: pin_len pin[pin_len].",
+      "display_name": "check pin"
+    },
+    "cmd_clear_nvs": {
+      "category": "commands",
+      "label": "clear nvs",
+      "description": "Clear internal storage; resets values to defaults and deletes LoRaWAN keys.",
+      "display_name": "clear nvs"
+    },
+    "cmd_decouple_collar": {
+      "category": "commands",
+      "label": "decouple collar",
+      "description": "CollarEdge: power the decoupling connector for 5 seconds.",
+      "display_name": "decouple collar"
+    },
+    "cmd_disable_bt_th": {
+      "category": "commands",
+      "label": "disable bt th",
+      "description": "Disable BT thread; BT module will be inactive.",
+      "display_name": "disable bt th"
+    },
+    "cmd_disable_flash_th": {
+      "category": "commands",
+      "label": "disable flash th",
+      "description": "Disable flash thread; nothing stored to flash.",
+      "display_name": "disable flash th"
+    },
+    "cmd_fence_measure": {
+      "category": "commands",
+      "label": "fence measure",
+      "description": "Measure fence voltage.",
+      "display_name": "fence measure"
+    },
+    "cmd_flash_clear": {
+      "category": "commands",
+      "label": "flash clear",
+      "description": "Clear all data from external flash.",
+      "display_name": "flash clear"
+    },
+    "cmd_flash_clear_confirmed": {
+      "category": "commands",
+      "label": "delete confirmed logs",
+      "description": "Erase whole flash sectors from the oldest logs onward as long as every record in them was confirmed delivered over the selected medium (or any medium). Stops at the first sector with an unconfirmed record. Replies with cmd_confirm 1 (done) or 0 (busy or failed). Firmware 8.2 (beta).",
+      "display_name": "delete confirmed logs",
+      "options": [
+        { "value": 0, "label": "Confirmed over any medium" },
+        { "value": 8, "label": "Confirmed by an LP0 station" },
+        { "value": 4, "label": "Confirmed over LoRaWAN" },
+        { "value": 2, "label": "Confirmed over Bluetooth" },
+        { "value": 1, "label": "Confirmed over satellite" }
+      ]
+    },
+    "cmd_offload_start": {
+      "category": "commands",
+      "label": "start offload",
+      "description": "Start a manual transfer of saved records: medium (0 LP0, 1 LoRaWAN, 2 satellite, 3 Bluetooth), selection (0 all, 1 confirmed, 2 unconfirmed over that medium), port (0 all, or 1 to 32). The reply carries the job ID, state and result; a Bluetooth transfer streams the records on port 29 and ends without a further message. Firmware 8.2 (beta).",
+      "display_name": "start offload"
+    },
+    "cmd_offload_cancel": {
+      "category": "commands",
+      "label": "cancel offload",
+      "description": "Cancel the current manual or automatic offload: job ID as uint32, or 0 for whatever runs. Firmware 8.2 (beta).",
+      "display_name": "cancel offload"
+    },
+    "cmd_flash_get_all": {
+      "category": "commands",
+      "label": "flash get all",
+      "description": "Get all messages on a port (port=0 for all). Returns messages then msg_cmd_confirm.",
+      "display_name": "flash get all",
+      "input": {
+        "label": "Port",
+        "placeholder": "0",
+        "format": "uint8"
+      }
+    },
+    "cmd_flash_get_from_head": {
+      "category": "commands",
+      "label": "flash get from head",
+      "description": "Read a specific number of messages from a given port, starting at a chosen message.",
+      "display_name": "flash get from head"
+    },
+    "cmd_get_ble_scan": {
+      "category": "commands",
+      "label": "get ble scan",
+      "description": "Get aggregated BT scan data (msg_ble_scan_aggregated).",
+      "display_name": "get ble scan"
+    },
+    "cmd_get_flash_status": {
+      "category": "commands",
+      "label": "get flash status",
+      "description": "Request flash status message.",
+      "display_name": "get flash status"
+    },
+    "cmd_get_lr_satellite_data": {
+      "category": "commands",
+      "label": "get lr satellite data",
+      "description": "Perform LR GNSS scan and return GNSS + satellite data.",
+      "display_name": "get lr satellite data"
+    },
+    "cmd_get_mac": {
+      "category": "commands",
+      "label": "get mac",
+      "description": "Get BT MAC address (msg_mac_id).",
+      "display_name": "get mac"
+    },
+    "cmd_get_rf_scan": {
+      "category": "commands",
+      "label": "get rf scan",
+      "description": "Get RF scan (not implemented).",
+      "display_name": "get rf scan"
+    },
+    "cmd_get_ublox_fix": {
+      "category": "commands",
+      "label": "get ublox fix",
+      "description": "Perform u-blox fix and return position message.",
+      "display_name": "get ublox fix"
+    },
+    "cmd_get_ublox_satellite_data": {
+      "category": "commands",
+      "label": "get ublox satellite data",
+      "description": "Perform u-blox fix and return position + satellite data.",
+      "display_name": "get ublox satellite data"
+    },
+    "cmd_get_wifi_scan": {
+      "category": "commands",
+      "label": "get wifi scan",
+      "description": "Get aggregated WiFi scan data (msg_wifi_scan_aggregated).",
+      "display_name": "get wifi scan"
+    },
+    "cmd_join": {
+      "category": "commands",
+      "label": "join",
+      "description": "Start LoRaWAN joining sequence. If already joined, leave and re-join.",
+      "display_name": "join"
+    },
+    "cmd_pause_rf_scan": {
+      "category": "commands",
+      "label": "pause rf scan",
+      "description": "Pause RF scanning. Use payload 0 to pause, 1 to unpause.",
+      "display_name": "pause rf scan",
+      "options": [
+        {
+          "value": 0,
+          "label": "Pause RF scanning"
+        },
+        {
+          "value": 1,
+          "label": "Unpause RF scanning"
+        }
+      ]
+    },
+    "cmd_read_all_lr_messages": {
+      "category": "commands",
+      "label": "read all lr messages",
+      "description": "Debug only (Bluetooth). Read and remove all queued LoRaWAN thread messages.",
+      "display_name": "read all lr messages"
+    },
+    "cmd_reset": {
+      "category": "commands",
+      "label": "reset",
+      "description": "Reboot tracker.",
+      "display_name": "reset"
+    },
+    "cmd_reset_gps": {
+      "category": "commands",
+      "label": "reset gps",
+      "description": "Reboot u-blox GPS module.",
+      "display_name": "reset gps"
+    },
+    "cmd_reset_initial_position": {
+      "category": "commands",
+      "label": "reset initial position",
+      "description": "Reset initial reference position to hardcoded value (not recommended).",
+      "display_name": "reset initial position"
+    },
+    "cmd_reset_initial_time": {
+      "category": "commands",
+      "label": "reset initial time",
+      "description": "Reset initial reference time to hardcoded value (not recommended).",
+      "display_name": "reset initial time"
+    },
+    "cmd_reset_lr": {
+      "category": "commands",
+      "label": "reset lr",
+      "description": "Reset LR module.",
+      "display_name": "reset lr"
+    },
+    "cmd_reset_to_def_settings": {
+      "category": "commands",
+      "label": "reset to def settings",
+      "description": "Revert settings to defaults; LoRaWAN keys will be deleted.",
+      "display_name": "reset to def settings"
+    },
+    "cmd_s_band_send": {
+      "category": "commands",
+      "label": "s band send",
+      "description": "Compose and send an s-band message.",
+      "display_name": "s band send"
+    },
+    "cmd_send_all_settings": {
+      "category": "commands",
+      "label": "send all settings",
+      "description": "Return all settings in stacked format. Not supported via LoRa due to payload size.",
+      "display_name": "send all settings"
+    },
+    "cmd_send_all_val": {
+      "category": "commands",
+      "label": "send all val",
+      "description": "Return all values in stacked format. Not recommended via LoRa due to payload size.",
+      "display_name": "send all val"
+    },
+    "cmd_send_bt_cmdq_results": {
+      "category": "commands",
+      "label": "send bt cmdq results",
+      "description": "Send latest CMDQ scan results (does not start a new scan).",
+      "display_name": "send bt cmdq results"
+    },
+    "cmd_send_lr_fix": {
+      "category": "commands",
+      "label": "send lr fix",
+      "description": "Obtain LR GNSS message and send via LoRa.",
+      "display_name": "send lr fix"
+    },
+    "cmd_send_lr_message": {
+      "category": "commands",
+      "label": "send lr message",
+      "description": "Send message to device to be sent via LR. Format: data_len data[data_len] (up to 46 bytes).",
+      "display_name": "send lr message"
+    },
+    "cmd_send_position": {
+      "category": "commands",
+      "label": "send position",
+      "description": "Send last known GPS position (no new fix). Responds with msg_last_position on port 31.",
+      "display_name": "send position"
+    },
+    "cmd_send_sat_buffer": {
+      "category": "commands",
+      "label": "send sat buffer",
+      "description": "Send a satellite message.",
+      "display_name": "send sat buffer"
+    },
+    "cmd_send_single_setting": {
+      "category": "commands",
+      "label": "send single setting",
+      "description": "Get a single setting by id. Format: setting_id setting_length [setting bytes].",
+      "display_name": "send single setting",
+      "input": {
+        "label": "Setting",
+        "placeholder": "0x01",
+        "format": "hex8",
+        "source": "settings"
+      }
+    },
+    "cmd_send_single_val": {
+      "category": "commands",
+      "label": "send single val",
+      "description": "Get a single value by id. Format: value_id value_length [value bytes].",
+      "display_name": "send single val",
+      "input": {
+        "label": "Value",
+        "placeholder": "0xD1",
+        "format": "hex8",
+        "source": "values"
+      }
+    },
+    "cmd_send_status": {
+      "category": "commands",
+      "label": "send status",
+      "description": "Send status message via LoRa/BT to status port 4.",
+      "display_name": "send status"
+    },
+    "cmd_send_status_lr": {
+      "category": "commands",
+      "label": "send status lr",
+      "description": "Send status message via LoRa to status port 4.",
+      "display_name": "send status lr"
+    },
+    "cmd_send_timestamp": {
+      "category": "commands",
+      "label": "send timestamp",
+      "description": "Send current unix timestamp.",
+      "display_name": "send timestamp"
+    },
+    "cmd_set_hibernation_mode": {
+      "category": "commands",
+      "label": "set hibernation mode",
+      "description": "Enter hibernation mode (like reed switch). Only magnet can reboot; BT and LoRaWAN disabled.",
+      "display_name": "set hibernation mode"
+    },
+    "cmd_set_location_and_time": {
+      "category": "commands",
+      "label": "set location and time",
+      "description": "Set reference location and time. Payload: lon*1e7 int32, lat*1e7 int32, unix time uint32.",
+      "display_name": "set location and time"
+    },
+    "cmd_set_operation_mode_com_th": {
+      "category": "commands",
+      "label": "set operation mode com th",
+      "description": "Set LoRa/GPS thread mode: 0 disabled, 1 low power, 2 normal.",
+      "display_name": "set operation mode com th",
+      "options": [
+        {
+          "value": 0,
+          "label": "Disabled"
+        },
+        {
+          "value": 1,
+          "label": "Low power"
+        },
+        {
+          "value": 2,
+          "label": "Normal operation"
+        }
+      ]
+    },
+    "cmd_set_operation_mode_main_th": {
+      "category": "commands",
+      "label": "set operation mode main th",
+      "description": "Set main thread mode: 0 disabled, 1 low power, 2 normal (BT advertising off for 0/1).",
+      "display_name": "set operation mode main th",
+      "options": [
+        {
+          "value": 0,
+          "label": "Disabled (BT advertising off)"
+        },
+        {
+          "value": 1,
+          "label": "Low power (BT advertising off)"
+        },
+        {
+          "value": 2,
+          "label": "Normal operation"
+        }
+      ]
+    },
+    "cmd_single_bt_scan": {
+      "category": "commands",
+      "label": "single bt scan",
+      "description": "Internal: initiate periodic single BT scan between threads.",
+      "display_name": "single bt scan"
+    },
+    "cmd_recover_sd": {
+      "category": "commands",
+      "label": "recover SD card",
+      "description": "Ask an offload station to check its SD card now. A healthy station only produces a fresh statistics report (port 23); a station with a failed card runs its recovery test (write, close and read back a test file) and gets ten new reader reset attempts. No reply on success; cmd_confirm 0 when refused (not an active offload station). Firmware 8.2 (beta).",
+      "display_name": "recover SD card"
+    }
+  }
+}

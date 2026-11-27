@@ -95,3 +95,11 @@ On the Settings tab, the card "Settings files":
 The credentials (`app_key`, `device_eui`, `app_eui`, `device_name`, `device_pin`, the LP0 keys and the S-Band keys, the app's own list) are kept in the stored file. A download holds them only for a person who may control the device and leaves the switch "Downloads with device credentials" on; every such download is in the audit log. Anyone else who may read the device gets the file without them.
 
 The API: `GET` and `POST /devices/{id}/settings-files`, `POST .../settings-files/snapshot` (the browser's Bluetooth read), `GET .../settings-files/current/download`, `GET .../settings-files/{file_id}/download` (both with `?credentials=true`), `DELETE .../settings-files/{file_id}`. At most 200 files are listed and a file is at most 64 kB.
+
+## Settings by topic
+
+The Settings tab opens with the device's settings by topic (decisions D431 and D432): the guided panels of the Smart Parks settings app, read against what Protect knows. A topic is one line with a sentence that says what the device does; a click opens its settings with readable names, durations in words, and where a setting has no meaning in the current choice, the reason. A topic says its sentence only when Protect knows every setting of it; until then it says how many it knows. Connect the device over Bluetooth once and everything is known.
+
+Below the topics are the settings files and "All settings": every setting by its firmware name with where its value came from, and the pencil to change one.
+
+The names, panels and rules are three files of the app (`settings-meta.json`, `panels/panel-definitions.js`, `panels/panel-engine.js`), copied into `services/frontend/src/vendor/ble-settings-app/` at the commit in `pin.json`. The app releases them under MIT as well. They are never edited in Protect: change them in the app, then run `uv run scripts/sync_settings_panels.py`. Their texts are English in every interface language.

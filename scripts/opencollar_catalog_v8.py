@@ -198,6 +198,9 @@ def build(source: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:
         "families": True,
         "source": SOURCE,
         "settings_family": {k: _byte(v) for k, v in source["settings_family"].items()},
+        # the message ports by name, for the settings that are a bit per port (the send, store,
+        # confirm and join flags): bit n - 1 is port n
+        "ports": {k: int(v) for k, v in source["ports"].items()},
         "settings": settings,
         "commands": commands,
         "values": values,

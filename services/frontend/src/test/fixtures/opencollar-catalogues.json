@@ -1,0 +1,1597 @@
+{
+ "v7": {
+  "firmware": "7.3.0",
+  "families": false,
+  "ports": {
+   "port_lr_gps": 1,
+   "port_ublox_gps": 2,
+   "port_settings": 3,
+   "port_status": 4,
+   "port_lr_sat_data": 5,
+   "port_wifi_scan_aggregated": 6,
+   "port_ble_scan_aggregated": 7,
+   "port_ublox_sat_data": 9,
+   "port_wifi_scan": 10,
+   "port_ble_scan": 11,
+   "port_fence": 12,
+   "port_ublox_short_message": 13,
+   "port_flash_status": 14,
+   "port_ble_cmdq": 15,
+   "port_ublox_resend_location": 16,
+   "port_timestamp": 18,
+   "port_external_switch_detection": 19,
+   "port_external_switch_detection_status": 20,
+   "port_air_quality": 21,
+   "port_lp0_ping": 22,
+   "port_memfault": 27,
+   "port_lr_messaging": 28,
+   "port_flash_log": 29,
+   "port_values": 30,
+   "port_messages": 31,
+   "port_commands": 32,
+   "port_lp0_commands": 33
+  },
+  "settings": [
+   {
+    "name": "tracker_type",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_gps_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_send_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "status_send_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "satellite_send_interval",
+    "type": "uint32",
+    "default": 86400,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_init_lon",
+    "type": "int32",
+    "default": 156447700,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_init_lat",
+    "type": "int32",
+    "default": 465556280,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "init_time",
+    "type": "uint32",
+    "default": 1606314575,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_adv",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gnss_assisted_scan",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "gps_resend_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "data_log",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_send_flag",
+    "type": "uint32",
+    "default": 4162715375,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "flash_store_flag",
+    "type": "uint32",
+    "default": 876143,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_adr",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_region",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "app_key",
+    "type": "byte_array",
+    "default": "8bcd49421167dd03bad3aeea98efe409",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "device_eui",
+    "type": "byte_array",
+    "default": "0000000000000000",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "app_eui",
+    "type": "byte_array",
+    "default": "0000000000000000",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "horizontal_accuracy",
+    "type": "uint32",
+    "default": 50,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "cold_fix_retry",
+    "type": "uint8",
+    "default": 200,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "hot_fix_retry",
+    "type": "uint8",
+    "default": 4,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "cold_fix_timeout",
+    "type": "uint16",
+    "default": 200,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "hot_fix_timeout",
+    "type": "uint16",
+    "default": 65,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_advertisement_interval",
+    "type": "uint32",
+    "default": 500,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "wifi_scan_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "wifi_scan_aggregated_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_duration",
+    "type": "uint32",
+    "default": 600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_aggregated_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_filter",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_auto_disconnect",
+    "type": "uint32",
+    "default": 600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "s_band_send_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "device_name",
+    "type": "string",
+    "default": "",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_join_flag",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_confirm_flag",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_max_confirm_fail",
+    "type": "uint16",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_backoff_factor",
+    "type": "uint8",
+    "default": 10,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_send_interval_2",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_interval1_start",
+    "type": "uint8",
+    "default": 11,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "ublox_min_fix_time",
+    "type": "uint8",
+    "default": 5,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_multiple_intervals",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "device_pin",
+    "type": "byte_array",
+    "default": "00000000",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_active_tracking",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "led_enabled",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "motion_ths",
+    "type": "uint8",
+    "default": 6,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "enable_motion_trig_gps",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_triggered_interval",
+    "type": "uint32",
+    "default": 60,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_skipped_triggered_interval",
+    "type": "uint8",
+    "default": 5,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_messaging_retry_interval",
+    "type": "uint32",
+    "default": 60,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_messaging_retry_count",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_leave_on",
+    "type": "uint8",
+    "default": 15,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "memfault_send_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "rejoin_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "check_error_interval",
+    "type": "uint32",
+    "default": 86400,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gnss_constellation_to_use",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_min_satellites_timer",
+    "type": "uint8",
+    "default": 30,
+    "since_firmware": null
+   },
+   {
+    "name": "sat_send_flag",
+    "type": "uint32",
+    "default": 16522,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "satellite_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "satellite_retry",
+    "type": "uint8",
+    "default": 10,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_interval",
+    "type": "uint32",
+    "default": 60,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_sampling_length",
+    "type": "uint16",
+    "default": 10,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_mv_scaling_factor",
+    "type": "uint32",
+    "default": 100000,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "flash_status_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lp0_app_key",
+    "type": "byte_array",
+    "default": "ec7f380e7adfb2e5c9bbde5ac21694a8",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_network_key",
+    "type": "byte_array",
+    "default": "db7e2726cff58c133a07b5a1b400e1d0",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_dev_addr",
+    "type": "byte_array",
+    "default": "260bf6ef",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "ble_scan_report_zero_connections_found",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "wifi_scan_report_zero_connections_found",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_scan_duration",
+    "type": "uint32",
+    "default": 10000,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_search_interval",
+    "type": "uint32",
+    "default": 300,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_on_no_detection_wait_duration",
+    "type": "uint32",
+    "default": 1800,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_searched_mac_address",
+    "type": "byte_array",
+    "default": "d81068acdae4",
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_reporting_interval",
+    "type": "uint32",
+    "default": 300,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "s_band_rf_frequency_hz",
+    "type": "uint32",
+    "default": 2008450000,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_report_zero_messages_to_be_sent",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "ublox_interval2_start",
+    "type": "uint8",
+    "default": 19,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "lr_adr_profile",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "ublox_min_satellites",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "external_switch_detection_gpio_pin_power_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "vhf_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval1",
+    "type": "uint32",
+    "default": 2,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval2",
+    "type": "uint32",
+    "default": 2,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval1_start",
+    "type": "uint8",
+    "default": 7,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval2_start",
+    "type": "uint8",
+    "default": 19,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_multiple_intervals",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_num_of_packets_per_burst",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_time_between_packets_ms",
+    "type": "uint16",
+    "default": 250,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_external_path",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_tx_frequency_khz",
+    "type": "uint32",
+    "default": 150000,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_single_pulse_duration_ms",
+    "type": "uint16",
+    "default": 18,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "s_band_send_mode",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "fence_led_blink",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "gps_motion_triggered_min_num_of_triggers_per_interval",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "ble_scan_manufacturer_id",
+    "type": "uint16",
+    "default": 2657,
+    "since_firmware": "6.12.1"
+   },
+   {
+    "name": "accel_movement_data_fifo_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "accel_odr_hz",
+    "type": "uint16",
+    "default": 12,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "accel_g_scale",
+    "type": "uint8",
+    "default": 2,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_send_interval2",
+    "type": "uint32",
+    "default": 86400,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_send_interval2_start",
+    "type": "uint8",
+    "default": 19,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_multiple_intervals",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_interval1_start",
+    "type": "uint8",
+    "default": 7,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "outdoor_detection_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "outdoor_detection_tau",
+    "type": "uint8",
+    "default": 11,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "outdoor_detection_parameters",
+    "type": "byte_array",
+    "default": "cbec6b122a13790f201c0000",
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "ublox_cold_fix_hour_interval",
+    "type": "uint16",
+    "default": 0,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_trigger_type",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_trigger_debounce_ms",
+    "type": "uint16",
+    "default": 50,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_reporting_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_send_inactivity_report",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_minimal_report_duration_ms",
+    "type": "uint16",
+    "default": 250,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_input_pull",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_counter_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "air_quality_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "air_quality_interval",
+    "type": "uint32",
+    "default": 300,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_send_flag",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_tx_frequency_hz",
+    "type": "uint32",
+    "default": 869150000,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_rx_frequency_hz",
+    "type": "uint32",
+    "default": 869150000,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_communication_params",
+    "type": "byte_array",
+    "default": "07050101",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_node_params",
+    "type": "byte_array",
+    "default": "00000a013c",
+    "since_firmware": "7.0.0"
+   }
+  ]
+ },
+ "v8": {
+  "firmware": "8.2.0",
+  "families": true,
+  "ports": {
+   "port_lr_gps": 1,
+   "port_ublox_gps": 2,
+   "port_settings": 3,
+   "port_status": 4,
+   "port_lr_sat_data": 5,
+   "port_wifi_scan_aggregated": 6,
+   "port_ble_scan_aggregated": 7,
+   "port_ublox_sat_data": 9,
+   "port_wifi_scan": 10,
+   "port_ble_scan": 11,
+   "port_fence": 12,
+   "port_ublox_short_message": 13,
+   "port_flash_status": 14,
+   "port_ble_cmdq": 15,
+   "port_ublox_resend_location": 16,
+   "port_timestamp": 18,
+   "port_external_switch_detection": 19,
+   "port_external_switch_detection_status": 20,
+   "port_air_quality": 21,
+   "port_lp0_ping": 22,
+   "port_lp0_statistics": 23,
+   "port_memfault": 27,
+   "port_lr_messaging": 28,
+   "port_flash_log": 29,
+   "port_values": 30,
+   "port_messages": 31,
+   "port_commands": 32,
+   "port_lp0_commands": 33
+  },
+  "settings": [
+   {
+    "name": "tracker_type",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "status_send_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "init_time",
+    "type": "uint32",
+    "default": 1787788800,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "data_log",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "wifi_scan_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "wifi_scan_aggregated_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "device_name",
+    "type": "string",
+    "default": "",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "device_pin",
+    "type": "byte_array",
+    "default": "00000000",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "led_enabled",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "memfault_send_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "check_error_interval",
+    "type": "uint32",
+    "default": 86400,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "flash_status_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "wifi_scan_report_zero_connections_found",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "lr_send_flag",
+    "type": "uint32",
+    "default": 4162715375,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "flash_store_flag",
+    "type": "uint32",
+    "default": 5070447,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "sat_send_flag",
+    "type": "uint32",
+    "default": 16522,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_adv",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_advertisement_interval",
+    "type": "uint32",
+    "default": 500,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_duration",
+    "type": "uint32",
+    "default": 600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_aggregated_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_filter",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_auto_disconnect",
+    "type": "uint32",
+    "default": 600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ble_scan_report_zero_connections_found",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_scan_duration",
+    "type": "uint32",
+    "default": 10000,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_search_interval",
+    "type": "uint32",
+    "default": 300,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_on_no_detection_wait_duration",
+    "type": "uint32",
+    "default": 1800,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_searched_mac_address",
+    "type": "byte_array",
+    "default": "d81068acdae4",
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_reporting_interval",
+    "type": "uint32",
+    "default": 300,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "cmdq_report_zero_messages_to_be_sent",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "ble_scan_manufacturer_id",
+    "type": "uint16",
+    "default": 2657,
+    "since_firmware": "6.12.1"
+   },
+   {
+    "name": "lr_gps_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gnss_assisted_scan",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "lr_adr",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_region",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "app_key",
+    "type": "byte_array",
+    "default": "8bcd49421167dd03bad3aeea98efe409",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "device_eui",
+    "type": "byte_array",
+    "default": "0000000000000000",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "app_eui",
+    "type": "byte_array",
+    "default": "0000000000000000",
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "s_band_send_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "lr_join_flag",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_confirm_flag",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_max_confirm_fail",
+    "type": "uint16",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_messaging_retry_interval",
+    "type": "uint32",
+    "default": 60,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lr_messaging_retry_count",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "rejoin_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "lp0_app_key",
+    "type": "byte_array",
+    "default": "ec7f380e7adfb2e5c9bbde5ac21694a8",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_network_key",
+    "type": "byte_array",
+    "default": "db7e2726cff58c133a07b5a1b400e1d0",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_dev_addr",
+    "type": "byte_array",
+    "default": "260bf6ef",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "s_band_rf_frequency_hz",
+    "type": "uint32",
+    "default": 2008450000,
+    "since_firmware": "5.0.1"
+   },
+   {
+    "name": "lr_adr_profile",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval1",
+    "type": "uint32",
+    "default": 2,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval2",
+    "type": "uint32",
+    "default": 2,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval1_start",
+    "type": "uint8",
+    "default": 7,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_interval2_start",
+    "type": "uint8",
+    "default": 19,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_multiple_intervals",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_num_of_packets_per_burst",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_time_between_packets_ms",
+    "type": "uint16",
+    "default": 250,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_external_path",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_tx_frequency_khz",
+    "type": "uint32",
+    "default": 150000,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "vhf_single_pulse_duration_ms",
+    "type": "uint16",
+    "default": 18,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "s_band_send_mode",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "lp0_send_flag",
+    "type": "uint32",
+    "default": 4194304,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_tx_frequency_hz",
+    "type": "uint32",
+    "default": 869150000,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_rx_frequency_hz",
+    "type": "uint32",
+    "default": 869150000,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_communication_params",
+    "type": "byte_array",
+    "default": "07050101",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_node_params",
+    "type": "byte_array",
+    "default": "00000a013c",
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_focus_offloading",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "8.1.0"
+   },
+   {
+    "name": "lp0_signal_checks",
+    "type": "byte_array",
+    "default": "010101640014",
+    "since_firmware": "8.1.0"
+   },
+   {
+    "name": "lp0_statistics_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "8.1.0"
+   },
+   {
+    "name": "lr_enabled",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "8.2.0"
+   },
+   {
+    "name": "lp0_gps_before_start",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "8.2.0"
+   },
+   {
+    "name": "lp0_discovery_retry_count",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "8.2.0"
+   },
+   {
+    "name": "ublox_send_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_init_lon",
+    "type": "int32",
+    "default": 156447700,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_init_lat",
+    "type": "int32",
+    "default": 465556280,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_resend_interval",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "horizontal_accuracy",
+    "type": "uint32",
+    "default": 50,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "cold_fix_retry",
+    "type": "uint8",
+    "default": 200,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "hot_fix_retry",
+    "type": "uint8",
+    "default": 4,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "cold_fix_timeout",
+    "type": "uint16",
+    "default": 200,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "hot_fix_timeout",
+    "type": "uint16",
+    "default": 65,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_backoff_factor",
+    "type": "uint8",
+    "default": 10,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_send_interval_2",
+    "type": "uint32",
+    "default": 0,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_interval1_start",
+    "type": "uint8",
+    "default": 11,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "ublox_min_fix_time",
+    "type": "uint8",
+    "default": 5,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_multiple_intervals",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_active_tracking",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_triggered_interval",
+    "type": "uint32",
+    "default": 60,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gps_skipped_triggered_interval",
+    "type": "uint8",
+    "default": 5,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_leave_on",
+    "type": "uint8",
+    "default": 15,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "gnss_constellation_to_use",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_min_satellites_timer",
+    "type": "uint8",
+    "default": 30,
+    "since_firmware": "7.3.0"
+   },
+   {
+    "name": "ublox_interval2_start",
+    "type": "uint8",
+    "default": 19,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "ublox_min_satellites",
+    "type": "uint8",
+    "default": 3,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "gps_motion_triggered_min_num_of_triggers_per_interval",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "enable_motion_trig_gps",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "ublox_cold_fix_hour_interval",
+    "type": "uint16",
+    "default": 0,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "ublox_require_time",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "8.2.0"
+   },
+   {
+    "name": "satellite_send_interval",
+    "type": "uint32",
+    "default": 86400,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "satellite_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "satellite_retry",
+    "type": "uint8",
+    "default": 10,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "satellite_send_interval2",
+    "type": "uint32",
+    "default": 86400,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_send_interval2_start",
+    "type": "uint8",
+    "default": 19,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_multiple_intervals",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "satellite_interval1_start",
+    "type": "uint8",
+    "default": 7,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "motion_ths",
+    "type": "uint8",
+    "default": 6,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_interval",
+    "type": "uint32",
+    "default": 60,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_sampling_length",
+    "type": "uint16",
+    "default": 10,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "fence_mv_scaling_factor",
+    "type": "uint32",
+    "default": 100000,
+    "since_firmware": "4.4.2"
+   },
+   {
+    "name": "external_switch_detection_gpio_pin_power_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "fence_led_blink",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.8.1"
+   },
+   {
+    "name": "accel_movement_data_fifo_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "accel_odr_hz",
+    "type": "uint16",
+    "default": 12,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "accel_g_scale",
+    "type": "uint8",
+    "default": 2,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "outdoor_detection_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "outdoor_detection_tau",
+    "type": "uint8",
+    "default": 11,
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "outdoor_detection_parameters",
+    "type": "byte_array",
+    "default": "cbec6b122a13790f201c0000",
+    "since_firmware": "6.14.1"
+   },
+   {
+    "name": "external_switch_detection_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_trigger_type",
+    "type": "uint8",
+    "default": 0,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_trigger_debounce_ms",
+    "type": "uint16",
+    "default": 50,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_detection_reporting_interval",
+    "type": "uint32",
+    "default": 3600,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_send_inactivity_report",
+    "type": "bool",
+    "default": true,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_minimal_report_duration_ms",
+    "type": "uint16",
+    "default": 250,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_input_pull",
+    "type": "uint8",
+    "default": 1,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "external_switch_counter_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "6.15.0"
+   },
+   {
+    "name": "air_quality_enabled",
+    "type": "bool",
+    "default": false,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "air_quality_interval",
+    "type": "uint32",
+    "default": 300,
+    "since_firmware": "7.0.0"
+   },
+   {
+    "name": "lp0_master_key",
+    "type": "byte_array",
+    "default": "00000000000000000000000000000000",
+    "since_firmware": "8.1.0"
+   }
+  ]
+ }
+}

@@ -33973,6 +33973,20 @@
       "type": "integer",
       "title": "Known"
      },
+     "families": {
+      "type": "boolean",
+      "title": "Families",
+      "description": "The catalogue addresses settings by family and id (firmware 7.4 and later)",
+      "default": false
+     },
+     "ports": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Ports",
+      "description": "The message ports by name, for the settings that hold a bit per port"
+     },
      "items": {
       "items": {
        "$ref": "#/components/schemas/DeviceSettingRead"
